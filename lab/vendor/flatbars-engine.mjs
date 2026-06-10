@@ -4009,7 +4009,7 @@ var stripParents = function($copy_s) {
         };
       }
       ;
-      throw new Error("Failed pattern match at ClassicBars.Surface (line 718, column 24 - line 720, column 32): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at ClassicBars.Surface (line 737, column 24 - line 739, column 32): " + [v.constructor.name]);
     }
     ;
     while (!$tco_done) {
@@ -4077,7 +4077,7 @@ var splitOnIn = function(args) {
     return Nothing.value;
   }
   ;
-  throw new Error("Failed pattern match at ClassicBars.Surface (line 301, column 18 - line 303, column 21): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at ClassicBars.Surface (line 302, column 18 - line 304, column 21): " + [v.constructor.name]);
 };
 var splitFirstEq = function(s) {
   var v = indexOf("=")(s);
@@ -4095,12 +4095,12 @@ var splitFirstEq = function(s) {
     };
   }
   ;
-  throw new Error("Failed pattern match at ClassicBars.Surface (line 470, column 18 - line 472, column 34): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at ClassicBars.Surface (line 471, column 18 - line 473, column 34): " + [v.constructor.name]);
 };
 var segmentsOf = function(s) {
   var flush = function(st) {
-    var $131 = st.cur === "";
-    if ($131) {
+    var $134 = st.cur === "";
+    if ($134) {
       return st;
     }
     ;
@@ -4113,8 +4113,8 @@ var segmentsOf = function(s) {
   var step2 = function(st) {
     return function(c) {
       if (st.inB) {
-        var $134 = c === "]";
-        if ($134) {
+        var $137 = c === "]";
+        if ($137) {
           return {
             cur: st.cur,
             segs: st.segs,
@@ -4150,7 +4150,7 @@ var segmentsOf = function(s) {
         };
       }
       ;
-      throw new Error("Failed pattern match at ClassicBars.Surface (line 744, column 3 - line 748, column 53): " + [st.constructor.name, c.constructor.name]);
+      throw new Error("Failed pattern match at ClassicBars.Surface (line 763, column 3 - line 767, column 53): " + [st.constructor.name, c.constructor.name]);
     };
   };
   var $$final = foldl3(step2)({
@@ -4178,7 +4178,7 @@ var segKey = function(seg) {
     return new Lit(new VString(seg));
   }
   ;
-  throw new Error("Failed pattern match at ClassicBars.Surface (line 753, column 14 - line 755, column 31): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at ClassicBars.Surface (line 772, column 14 - line 774, column 31): " + [v.constructor.name]);
 };
 var retiredLetViolation = function(nodes) {
   var node2 = function(v) {
@@ -4208,7 +4208,7 @@ var reservedScope = function(lv) {
       return lv(name2);
     }
     ;
-    throw new Error("Failed pattern match at ClassicBars.Surface (line 118, column 1 - line 118, column 38): " + [lv.constructor.name, name2.constructor.name]);
+    throw new Error("Failed pattern match at ClassicBars.Surface (line 119, column 1 - line 119, column 38): " + [lv.constructor.name, name2.constructor.name]);
   };
 };
 var $lazy_renameSurfaceHeads = /* @__PURE__ */ $runtime_lazy3("renameSurfaceHeads", "ClassicBars.Surface", function() {
@@ -4225,14 +4225,14 @@ var $lazy_renameSurfaceHeads = /* @__PURE__ */ $runtime_lazy3("renameSurfaceHead
   };
   var node2 = function(v) {
     if (v instanceof Block) {
-      return new Block(v.value0, v.value1, canonicalHead(v.value2), v.value3, $lazy_renameSurfaceHeads(677)(v.value4));
+      return new Block(v.value0, v.value1, canonicalHead(v.value2), v.value3, $lazy_renameSurfaceHeads(696)(v.value4));
     }
     ;
     return v;
   };
   return map5(node2);
 });
-var renameSurfaceHeads = /* @__PURE__ */ $lazy_renameSurfaceHeads(672);
+var renameSurfaceHeads = /* @__PURE__ */ $lazy_renameSurfaceHeads(691);
 var parents = function(n) {
   if (n <= 0) {
     return new App2("this", []);
@@ -4246,7 +4246,7 @@ var parents = function(n) {
     return new App2("parent", [parents(n - 1 | 0)]);
   }
   ;
-  throw new Error("Failed pattern match at ClassicBars.Surface (line 724, column 1 - line 724, column 23): " + [n.constructor.name]);
+  throw new Error("Failed pattern match at ClassicBars.Surface (line 743, column 1 - line 743, column 23): " + [n.constructor.name]);
 };
 var noLoopVars = function(v) {
   return Nothing.value;
@@ -4307,7 +4307,7 @@ var extractLabel = function(name2) {
       };
     }
     ;
-    throw new Error("Failed pattern match at ClassicBars.Surface (line 421, column 1 - line 421, column 85): " + [name2.constructor.name, args.constructor.name]);
+    throw new Error("Failed pattern match at ClassicBars.Surface (line 422, column 1 - line 422, column 85): " + [name2.constructor.name, args.constructor.name]);
   };
 };
 var expandElseIf = /* @__PURE__ */ (function() {
@@ -4316,11 +4316,11 @@ var expandElseIf = /* @__PURE__ */ (function() {
       return v;
     };
     if (v instanceof Sep && v.value1 === "else") {
-      var $192 = uncons(v.value2);
-      if ($192 instanceof Just && ($192.value0.head instanceof App2 && ($192.value0.head.value0 === "if" && $192.value0.head.value1.length === 0))) {
-        var $193 = !$$null($192.value0.tail);
-        if ($193) {
-          return new Sep(v.value0, "elif", $192.value0.tail);
+      var $195 = uncons(v.value2);
+      if ($195 instanceof Just && ($195.value0.head instanceof App2 && ($195.value0.head.value0 === "if" && $195.value0.head.value1.length === 0))) {
+        var $196 = !$$null($195.value0.tail);
+        if ($196) {
+          return new Sep(v.value0, "elif", $195.value0.tail);
         }
         ;
         return v1(true);
@@ -4333,6 +4333,31 @@ var expandElseIf = /* @__PURE__ */ (function() {
   };
   return map5(toElif);
 })();
+var elseIfViolation = function(nodes) {
+  var node2 = function(v) {
+    var v1 = function(v2) {
+      if (v instanceof Block) {
+        return elseIfViolation(v.value4);
+      }
+      ;
+      return Nothing.value;
+    };
+    if (v instanceof Sep && v.value1 === "else") {
+      var $212 = uncons(v.value2);
+      if ($212 instanceof Just && ($212.value0.head instanceof App2 && ($212.value0.head.value0 === "if" && $212.value0.head.value1.length === 0))) {
+        return new Just({
+          off: v.value0.start,
+          shape: "{% else if \u2026 %} (the chained conditional is spelled {% elif \u2026 %} in RawBars/MaxBars \u2014 `else if` is a ClassicBars/Handlebars-only form)"
+        });
+      }
+      ;
+      return v1(true);
+    }
+    ;
+    return v1(true);
+  };
+  return head(mapMaybe(node2)(nodes));
+};
 var eachLoopViolation = function(nodes) {
   var node2 = function(v) {
     if (v instanceof Block && (v.value1 instanceof Section && v.value2 === "each")) {
@@ -4367,8 +4392,8 @@ var dataExpr = function(raw) {
   var v1 = uncons(segmentsOf(v.rest));
   if (v1 instanceof Just) {
     if (v.depth === 0) {
-      var $216 = $$null(v1.value0.tail);
-      if ($216) {
+      var $234 = $$null(v1.value0.tail);
+      if ($234) {
         return new App2(v1.value0.head, []);
       }
       ;
@@ -4385,7 +4410,7 @@ var dataExpr = function(raw) {
     return new App2("this", []);
   }
   ;
-  throw new Error("Failed pattern match at ClassicBars.Surface (line 554, column 5 - line 568, column 31): " + [v1.constructor.name]);
+  throw new Error("Failed pattern match at ClassicBars.Surface (line 555, column 5 - line 569, column 31): " + [v1.constructor.name]);
 };
 var pathExpr = function(lv) {
   return function(scope) {
@@ -4397,8 +4422,8 @@ var pathExpr = function(lv) {
       if (otherwise) {
         var scopedHead = function(name2) {
           return function(tail2) {
-            var $225 = $$null(tail2);
-            if ($225) {
+            var $243 = $$null(tail2);
+            if ($243) {
               return new App2(name2, []);
             }
             ;
@@ -4417,8 +4442,8 @@ var pathExpr = function(lv) {
           var v2 = uncons(segs);
           if (v2 instanceof Just) {
             if (v1.depth === 0 && elem3(v2.value0.head)(scope)) {
-              var $230 = $$null(v2.value0.tail);
-              if ($230) {
+              var $248 = $$null(v2.value0.tail);
+              if ($248) {
                 return new App2(v2.value0.head, []);
               }
               ;
@@ -4445,19 +4470,19 @@ var pathExpr = function(lv) {
           ;
           var v3 = function(v4) {
             var base = parents(v1.depth);
-            var $234 = $$null(segs);
-            if ($234) {
+            var $252 = $$null(segs);
+            if ($252) {
               return base;
             }
             ;
             return new App2("lookup", cons(base)(map5(segKey)(segs)));
           };
           if (v2 instanceof Just) {
-            var $236 = v1.depth === 0 && $$null(v2.value0.tail);
-            if ($236) {
-              var $237 = lv(raw);
-              if ($237 instanceof Just) {
-                return new App2($237.value0, []);
+            var $254 = v1.depth === 0 && $$null(v2.value0.tail);
+            if ($254) {
+              var $255 = lv(raw);
+              if ($255 instanceof Just) {
+                return new App2($255.value0, []);
               }
               ;
               return v3(true);
@@ -4469,10 +4494,10 @@ var pathExpr = function(lv) {
           return v3(true);
         }
         ;
-        throw new Error("Failed pattern match at ClassicBars.Surface (line 496, column 7 - line 534, column 72): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at ClassicBars.Surface (line 497, column 7 - line 535, column 72): " + [v.constructor.name]);
       }
       ;
-      throw new Error("Failed pattern match at ClassicBars.Surface (line 492, column 1 - line 492, column 47): " + [lv.constructor.name, scope.constructor.name, raw.constructor.name]);
+      throw new Error("Failed pattern match at ClassicBars.Surface (line 493, column 1 - line 493, column 47): " + [lv.constructor.name, scope.constructor.name, raw.constructor.name]);
     };
   };
 };
@@ -4493,10 +4518,10 @@ var hashValue = function(lv) {
           return pathExpr(lv)(scope)(t);
         }
         ;
-        throw new Error("Failed pattern match at ClassicBars.Surface (line 478, column 17 - line 480, column 37): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at ClassicBars.Surface (line 479, column 17 - line 481, column 37): " + [v.constructor.name]);
       }
       ;
-      throw new Error("Failed pattern match at ClassicBars.Surface (line 475, column 1 - line 475, column 49): " + [lv.constructor.name, scope.constructor.name, t.constructor.name]);
+      throw new Error("Failed pattern match at ClassicBars.Surface (line 476, column 1 - line 476, column 49): " + [lv.constructor.name, scope.constructor.name, t.constructor.name]);
     };
   };
 };
@@ -4511,7 +4536,7 @@ var pathOrLit = function(lv) {
         return pathExpr(lv)(scope)(name2);
       }
       ;
-      throw new Error("Failed pattern match at ClassicBars.Surface (line 484, column 1 - line 484, column 48): " + [lv.constructor.name, scope.constructor.name, name2.constructor.name]);
+      throw new Error("Failed pattern match at ClassicBars.Surface (line 485, column 1 - line 485, column 48): " + [lv.constructor.name, scope.constructor.name, name2.constructor.name]);
     };
   };
 };
@@ -4581,8 +4606,8 @@ var asHashKey = function(lv) {
       if (v instanceof App2 && (v.value1.length === 0 && contains("=")(v.value0))) {
         var v1 = splitFirstEq(v.value0);
         return new Just((function() {
-          var $270 = v1.rest === "";
-          if ($270) {
+          var $288 = v1.rest === "";
+          if ($288) {
             return {
               key: v1.key,
               consumesNext: true,
@@ -4606,8 +4631,8 @@ var rewriteArgs = function(lv) {
   return function(scope) {
     return function(args) {
       var h = collectHash(lv)(scope)(args);
-      var $275 = $$null(h.pairs);
-      if ($275) {
+      var $293 = $$null(h.pairs);
+      if ($293) {
         return map5(rewrite(lv)(scope))(h.positional);
       }
       ;
@@ -4633,7 +4658,7 @@ var rewrite = function(lv) {
         ;
       }
       ;
-      throw new Error("Failed pattern match at ClassicBars.Surface (line 376, column 20 - line 380, column 56): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at ClassicBars.Surface (line 377, column 20 - line 381, column 56): " + [v.constructor.name]);
     };
   };
 };
@@ -4679,7 +4704,7 @@ var collectHash = function(lv) {
                 return;
               }
               ;
-              throw new Error("Failed pattern match at ClassicBars.Surface (line 443, column 43 - line 446, column 92): " + [v2.constructor.name]);
+              throw new Error("Failed pattern match at ClassicBars.Surface (line 444, column 43 - line 447, column 92): " + [v2.constructor.name]);
             }
             ;
             if (v1 instanceof Just) {
@@ -4703,10 +4728,10 @@ var collectHash = function(lv) {
               return;
             }
             ;
-            throw new Error("Failed pattern match at ClassicBars.Surface (line 442, column 28 - line 449, column 79): " + [v1.constructor.name]);
+            throw new Error("Failed pattern match at ClassicBars.Surface (line 443, column 28 - line 450, column 79): " + [v1.constructor.name]);
           }
           ;
-          throw new Error("Failed pattern match at ClassicBars.Surface (line 440, column 17 - line 449, column 79): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at ClassicBars.Surface (line 441, column 17 - line 450, column 79): " + [v.constructor.name]);
         }
         ;
         while (!$tco_done) {
@@ -4741,8 +4766,8 @@ var blockHeadArgs = function(lv) {
           var h = collectHash(lv)(scope)(mainArgs);
           var pos = map5(rewrite(lv)(scope))(h.positional);
           var withHash = (function() {
-            var $295 = $$null(h.pairs);
-            if ($295) {
+            var $313 = $$null(h.pairs);
+            if ($313) {
               return pos;
             }
             ;
@@ -4760,8 +4785,8 @@ var partialCall = function(lv) {
       return function(valueArgs) {
         var h = collectHash(lv)(scope)(valueArgs);
         var ctx2 = maybe(new App2("this", []))(rewrite(lv)(scope))(head(h.positional));
-        var $296 = $$null(h.pairs);
-        if ($296) {
+        var $314 = $$null(h.pairs);
+        if ($314) {
           return [nameExpr, ctx2];
         }
         ;
@@ -4793,7 +4818,7 @@ var inlineArgs = function(lv) {
         return [new Lit(new VString(""))];
       }
       ;
-      throw new Error("Failed pattern match at ClassicBars.Surface (line 362, column 28 - line 364, column 34): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at ClassicBars.Surface (line 363, column 28 - line 365, column 34): " + [v.constructor.name]);
     };
   };
 };
@@ -4809,7 +4834,7 @@ var partialArgs = function(lv) {
         return [new Lit(new VString("")), new App2("this", [])];
       }
       ;
-      throw new Error("Failed pattern match at ClassicBars.Surface (line 356, column 29 - line 358, column 49): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at ClassicBars.Surface (line 357, column 29 - line 359, column 49): " + [v.constructor.name]);
     };
   };
 };
@@ -4834,7 +4859,7 @@ var partialExpr = function(lv) {
               };
             }
             ;
-            throw new Error("Failed pattern match at ClassicBars.Surface (line 333, column 13 - line 335, column 65): " + [v1.constructor.name]);
+            throw new Error("Failed pattern match at ClassicBars.Surface (line 334, column 13 - line 336, column 65): " + [v1.constructor.name]);
           }
           ;
           return {
@@ -4863,7 +4888,7 @@ var rewriteHead = function(lv) {
           return new App2(name2, rewriteArgs(lv)(scope)(args));
         }
         ;
-        throw new Error("Failed pattern match at ClassicBars.Surface (line 318, column 1 - line 318, column 64): " + [lv.constructor.name, scope.constructor.name, name2.constructor.name, args.constructor.name]);
+        throw new Error("Failed pattern match at ClassicBars.Surface (line 319, column 1 - line 319, column 64): " + [lv.constructor.name, scope.constructor.name, name2.constructor.name, args.constructor.name]);
       };
     };
   };
@@ -4893,7 +4918,7 @@ var desugarWith = function(lv) {
               });
             }
             ;
-            throw new Error("Failed pattern match at ClassicBars.Surface (line 156, column 43 - line 158, column 62): " + [v2.constructor.name]);
+            throw new Error("Failed pattern match at ClassicBars.Surface (line 157, column 43 - line 159, column 62): " + [v2.constructor.name]);
           }
           ;
           if (v1 instanceof Just) {
@@ -4908,14 +4933,14 @@ var desugarWith = function(lv) {
             return Nothing.value;
           }
           ;
-          throw new Error("Failed pattern match at ClassicBars.Surface (line 155, column 28 - line 160, column 25): " + [v1.constructor.name]);
+          throw new Error("Failed pattern match at ClassicBars.Surface (line 156, column 28 - line 161, column 25): " + [v1.constructor.name]);
         }
         ;
         if (v instanceof Nothing) {
           return Nothing.value;
         }
         ;
-        throw new Error("Failed pattern match at ClassicBars.Surface (line 154, column 28 - line 161, column 23): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at ClassicBars.Surface (line 155, column 28 - line 162, column 23): " + [v.constructor.name]);
       };
     };
     var dropPipes = isJust(lv(reservedMarker));
@@ -4930,8 +4955,8 @@ var desugarWith = function(lv) {
             ;
             if (v instanceof Just) {
               return new Block(sp, Section.value, "local", [new App2("@hash", [new Lit(new VString(v.value0.key)), v.value0.val])], (function() {
-                var $338 = $$null(v.value0.rest);
-                if ($338) {
+                var $356 = $$null(v.value0.rest);
+                if ($356) {
                   return go(append1(scope)([v.value0.key]))(body);
                 }
                 ;
@@ -4939,7 +4964,7 @@ var desugarWith = function(lv) {
               })());
             }
             ;
-            throw new Error("Failed pattern match at ClassicBars.Surface (line 146, column 32 - line 152, column 10): " + [v.constructor.name]);
+            throw new Error("Failed pattern match at ClassicBars.Surface (line 147, column 32 - line 153, column 10): " + [v.constructor.name]);
           };
         };
       };
@@ -4973,7 +4998,7 @@ var desugarWith = function(lv) {
               return new Output(v.value0, new App2("escapeHtml", [rewriteHead(lv)(scope)(v.value1)(v.value2)]));
             }
             ;
-            throw new Error("Failed pattern match at ClassicBars.Surface (line 177, column 24 - line 181, column 87): " + [v1.constructor.name]);
+            throw new Error("Failed pattern match at ClassicBars.Surface (line 178, column 24 - line 182, column 87): " + [v1.constructor.name]);
           }
           ;
         }
@@ -5015,7 +5040,7 @@ var desugarWith = function(lv) {
             return new Block(v.value0, Section.value, "each", blockHeadArgs(lv)(scope)(v1.args)([])(v1.label), go(append1(scope)(maybe([])(pure2)(v1.label)))(expandElseIf(v.value4)));
           }
           ;
-          throw new Error("Failed pattern match at ClassicBars.Surface (line 226, column 11 - line 236, column 72): " + [v2.constructor.name]);
+          throw new Error("Failed pattern match at ClassicBars.Surface (line 227, column 11 - line 237, column 72): " + [v2.constructor.name]);
         }
         ;
         if (v instanceof Block && v.value1 instanceof Section) {
@@ -5034,7 +5059,7 @@ var desugarWith = function(lv) {
           return new RawBlock(v.value0, v.value1, v.value2, v.value3);
         }
         ;
-        throw new Error("Failed pattern match at ClassicBars.Surface (line 166, column 12 - line 259, column 61): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at ClassicBars.Surface (line 167, column 12 - line 260, column 61): " + [v.constructor.name]);
       };
       return map5(node2);
     };
@@ -14888,8 +14913,8 @@ var i18nNote = function(template) {
   var used = filter(function(r) {
     return elem13(r.name)(i18nOpNames);
   })(operationRefs(template));
-  var $90 = $$null(used);
-  if ($90) {
+  var $91 = $$null(used);
+  if ($91) {
     return "";
   }
   ;
@@ -14934,16 +14959,25 @@ var checkSurfaceStrict = function(strict) {
           }
           ;
           if (v1 instanceof Nothing) {
-            return caseLeadingViolation(nodes);
+            var v2 = elseIfViolation(nodes);
+            if (v2 instanceof Just) {
+              return new Just(v2.value0);
+            }
+            ;
+            if (v2 instanceof Nothing) {
+              return caseLeadingViolation(nodes);
+            }
+            ;
+            throw new Error("Failed pattern match at ClassicBars (line 120, column 22 - line 122, column 50): " + [v2.constructor.name]);
           }
           ;
-          throw new Error("Failed pattern match at ClassicBars (line 118, column 20 - line 120, column 48): " + [v1.constructor.name]);
+          throw new Error("Failed pattern match at ClassicBars (line 118, column 20 - line 122, column 50): " + [v1.constructor.name]);
         }
         ;
-        throw new Error("Failed pattern match at ClassicBars (line 116, column 19 - line 120, column 48): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at ClassicBars (line 116, column 19 - line 122, column 50): " + [v.constructor.name]);
       }
       ;
-      throw new Error("Failed pattern match at ClassicBars (line 114, column 3 - line 120, column 48): ");
+      throw new Error("Failed pattern match at ClassicBars (line 114, column 3 - line 122, column 50): ");
     })();
     if (violation instanceof Just) {
       return new Left(new DisallowedShape(violation.value0.shape, violation.value0.off));
@@ -14968,10 +15002,10 @@ var renderSurfaceI18n = function(tr) {
         if (v instanceof Right) {
           var v3 = hoistInline(desugarSurface(v.value0.nodes));
           var v4 = runResolvedLenient2(v.value0.directives)((function() {
-            var $290 = withTranslator(tr);
-            var $291 = registerPartials(v3.partials);
-            return function($292) {
-              return $290($291($292));
+            var $293 = withTranslator(tr);
+            var $294 = registerPartials(v3.partials);
+            return function($295) {
+              return $293($294($295));
             };
           })())(v3.template)(dat);
           if (v4 instanceof Left) {
@@ -14982,15 +15016,15 @@ var renderSurfaceI18n = function(tr) {
             return new Right(v4.value0);
           }
           ;
-          throw new Error("Failed pattern match at ClassicBars (line 411, column 7 - line 415, column 31): " + [v4.constructor.name]);
+          throw new Error("Failed pattern match at ClassicBars (line 413, column 7 - line 417, column 31): " + [v4.constructor.name]);
         }
         ;
-        throw new Error("Failed pattern match at ClassicBars (line 403, column 1 - line 403, column 75): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at ClassicBars (line 405, column 1 - line 405, column 75): " + [v.constructor.name]);
       };
       if (v instanceof Right) {
-        var $117 = checkSurfaceStrict(true)(v.value0.nodes);
-        if ($117 instanceof Left) {
-          return new Left(renderParseErrorAt(src)($117.value0));
+        var $120 = checkSurfaceStrict(true)(v.value0.nodes);
+        if ($120 instanceof Left) {
+          return new Left(renderParseErrorAt(src)($120.value0));
         }
         ;
         return v1(true);
@@ -15016,7 +15050,7 @@ var renderSurfaceWith = function(partialSrcs) {
           });
         }
         ;
-        throw new Error("Failed pattern match at ClassicBars (line 180, column 35 - line 182, column 70): " + [v12.constructor.name]);
+        throw new Error("Failed pattern match at ClassicBars (line 182, column 35 - line 184, column 70): " + [v12.constructor.name]);
       };
       var v = traverse6(compilePartial)(partialSrcs);
       if (v instanceof Left) {
@@ -15045,15 +15079,15 @@ var renderSurfaceWith = function(partialSrcs) {
               return new Right(v5.value0);
             }
             ;
-            throw new Error("Failed pattern match at ClassicBars (line 174, column 11 - line 176, column 35): " + [v5.constructor.name]);
+            throw new Error("Failed pattern match at ClassicBars (line 176, column 11 - line 178, column 35): " + [v5.constructor.name]);
           }
           ;
-          throw new Error("Failed pattern match at ClassicBars (line 161, column 1 - line 161, column 92): " + [v1.constructor.name]);
+          throw new Error("Failed pattern match at ClassicBars (line 163, column 1 - line 163, column 92): " + [v1.constructor.name]);
         };
         if (v1 instanceof Right) {
-          var $143 = checkSurfaceStrict(true)(v1.value0.nodes);
-          if ($143 instanceof Left) {
-            return new Left(renderParseErrorAt(src)($143.value0));
+          var $146 = checkSurfaceStrict(true)(v1.value0.nodes);
+          if ($146 instanceof Left) {
+            return new Left(renderParseErrorAt(src)($146.value0));
           }
           ;
           return v2(true);
@@ -15062,7 +15096,7 @@ var renderSurfaceWith = function(partialSrcs) {
         return v2(true);
       }
       ;
-      throw new Error("Failed pattern match at ClassicBars (line 163, column 3 - line 176, column 35): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at ClassicBars (line 165, column 3 - line 178, column 35): " + [v.constructor.name]);
     };
   };
 };
@@ -15095,16 +15129,16 @@ var checkBraceControl = function(src) {
             return pure7(unit);
           }
           ;
-          throw new Error("Failed pattern match at ClassicBars (line 140, column 18 - line 142, column 29): " + [v3.constructor.name]);
+          throw new Error("Failed pattern match at ClassicBars (line 142, column 18 - line 144, column 29): " + [v3.constructor.name]);
         }
         ;
-        throw new Error("Failed pattern match at ClassicBars (line 138, column 16 - line 142, column 29): " + [v2.constructor.name]);
+        throw new Error("Failed pattern match at ClassicBars (line 140, column 16 - line 144, column 29): " + [v2.constructor.name]);
       }
       ;
-      throw new Error("Failed pattern match at ClassicBars (line 133, column 14 - line 142, column 29): " + [v1.constructor.name]);
+      throw new Error("Failed pattern match at ClassicBars (line 135, column 14 - line 144, column 29): " + [v1.constructor.name]);
     }
     ;
-    throw new Error("Failed pattern match at ClassicBars (line 129, column 31 - line 142, column 29): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at ClassicBars (line 131, column 31 - line 144, column 29): " + [v.constructor.name]);
   };
 };
 var inspectSurfaceDiagWith = function(strict) {
@@ -15128,7 +15162,7 @@ var inspectSurfaceDiagWith = function(strict) {
                     });
                   }
                   ;
-                  throw new Error("Failed pattern match at ClassicBars (line 292, column 35 - line 294, column 75): " + [v12.constructor.name]);
+                  throw new Error("Failed pattern match at ClassicBars (line 294, column 35 - line 296, column 75): " + [v12.constructor.name]);
                 };
                 var v = traverse6(compilePartial)(partialSrcs);
                 if (v instanceof Left) {
@@ -15152,30 +15186,30 @@ var inspectSurfaceDiagWith = function(strict) {
                           return new Tuple(p.name, p.template);
                         })(v.value0));
                         var setup = (function() {
-                          var $293 = registerPartialFiles(partialFiles);
-                          var $294 = withTruthy(truthy);
-                          var $295 = withYieldName((function() {
+                          var $296 = registerPartialFiles(partialFiles);
+                          var $297 = withTruthy(truthy);
+                          var $298 = withYieldName((function() {
                             if (opts.partialBlocks) {
                               return "partial-block";
                             }
                             ;
                             return "yield";
                           })());
-                          var $296 = registerPartials(union6(v6.partials)(externalT));
-                          return function($297) {
-                            return $293($294($295($296($297))));
+                          var $299 = registerPartials(union6(v6.partials)(externalT));
+                          return function($300) {
+                            return $296($297($298($299($300))));
                           };
                         })();
                         return lmap2(formatError(src))(inspectResolvedLenient(setup)(target)(v6.template)(dat));
                       }
                       ;
-                      throw new Error("Failed pattern match at ClassicBars (line 259, column 1 - line 268, column 36): " + [v1.constructor.name]);
+                      throw new Error("Failed pattern match at ClassicBars (line 261, column 1 - line 270, column 36): " + [v1.constructor.name]);
                     };
                     if (v1 instanceof Right) {
                       if (opts.lexConfig.statementTags) {
-                        var $176 = checkBraceControl(src)(v1.value0.nodes);
-                        if ($176 instanceof Left) {
-                          return new Left(renderParseErrorAt(src)($176.value0));
+                        var $179 = checkBraceControl(src)(v1.value0.nodes);
+                        if ($179 instanceof Left) {
+                          return new Left(renderParseErrorAt(src)($179.value0));
                         }
                         ;
                         return v4(true);
@@ -15187,9 +15221,9 @@ var inspectSurfaceDiagWith = function(strict) {
                     return v4(true);
                   };
                   if (v1 instanceof Right) {
-                    var $181 = checkSurfaceStrict(strict)(v1.value0.nodes);
-                    if ($181 instanceof Left) {
-                      return new Left(renderParseErrorAt(src)($181.value0));
+                    var $184 = checkSurfaceStrict(strict)(v1.value0.nodes);
+                    if ($184 instanceof Left) {
+                      return new Left(renderParseErrorAt(src)($184.value0));
                     }
                     ;
                     return v2(true);
@@ -15198,7 +15232,7 @@ var inspectSurfaceDiagWith = function(strict) {
                   return v2(true);
                 }
                 ;
-                throw new Error("Failed pattern match at ClassicBars (line 270, column 3 - line 290, column 84): " + [v.constructor.name]);
+                throw new Error("Failed pattern match at ClassicBars (line 272, column 3 - line 292, column 84): " + [v.constructor.name]);
               };
             };
           };
@@ -15224,17 +15258,17 @@ var renderSurfaceDiagWith = function(strict) {
                 if (v instanceof Right) {
                   var v5 = hoistInline(desugarStmt(opts)(lv)(v.value0.nodes));
                   var v6 = runResolvedLenient2(v.value0.directives)((function() {
-                    var $298 = withTruthy(truthy);
-                    var $299 = withYieldName((function() {
+                    var $301 = withTruthy(truthy);
+                    var $302 = withYieldName((function() {
                       if (opts.partialBlocks) {
                         return "partial-block";
                       }
                       ;
                       return "yield";
                     })());
-                    var $300 = registerPartials(v5.partials);
-                    return function($301) {
-                      return $298($299($300($301)));
+                    var $303 = registerPartials(v5.partials);
+                    return function($304) {
+                      return $301($302($303($304)));
                     };
                   })())(v5.template)(dat);
                   if (v6 instanceof Left) {
@@ -15245,16 +15279,16 @@ var renderSurfaceDiagWith = function(strict) {
                     return new Right(v6.value0);
                   }
                   ;
-                  throw new Error("Failed pattern match at ClassicBars (line 380, column 7 - line 390, column 31): " + [v6.constructor.name]);
+                  throw new Error("Failed pattern match at ClassicBars (line 382, column 7 - line 392, column 31): " + [v6.constructor.name]);
                 }
                 ;
-                throw new Error("Failed pattern match at ClassicBars (line 368, column 1 - line 369, column 94): " + [v.constructor.name]);
+                throw new Error("Failed pattern match at ClassicBars (line 370, column 1 - line 371, column 94): " + [v.constructor.name]);
               };
               if (v instanceof Right) {
                 if (opts.lexConfig.statementTags) {
-                  var $201 = checkBraceControl(src)(v.value0.nodes);
-                  if ($201 instanceof Left) {
-                    return new Left(renderParseErrorAt(src)($201.value0));
+                  var $204 = checkBraceControl(src)(v.value0.nodes);
+                  if ($204 instanceof Left) {
+                    return new Left(renderParseErrorAt(src)($204.value0));
                   }
                   ;
                   return v3(true);
@@ -15266,9 +15300,9 @@ var renderSurfaceDiagWith = function(strict) {
               return v3(true);
             };
             if (v instanceof Right) {
-              var $206 = checkSurfaceStrict(strict)(v.value0.nodes);
-              if ($206 instanceof Left) {
-                return new Left(renderParseErrorAt(src)($206.value0));
+              var $209 = checkSurfaceStrict(strict)(v.value0.nodes);
+              if ($209 instanceof Left) {
+                return new Left(renderParseErrorAt(src)($209.value0));
               }
               ;
               return v1(true);
@@ -15302,7 +15336,7 @@ var renderSurfaceMappedDiagWith = function(strict) {
                   });
                 }
                 ;
-                throw new Error("Failed pattern match at ClassicBars (line 240, column 35 - line 242, column 75): " + [v12.constructor.name]);
+                throw new Error("Failed pattern match at ClassicBars (line 242, column 35 - line 244, column 75): " + [v12.constructor.name]);
               };
               var v = traverse6(compilePartial)(partialSrcs);
               if (v instanceof Left) {
@@ -15326,30 +15360,30 @@ var renderSurfaceMappedDiagWith = function(strict) {
                         return new Tuple(p.name, p.template);
                       })(v.value0));
                       var setup = (function() {
-                        var $304 = registerPartialFiles(partialFiles);
-                        var $305 = withTruthy(truthy);
-                        var $306 = withYieldName((function() {
+                        var $307 = registerPartialFiles(partialFiles);
+                        var $308 = withTruthy(truthy);
+                        var $309 = withYieldName((function() {
                           if (opts.partialBlocks) {
                             return "partial-block";
                           }
                           ;
                           return "yield";
                         })());
-                        var $307 = registerPartials(union6(v6.partials)(externalT));
-                        return function($308) {
-                          return $304($305($306($307($308))));
+                        var $310 = registerPartials(union6(v6.partials)(externalT));
+                        return function($311) {
+                          return $307($308($309($310($311))));
                         };
                       })();
                       return lmap2(formatError(src))(runResolvedLenientMapped(setup)(v6.template)(dat));
                     }
                     ;
-                    throw new Error("Failed pattern match at ClassicBars (line 206, column 1 - line 214, column 67): " + [v1.constructor.name]);
+                    throw new Error("Failed pattern match at ClassicBars (line 208, column 1 - line 216, column 67): " + [v1.constructor.name]);
                   };
                   if (v1 instanceof Right) {
                     if (opts.lexConfig.statementTags) {
-                      var $230 = checkBraceControl(src)(v1.value0.nodes);
-                      if ($230 instanceof Left) {
-                        return new Left(renderParseErrorAt(src)($230.value0));
+                      var $233 = checkBraceControl(src)(v1.value0.nodes);
+                      if ($233 instanceof Left) {
+                        return new Left(renderParseErrorAt(src)($233.value0));
                       }
                       ;
                       return v4(true);
@@ -15361,9 +15395,9 @@ var renderSurfaceMappedDiagWith = function(strict) {
                   return v4(true);
                 };
                 if (v1 instanceof Right) {
-                  var $235 = checkSurfaceStrict(strict)(v1.value0.nodes);
-                  if ($235 instanceof Left) {
-                    return new Left(renderParseErrorAt(src)($235.value0));
+                  var $238 = checkSurfaceStrict(strict)(v1.value0.nodes);
+                  if ($238 instanceof Left) {
+                    return new Left(renderParseErrorAt(src)($238.value0));
                   }
                   ;
                   return v2(true);
@@ -15372,7 +15406,7 @@ var renderSurfaceMappedDiagWith = function(strict) {
                 return v2(true);
               }
               ;
-              throw new Error("Failed pattern match at ClassicBars (line 216, column 3 - line 238, column 79): " + [v.constructor.name]);
+              throw new Error("Failed pattern match at ClassicBars (line 218, column 3 - line 240, column 79): " + [v.constructor.name]);
             };
           };
         };
@@ -15403,7 +15437,7 @@ var renderSurfaceWithHelpersWith = function(strict) {
                     });
                   }
                   ;
-                  throw new Error("Failed pattern match at ClassicBars (line 355, column 35 - line 357, column 75): " + [v12.constructor.name]);
+                  throw new Error("Failed pattern match at ClassicBars (line 357, column 35 - line 359, column 75): " + [v12.constructor.name]);
                 };
                 var v = traverse6(compilePartial)(partialSrcs);
                 if (v instanceof Left) {
@@ -15424,18 +15458,18 @@ var renderSurfaceWithHelpersWith = function(strict) {
                           return new Tuple(p.name, p.template);
                         })(v.value0));
                         var setup = (function() {
-                          var $309 = withTruthy(truthy);
-                          var $310 = withYieldName((function() {
+                          var $312 = withTruthy(truthy);
+                          var $313 = withYieldName((function() {
                             if (opts.partialBlocks) {
                               return "partial-block";
                             }
                             ;
                             return "yield";
                           })());
-                          var $311 = registerAll(helpers);
-                          var $312 = registerPartials(union6(v6.partials)(externalT));
-                          return function($313) {
-                            return $309($310($311($312($313))));
+                          var $314 = registerAll(helpers);
+                          var $315 = registerPartials(union6(v6.partials)(externalT));
+                          return function($316) {
+                            return $312($313($314($315($316))));
                           };
                         })();
                         var v7 = runResolvedLenient2(v1.value0.directives)(setup)(v6.template)(dat);
@@ -15447,16 +15481,16 @@ var renderSurfaceWithHelpersWith = function(strict) {
                           return new Right(v7.value0);
                         }
                         ;
-                        throw new Error("Failed pattern match at ClassicBars (line 349, column 11 - line 351, column 35): " + [v7.constructor.name]);
+                        throw new Error("Failed pattern match at ClassicBars (line 351, column 11 - line 353, column 35): " + [v7.constructor.name]);
                       }
                       ;
-                      throw new Error("Failed pattern match at ClassicBars (line 317, column 1 - line 326, column 26): " + [v1.constructor.name]);
+                      throw new Error("Failed pattern match at ClassicBars (line 319, column 1 - line 328, column 26): " + [v1.constructor.name]);
                     };
                     if (v1 instanceof Right) {
                       if (opts.lexConfig.statementTags) {
-                        var $264 = checkBraceControl(src)(v1.value0.nodes);
-                        if ($264 instanceof Left) {
-                          return new Left(renderParseErrorAt(src)($264.value0));
+                        var $267 = checkBraceControl(src)(v1.value0.nodes);
+                        if ($267 instanceof Left) {
+                          return new Left(renderParseErrorAt(src)($267.value0));
                         }
                         ;
                         return v4(true);
@@ -15468,9 +15502,9 @@ var renderSurfaceWithHelpersWith = function(strict) {
                     return v4(true);
                   };
                   if (v1 instanceof Right) {
-                    var $269 = checkSurfaceStrict(strict)(v1.value0.nodes);
-                    if ($269 instanceof Left) {
-                      return new Left(renderParseErrorAt(src)($269.value0));
+                    var $272 = checkSurfaceStrict(strict)(v1.value0.nodes);
+                    if ($272 instanceof Left) {
+                      return new Left(renderParseErrorAt(src)($272.value0));
                     }
                     ;
                     return v2(true);
@@ -15479,7 +15513,7 @@ var renderSurfaceWithHelpersWith = function(strict) {
                   return v2(true);
                 }
                 ;
-                throw new Error("Failed pattern match at ClassicBars (line 328, column 3 - line 351, column 35): " + [v.constructor.name]);
+                throw new Error("Failed pattern match at ClassicBars (line 330, column 3 - line 353, column 35): " + [v.constructor.name]);
               };
             };
           };
@@ -15515,15 +15549,15 @@ var analyseSurfaceWith = function(schema) {
             });
           }
           ;
-          throw new Error("Failed pattern match at ClassicBars (line 456, column 7 - line 466, column 12): " + [v4.constructor.name]);
+          throw new Error("Failed pattern match at ClassicBars (line 458, column 7 - line 468, column 12): " + [v4.constructor.name]);
         }
         ;
-        throw new Error("Failed pattern match at ClassicBars (line 438, column 1 - line 448, column 9): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at ClassicBars (line 440, column 1 - line 450, column 9): " + [v.constructor.name]);
       };
       if (v instanceof Right) {
-        var $286 = checkSurfaceStrict(true)(v.value0.nodes);
-        if ($286 instanceof Left) {
-          return new Left(renderParseErrorAt(src)($286.value0));
+        var $289 = checkSurfaceStrict(true)(v.value0.nodes);
+        if ($289 instanceof Left) {
+          return new Left(renderParseErrorAt(src)($289.value0));
         }
         ;
         return v1(true);

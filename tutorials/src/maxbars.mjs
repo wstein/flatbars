@@ -26,8 +26,9 @@
 //   • Loop variables are BARE under `loop.` — `loop.index0/index1/first/last/
 //     length/key/rindex0/depth` — never @-prefixed. Context climbs with `parent`
 //     (chainable) and `root`, never `../` or `@root`.
-//   • A clause-separator condition MUST be parenthesised: `{% else if (gte n 1) %}`.
-//     A bare infix separator parses but silently takes the wrong branch.
+//   • The chained conditional is `{% elif … %}` (the two-word `else if` is gone), and
+//     its condition MUST be parenthesised: `{% elif (gte n 1) %}`. A bare infix
+//     separator parses but silently takes the wrong branch.
 //   • Partials: EXTERNAL host-threaded `{% include "name" %}` (the partials registry, each
 //     partial itself MaxBars source — ADR/commit cfadebc) AND template-local
 //     `{% inline "x" %}…{% endinline %}` both work, plus the `{% yield %}` layout
@@ -140,15 +141,16 @@ export const examples = {
 
   conditionals: {
     engine: "maxbars",
-    label: "Intermediate — If / else if / unless (infix, {% %} tags)",
+    label: "Intermediate — If / elif / unless (infix, {% %} tags)",
     // Control flow is written with Django-style `{% %}` statement tags (docs-19); `{{ }}`
     // stays for output. Infix comparisons make the condition direct — `{% if stock >= 10 %}`
-    // instead of ClassicBars's `{{#if (gte stock 10)}}`. The ONE catch: a clause SEPARATOR
-    // must parenthesise its condition (`{% else if (gte stock 1) %}`) — a bare infix there
+    // instead of ClassicBars's `{{#if (gte stock 10)}}`. The chained conditional is
+    // `{% elif … %}` (the two-word `else if` is gone). The ONE catch: a clause SEPARATOR
+    // must parenthesise its condition (`{% elif (gte stock 1) %}`) — a bare infix there
     // silently takes the wrong branch. `{% unless %}` is the inverse.
     compiles: true,
     template:
-      "{{name}}: {% if stock >= 10 %}in stock{% else if (gte stock 1) %}low ({{stock}}){% else %}sold out{% endif %}{% unless shipsFree %} · shipping extra{% endunless %}",
+      "{{name}}: {% if stock >= 10 %}in stock{% elif (gte stock 1) %}low ({{stock}}){% else %}sold out{% endif %}{% unless shipsFree %} · shipping extra{% endunless %}",
     data: { name: "Keyboard", stock: 3, shipsFree: false },
   },
 
@@ -156,7 +158,7 @@ export const examples = {
     engine: "maxbars",
     label: "Intermediate — Case / when (multi-arm)",
     // `{% case s %}` dispatches the subject against each `{% when %}` arm by equality —
-    // clearer than a chain of `{% else if (eq s …) %}`. One arm can list several values
+    // clearer than a chain of `{% elif (eq s …) %}`. One arm can list several values
     // (`{% when "pending" "queued" %}`); `{% else %}` is the catch-all. It is a first-class
     // construct: the Trussbars compiler lowers it to a Rust `match` (the subject read once).
     compiles: true,

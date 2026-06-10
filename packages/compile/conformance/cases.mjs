@@ -426,7 +426,7 @@ export const cases = [
   // the `{{else if …}}` spelling carries a trailing hash through to `elif`, so it
   // behaves identically to the `{{elif …}}` form above (both targets).
   { name: "s:else-if-includeZero", dialect: "surface", t: "{{#if a}}A{{else if n includeZero=true}}Z{{else}}E{{/if}}", d: { a: false, n: 0 } },
-  { name: "mx:else-if-includeZero", dialect: "maxbars", t: "{% if a %}A{% else if n includeZero=true %}Z{% else %}E{% endif %}", d: { a: false, n: 0 } },
+  { name: "mx:elif-includeZero", dialect: "maxbars", t: "{% if a %}A{% elif n includeZero=true %}Z{% else %}E{% endif %}", d: { a: false, n: 0 } },
   // block params parse in MaxBars (head ladder omits the pipe rung) — built-ins
   // bind them exactly as ClassicBars does, compiled ≡ interpreted.
   { name: "mx:blockparams-each", dialect: "maxbars", t: "{% for item i in xs %}[{{i}}:{{item}}]{% endfor %}", d: { xs: ["a", "b", "c"] } },

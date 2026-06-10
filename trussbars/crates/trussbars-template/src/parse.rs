@@ -66,7 +66,7 @@ enum Stop {
     Close(String),
     /// A `{% else %}`.
     Else,
-    /// A `{% elif cond %}` / `{% else if cond %}` (the raw condition source).
+    /// A `{% elif cond %}` (the raw condition source). The two-word `else if` is gone.
     ElseIf(String),
     /// A `{% when V … %}` arm of a `{% case %}` (the raw value-expression source).
     When(String),
@@ -119,10 +119,9 @@ impl Blocks<'_> {
                     if text == "else" {
                         return Ok((nodes, Stop::Else));
                     }
-                    if let Some(c) = strip_else_if(text) {
-                        return Ok((nodes, Stop::ElseIf(c.to_string())));
-                    }
-                    // `elif` — the `{% %}` statement-tag spelling of `else if` (docs-19).
+                    // `elif` is the sole chained-conditional spelling — the two-word
+                    // `else if` sugar is gone (PURE grammar), so `{% else if … %}` falls
+                    // through to the "unexpected clause" error below.
                     if let Some(c) = strip_elif(text) {
                         return Ok((nodes, Stop::ElseIf(c.to_string())));
                     }
@@ -617,14 +616,6 @@ fn split_head(interior: &str) -> (&str, &str) {
     (&t[..end], t[end..].trim())
 }
 
-/// `else if <cond>` → `Some(cond)`.
-fn strip_else_if(text: &str) -> Option<&str> {
-    text.strip_prefix("else")
-        .map(str::trim_start)
-        .and_then(|r| r.strip_prefix("if"))
-        .map(str::trim)
-}
-
 /// `when <values…>` → `Some(values)` (a `{% case %}` arm). Requires a word boundary, so
 /// `whenever` is not read as `when ever`.
 fn strip_when(text: &str) -> Option<&str> {
@@ -636,8 +627,8 @@ fn strip_when(text: &str) -> Option<&str> {
     }
 }
 
-/// `elif COND` (the `{% %}` spelling of `else if`) → the raw condition source. The head
-/// word must be exactly `elif` (a bare `elif` or `elif…` identifier is not a clause).
+/// `elif COND` (the sole chained-conditional spelling) → the raw condition source. The
+/// head word must be exactly `elif` (a bare `elif` or `elif…` identifier is not a clause).
 fn strip_elif(text: &str) -> Option<&str> {
     let rest = text.strip_prefix("elif")?;
     if rest.is_empty() || rest.starts_with(char::is_whitespace) {
@@ -1144,8 +1135,8 @@ mod tests {
     }
 
     #[test]
-    fn statement_elif_is_an_else_if_clause() {
-        // `{% elif … %}` is the statement-tag spelling of `{{else if …}}`.
+    fn statement_elif_is_the_chained_conditional() {
+        // `{% elif … %}` is the sole chained-conditional clause.
         let ns = parse("{% if a %}A{% elif b %}B{% else %}C{% endif %}").unwrap();
         match &ns[0] {
             Node::Cond(c) => {
@@ -1154,6 +1145,12 @@ mod tests {
             }
             o => panic!("{o:?}"),
         }
+    }
+
+    #[test]
+    fn two_word_else_if_is_rejected() {
+        // The two-word `else if` sugar is gone — only `{% elif %}` chains (PURE grammar).
+        assert!(parse("{% if a %}A{% else if b %}B{% endif %}").is_err());
     }
 
     #[test]

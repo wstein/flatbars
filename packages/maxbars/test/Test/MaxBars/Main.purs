@@ -7,8 +7,9 @@
 -- | the Liquid-style loop bindings (`{{#each a i j in xs}}`: element, index,
 -- | 1-based index; `with` keeps a drop-pipes `as p`). The head ladder omits the
 -- | pipe rung and MaxBars rejects a head bar, so the Handlebars `as |x|` form is a
--- | parse error here. Clause separators (`{{elif …}}` / `{{else if …}}`) still take
--- | a parenthesised condition; a pipe in a block head must also be parenthesised.
+-- | parse error here. The chained-conditional separator is `{% elif … %}` (the two-word
+-- | `else if` is gone); it still takes a parenthesised condition, and a pipe in a block
+-- | head must also be parenthesised.
 module Test.MaxBars.Main where
 
 import Prelude
@@ -387,6 +388,11 @@ main = do
   assert' "reject: inverse {{^}}" (isLeft (renderMax "{{^a}}x{% enda %}" (obj [])))
   assert' "reject: unescaped {{&}}" (isLeft (renderMax "{{&a}}" (obj [])))
   assert' "reject: raw block {{{{}}}}" (isLeft (renderMax "{{{{r}}}}body{{{{/r}}}}" (obj [])))
+
+  -- The two-word `else if` sugar is gone (the chained conditional is `{% elif … %}`);
+  -- `else if` is a ClassicBars/Handlebars-only form, rejected on the MaxBars surface.
+  assert' "reject: two-word else if"
+    (isLeft (renderMax "{% if a %}A{% else if b %}B{% endif %}" (obj [])))
 
   -- Verbatim region: the `{% raw %}` spelling (ADR-039 item 2) keeps its body
   -- untouched — `{{x}}` and a nested `{% if %}` are literal text, not interpolated.

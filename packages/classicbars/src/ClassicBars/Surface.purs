@@ -60,6 +60,7 @@ module ClassicBars.Surface
   , strictSurfaceViolation
   , maxbarsEachAsViolation
   , retiredLetViolation
+  , elseIfViolation
   , renameSurfaceHeads
   , withReRootViolation
   , eachLoopViolation
@@ -646,6 +647,25 @@ maxbarsEachAsViolation nodes = Array.head (Array.mapMaybe node nodes)
     _ -> false
   eachAsShape =
     "{% for … as … %} (MaxBars binds loops Liquid-style — write the names before `in`, e.g. {% for x in xs %} or {% for x i in xs %}; the trailing `as` form is gone. `scope`/custom helpers still use `as`.)"
+
+-- | The first two-word `{% else if … %}` chained-conditional in `nodes` — its offset
+-- | and a "shape" string for the located `DisallowedShape` error. In the native `{% %}`
+-- | family (RawBars/MaxBars) the chained conditional is spelled `{% elif … %}`; the
+-- | two-word `else if` is a ClassicBars/Handlebars form and is rejected rather than
+-- | silently desugared. (`expandElseIf` still serves the ClassicBars strict path, which
+-- | does not run this gate.) Detected pre-desugar: `{% else if c %}` parses as a
+-- | `Sep "else"` whose first argument is the bare helper `if`.
+elseIfViolation :: Template -> Maybe { off :: Int, shape :: String }
+elseIfViolation nodes = Array.head (Array.mapMaybe node nodes)
+  where
+  node = case _ of
+    Sep sp "else" args
+      | Just { head: App "if" [] } <- Array.uncons args -> Just
+          { off: sp.start, shape: elseIfShape }
+    Block _ _ _ _ body -> elseIfViolation body
+    _ -> Nothing
+  elseIfShape =
+    "{% else if … %} (the chained conditional is spelled {% elif … %} in RawBars/MaxBars — `else if` is a ClassicBars/Handlebars-only form)"
 
 -- | The first retired `{% let … %}` (the old bounded-binding keyword, docs-17) in
 -- | `nodes` — its offset and a "shape" string for the located `DisallowedShape`
