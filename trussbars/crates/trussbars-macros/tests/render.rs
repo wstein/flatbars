@@ -272,3 +272,60 @@ fn numeric_literal_coerces_against_an_i64_field() {
         "meh high 51"
     );
 }
+
+// #4 cross-file partials (docs/21): `partials = [name = "file"]` loads partials from separate
+// files, resolved by the same inline mechanism — so a shared header/footer, a sub-context
+// partial, and a `{{yield}}` layout all compose across files, type-checked against the
+// caller's context.
+#[derive(trussbars_core::Trussbars)]
+struct Item {
+    label: String,
+    score: i64,
+}
+#[derive(trussbars_core::Trussbars)]
+struct Page {
+    title: String,
+    year: i64,
+    items: Vec<Item>,
+}
+truss!(
+    blog,
+    Page,
+    "{{> header}}<ul>{{#each items}}{{> row this}}{{/each}}</ul>{{> footer}}",
+    partials = [
+        header = "tests/templates/header.truss",
+        footer = "tests/templates/footer.truss",
+        row = "tests/templates/row.truss"
+    ]
+);
+// A cross-file layout: the block body renders in the caller's frame and splices into the
+// imported layout's `{{yield}}`.
+truss!(
+    doc,
+    Page,
+    "{{#partial \"layout\"}}<h1>{{title}}</h1>{{/partial}}",
+    partials = [layout = "tests/templates/layout.truss"]
+);
+
+#[test]
+fn cross_file_partials_compose() {
+    let p = Page {
+        title: "Hi".into(),
+        year: 2026,
+        items: vec![
+            Item {
+                label: "a".into(),
+                score: 1,
+            },
+            Item {
+                label: "b".into(),
+                score: 2,
+            },
+        ],
+    };
+    assert_eq!(
+        blog(&p),
+        "<header>Hi</header><ul><li>a: 1</li><li>b: 2</li></ul><footer>(c) 2026</footer>"
+    );
+    assert_eq!(doc(&p), "<!doctype html><main><h1>Hi</h1></main>");
+}

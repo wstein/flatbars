@@ -44,10 +44,13 @@ use proc_macro::{Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, Tok
 /// build (cargo tracks it as a source dependency).
 ///
 /// Trailing clauses, in any order, tune compilation: `helpers = [a, b]` is the
-/// host-helper allow-list (F3, below), and `truthiness = Mode` selects the
-/// truthiness policy — `NonEmpty` (default, conformance-checked), `Liquid`, or
-/// `Handlebars` (spec §7, `docs/16-truthiness-modes.md`). A Trussbars-owned
-/// (class-A) error expands to a `compile_error!` located at `line:col`.
+/// host-helper allow-list (F3, below); `truthiness = Mode` selects the truthiness
+/// policy — `NonEmpty` (default, conformance-checked), `Liquid`, `Handlebars`, or a
+/// host policy path (spec §7, `docs/16-truthiness-modes.md`); and
+/// `partials = [name = "file.truss"]` imports partials from other files, resolved by
+/// `{{> name}}` / `{{#partial "name"}}` (cross-file layouts and sub-context partials,
+/// `docs/21-cross-file-partials.md`). A Trussbars-owned (class-A) error expands to a
+/// `compile_error!` located at `line:col`.
 #[proc_macro]
 pub fn truss(input: TokenStream) -> TokenStream {
     match expand(input) {
@@ -153,8 +156,9 @@ fn expand(input: TokenStream) -> Result<TokenStream, String> {
     }
     if groups.len() < 3 {
         return Err(format!(
-            "truss! expects `name, CtxType, \"template\"` (optionally `, helpers = [..]` \
-             and/or `, truthiness = Mode`) ({} comma-separated parts given)",
+            "truss! expects `name, CtxType, \"template\"` (optionally `, helpers = [..]`, \
+             `, truthiness = Mode`, and/or `, partials = [name = \"file\"]`) \
+             ({} comma-separated parts given)",
             groups.len()
         ));
     }
@@ -183,35 +187,52 @@ fn expand(input: TokenStream) -> Result<TokenStream, String> {
     // The third argument is either an inline string literal or `path = "file"`.
     let (template, dep) = template_arg(&groups[2])?;
 
-    // The optional trailing clauses — `helpers = [a, b]` (F3) and `truthiness = Mode`
-    // (spec §7) — in any order.
+    // The optional trailing clauses — `helpers = [a, b]` (F3), `truthiness = Mode` (spec §7),
+    // and `partials = [name = "file"]` (cross-file partials, docs/21) — in any order.
     let mut helpers = Vec::new();
     let mut mode = trussbars_template::TruthPolicy::default();
+    let mut partials: Vec<(String, String)> = Vec::new(); // (name, relpath)
     for group in &groups[3..] {
         match clause_key(group).as_deref() {
             Some("helpers") => helpers = parse_helpers(group)?,
             Some("truthiness") => mode = parse_truthiness(group)?,
+            Some("partials") => partials = parse_partials(group)?,
             _ => {
-                return Err(
-                    "truss!: trailing arguments must be `helpers = [name, …]` or \
-                     `truthiness = Mode`"
-                        .into(),
-                );
+                return Err("truss!: trailing arguments must be `helpers = [name, …]`, \
+                     `truthiness = Mode`, or `partials = [name = \"file\", …]`"
+                    .into());
             }
         }
     }
 
-    let rust = trussbars_template::emit_named(&name, &ctx_type, &template, &helpers, mode)?;
-    // The `path` form appends an anonymous `include_bytes!` so cargo tracks the
-    // `.truss` file as a source dependency (an edit re-triggers the build). It uses
-    // an absolute path via `CARGO_MANIFEST_DIR` so it resolves regardless of which
-    // module the macro is invoked from.
-    let source = match dep {
-        Some(rel) => format!(
-            "{rust}\nconst _: &[u8] = include_bytes!(concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/\", {rel}));\n"
-        ),
-        None => rust,
-    };
+    // Read each declared partial file at expansion time (the file paths are static; the engine
+    // stays file-IO-free and just receives the sources).
+    let file_partials: Vec<(String, String)> = partials
+        .iter()
+        .map(|(name, rel)| Ok((name.clone(), read_manifest_relative(rel)?)))
+        .collect::<Result<_, String>>()?;
+
+    let rust = trussbars_template::emit_with_partials(
+        &name,
+        &ctx_type,
+        &template,
+        &helpers,
+        mode,
+        &file_partials,
+    )?;
+
+    // Append an anonymous `include_bytes!` per file (the main `path` template and every partial
+    // file) so cargo tracks each as a source dependency — an edit re-triggers the build. The
+    // absolute `CARGO_MANIFEST_DIR` path resolves regardless of the invoking module.
+    let mut source = rust;
+    let deps = dep
+        .into_iter()
+        .chain(partials.iter().map(|(_, rel)| format!("{rel:?}")));
+    for rel in deps {
+        source.push_str(&format!(
+            "\nconst _: &[u8] = include_bytes!(concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/\", {rel}));\n"
+        ));
+    }
     source
         .parse()
         .map_err(|e| format!("truss!: internal error re-tokenizing generated Rust: {e}"))
@@ -236,18 +257,83 @@ fn template_arg(group: &[TokenTree]) -> Result<(String, Option<String>), String>
         ] if id.to_string() == "path" && eq.as_char() == '=' => {
             let rel = string_literal_text(&lit.to_string())
                 .ok_or_else(|| "truss!: `path = …` needs a string-literal file path".to_string())?;
-            let root = std::env::var("CARGO_MANIFEST_DIR").map_err(|_| {
-                "truss!: CARGO_MANIFEST_DIR is unset (cannot resolve `path`)".to_string()
-            })?;
-            let full = std::path::Path::new(&root).join(&rel);
-            let text = std::fs::read_to_string(&full)
-                .map_err(|e| format!("truss!: cannot read template `{}`: {e}", full.display()))?;
+            let text = read_manifest_relative(&rel)?;
             Ok((text, Some(lit.to_string())))
         }
         _ => Err(
             "truss!: the third argument must be a string literal or `path = \"file.truss\"`".into(),
         ),
     }
+}
+
+/// Read a file relative to the crate root (`CARGO_MANIFEST_DIR`, the Askama convention), so it
+/// resolves regardless of which module the macro is invoked from. Shared by the `path = …`
+/// template form and `partials = [name = "file"]`.
+fn read_manifest_relative(rel: &str) -> Result<String, String> {
+    let root = std::env::var("CARGO_MANIFEST_DIR").map_err(|_| {
+        "truss!: CARGO_MANIFEST_DIR is unset (cannot resolve a file path)".to_string()
+    })?;
+    let full = std::path::Path::new(&root).join(rel);
+    std::fs::read_to_string(&full)
+        .map_err(|e| format!("truss!: cannot read template `{}`: {e}", full.display()))
+}
+
+/// Parse the optional `partials = [name = "file", …]` clause (docs/21) into `(name, relpath)`
+/// pairs. Each entry is `Ident = "string"`; the bracket's inner commas separate entries.
+fn parse_partials(group: &[TokenTree]) -> Result<Vec<(String, String)>, String> {
+    let list = match group {
+        [
+            TokenTree::Ident(kw),
+            TokenTree::Punct(eq),
+            TokenTree::Group(list),
+        ] if kw.to_string() == "partials"
+            && eq.as_char() == '='
+            && list.delimiter() == Delimiter::Bracket =>
+        {
+            list
+        }
+        _ => return Err("truss!: `partials = [name = \"file\", …]` needs a bracketed list".into()),
+    };
+    // Split the bracket stream on top-level commas, then each entry must be `name = "file"`.
+    let mut entries: Vec<Vec<TokenTree>> = vec![Vec::new()];
+    for tt in list.stream() {
+        if let TokenTree::Punct(ref p) = tt
+            && p.as_char() == ','
+        {
+            entries.push(Vec::new());
+            continue;
+        }
+        entries.last_mut().expect("at least one entry").push(tt);
+    }
+    let mut out = Vec::new();
+    for entry in entries {
+        if entry.is_empty() {
+            continue; // trailing / doubled comma
+        }
+        match entry.as_slice() {
+            [
+                TokenTree::Ident(name),
+                TokenTree::Punct(eq),
+                TokenTree::Literal(lit),
+            ] if eq.as_char() == '=' => {
+                let rel = string_literal_text(&lit.to_string()).ok_or_else(|| {
+                    format!(
+                        "truss!: partial '{}' needs a string-literal file path",
+                        name
+                    )
+                })?;
+                out.push((name.to_string(), rel));
+            }
+            _ => {
+                return Err(
+                    "truss!: each partial entry must be `name = \"file\"` (a name and a \
+                     string-literal path)"
+                        .into(),
+                );
+            }
+        }
+    }
+    Ok(out)
 }
 
 /// The leading `key` of a `key = …` trailing clause (e.g. `helpers`, `truthiness`),

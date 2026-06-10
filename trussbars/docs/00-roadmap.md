@@ -106,3 +106,7 @@ emit mode alongside clean/commented from the start** — don't bolt it on. Phase
   as `trussbars_core::NumLit`, coercing against any numeric field type (`views: i64` works with
   `> 100`) by widening to the f64 model; string ordering untouched, string-vs-number a compile
   error. v2-conformance 71/71, 0 drift.
+- `21-cross-file-partials.md` — **DONE** (#4). `truss!(…, partials = [name = "file.truss"])`
+  imports partials from other files (shared header/footer, sub-context partials, `{{yield}}`
+  layouts), resolved by the inline mechanism. Per-source error spans (`(in partial 'name')`);
+  duplicate name = compile error. v2-conformance 71/71, 0 drift.

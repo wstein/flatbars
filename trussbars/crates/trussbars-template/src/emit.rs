@@ -58,6 +58,27 @@ pub fn emit_named(
     helpers: &[String],
     mode: impl Into<TruthPolicy>,
 ) -> Result<String, String> {
+    emit_with_partials(fn_name, ctx_type, src, helpers, mode, &[])
+}
+
+/// As [`emit_named`], plus **cross-file partials** (docs/21): `file_partials` is the declared
+/// `partials = [name = "file"]` map as `(name, source)` pairs (the macro reads the files). Each
+/// is parsed and merged into the partial registry — so `{{> name}}` / `{{#partial "name"}}`
+/// resolves to it, inlined against the caller's context (a layout's `{{yield}}` and nested
+/// `{{> other}}` work for free). A name defined more than once (in-source `{{#inline}}` ×
+/// imported file, or twice in the map) is a compile error; an error *inside* a partial locates
+/// within that partial's source and is tagged `(in partial 'name')`.
+///
+/// # Errors
+/// The located `line:col: message` reason (see [`emit`]).
+pub fn emit_with_partials(
+    fn_name: &str,
+    ctx_type: &str,
+    src: &str,
+    helpers: &[String],
+    mode: impl Into<TruthPolicy>,
+    file_partials: &[(String, String)],
+) -> Result<String, String> {
     let mode = mode.into();
     // A host cannot declare a built-in block head (`if`/`each`/`case`/…) as a helper —
     // it is shadowed by the parser, so accepting it would silently never fire (docs/12 §5.2).
@@ -70,7 +91,50 @@ pub fn emit_named(
         ));
     }
     let nodes = parse(src).map_err(|e| located(e.at, src, &e.message))?;
-    let (registry, top) = hoist(nodes);
+    let (main_inlines, top) = hoist(nodes);
+
+    // Build the registry: in-source `{{#inline}}` defs (spans index the main template), then
+    // the imported file partials (spans index each file). A duplicate name is rejected.
+    let main_src: Rc<str> = Rc::from(src);
+    let mut registry: BTreeMap<String, PartialDef> = BTreeMap::new();
+    for (name, body) in main_inlines {
+        registry.insert(
+            name,
+            PartialDef {
+                src: main_src.clone(),
+                origin: None,
+                body,
+            },
+        );
+    }
+    for (name, psrc) in file_partials {
+        let psrc_rc: Rc<str> = Rc::from(psrc.as_str());
+        let pnodes = parse(psrc)
+            .map_err(|e| format!("{} (in partial '{name}')", located(e.at, psrc, &e.message)))?;
+        let (nested, ptop) = hoist(pnodes);
+        // A file partial may itself define `{{#inline}}`s (hoisted, spans into this file).
+        for (iname, ibody) in nested {
+            insert_partial(
+                &mut registry,
+                iname,
+                PartialDef {
+                    src: psrc_rc.clone(),
+                    origin: Some(name.clone()),
+                    body: ibody,
+                },
+            )?;
+        }
+        insert_partial(
+            &mut registry,
+            name.clone(),
+            PartialDef {
+                src: psrc_rc.clone(),
+                origin: Some(name.clone()),
+                body: ptop,
+            },
+        )?;
+    }
+
     let env = Env {
         scope: "ctx".into(),
         loop_var: None,
@@ -90,6 +154,22 @@ pub fn emit_named(
     emit_nodes(&env, src, &top, &mut body)?;
     let (header, footer) = render_fn_parts(fn_name, ctx_type, estimate_bytes(&top));
     Ok(format!("{header}{body}{footer}"))
+}
+
+/// Insert a partial, rejecting a duplicate name (names are static — an ambiguous binding is a
+/// bug, not a precedence puzzle; docs/21 §5.2).
+fn insert_partial(
+    registry: &mut BTreeMap<String, PartialDef>,
+    name: String,
+    def: PartialDef,
+) -> Result<(), String> {
+    if registry.contains_key(&name) {
+        return Err(format!(
+            "duplicate partial '{name}' — defined more than once (an in-source `{{{{#inline}}}}` and a `partials = […]` file, or twice in the map)"
+        ));
+    }
+    registry.insert(name, def);
+    Ok(())
 }
 
 /// Prefix a message with its `line:col:` template coordinates (class-A diagnostics,
@@ -113,7 +193,20 @@ fn is_located(m: &str) -> bool {
     )
 }
 
-type Partials = Rc<BTreeMap<String, Vec<Node>>>;
+/// A registered partial: its body plus the **source its node spans index into**, so an error
+/// inside a partial locates within *that* source — the main template for an in-source
+/// `{{#inline}}`, or the imported file for a `partials = […]` entry (docs/21 §4).
+struct PartialDef {
+    /// The source the body's spans index into.
+    src: Rc<str>,
+    /// `None` for an in-source `{{#inline}}` (errors read against the main template); `Some(name)`
+    /// for an imported file partial (its errors get a `(in partial 'name')` tag).
+    origin: Option<String>,
+    /// The partial's node tree.
+    body: Vec<Node>,
+}
+
+type Partials = Rc<BTreeMap<String, PartialDef>>;
 
 #[derive(Clone)]
 struct Env {
@@ -302,7 +395,6 @@ fn emit_node_inner(env: &Env, src: &str, n: &Node, out: &mut String) -> Result<(
         Node::Partial { name, ctx, .. } => {
             return inline_partial(
                 env,
-                src,
                 name,
                 ctx.clone().unwrap_or_else(|| Expr::nullary("this")),
                 None,
@@ -312,12 +404,11 @@ fn emit_node_inner(env: &Env, src: &str, n: &Node, out: &mut String) -> Result<(
         Node::PartialBlock {
             name, ctx, body, ..
         } => {
-            // The block body renders into a separate buffer (its yield).
+            // The block body renders into a separate buffer (its yield), in the caller's source.
             let mut yield_buf = String::new();
             emit_nodes(env, src, body, &mut yield_buf)?;
             return inline_partial(
                 env,
-                src,
                 name,
                 ctx.clone().unwrap_or_else(|| Expr::nullary("this")),
                 Some(yield_buf),
@@ -380,13 +471,12 @@ fn yield_here(env: &Env, out: &mut String) -> Result<(), String> {
 
 fn inline_partial(
     env: &Env,
-    src: &str,
     name: &str,
     ctx_e: Expr,
     yield_code: Option<String>,
     out: &mut String,
 ) -> Result<(), String> {
-    let Some(body) = env.partials.get(name) else {
+    let Some(def) = env.partials.get(name) else {
         return Err(format!("unsupported: unknown partial '{name}'"));
     };
     if env.expanding.iter().any(|n| n == name) {
@@ -400,7 +490,16 @@ fn inline_partial(
     child.parents = Vec::new();
     child.expanding.push(name.to_string());
     child.yield_code = yield_code;
-    emit_nodes(&child, src, body, out)
+    // Emit the body against the partial's OWN source, so a located error inside it carries the
+    // partial's `line:col`, not a coordinate misread against the caller's template (docs/21 §4).
+    // An imported file partial tags the (already-located) error with `(in partial 'name')`; a
+    // deeper partial's tag is left intact.
+    let def_src = Rc::clone(&def.src);
+    let origin = def.origin.clone();
+    emit_nodes(&child, &def_src, &def.body, out).map_err(|m| match &origin {
+        Some(p) if !m.contains(" (in partial '") => format!("{m} (in partial '{p}')"),
+        _ => m,
+    })
 }
 
 // ── blocks ────────────────────────────────────────────────────────────────────
@@ -1152,7 +1251,7 @@ fn rust_str(s: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{TruthMode, TruthPolicy, emit, emit_named};
+    use super::{TruthMode, TruthPolicy, emit, emit_named, emit_with_partials};
 
     fn e(src: &str) -> String {
         emit("Ctx", src).unwrap_or_else(|err| panic!("{src:?}: {err}"))
@@ -1171,6 +1270,74 @@ mod tests {
         let s = e(r#"{{#if name < "m"}}x{{/if}}"#);
         assert!(s.contains("< \"m\""), "{s}");
         assert!(!s.contains("NumLit"), "{s}");
+    }
+
+    // ── cross-file partials (docs/21) ──────────────────────────────────────────
+
+    #[test]
+    fn file_partial_body_inlines_at_the_call_site() {
+        // A `partials = [name = source]` entry resolves `{{> name}}` to that body, inlined
+        // against the caller's context (so it type-checks like an in-source `{{#inline}}`).
+        let out = emit_with_partials(
+            "render",
+            "Ctx",
+            "{{> header}}",
+            &[],
+            TruthMode::NonEmpty,
+            &[("header".to_string(), "<h1>{{title}}</h1>".to_string())],
+        )
+        .unwrap();
+        assert!(out.contains("ctx.title"), "{out}");
+    }
+
+    #[test]
+    fn duplicate_partial_name_is_rejected() {
+        // An in-source `{{#inline}}` and an imported file of the same name is a compile error
+        // (names are static — an ambiguous binding is a bug; docs/21 §5.2).
+        let err = emit_with_partials(
+            "render",
+            "Ctx",
+            "{{#inline \"h\"}}x{{/inline}}{{> h}}",
+            &[],
+            TruthMode::NonEmpty,
+            &[("h".to_string(), "<p>file</p>".to_string())],
+        )
+        .unwrap_err();
+        assert!(err.contains("duplicate partial 'h'"), "{err}");
+    }
+
+    #[test]
+    fn parse_error_inside_a_partial_locates_in_that_partial() {
+        // A parse error in a declared partial file locates within that file and is tagged.
+        let err = emit_with_partials(
+            "render",
+            "Ctx",
+            "{{> broken}}",
+            &[],
+            TruthMode::NonEmpty,
+            &[("broken".to_string(), "{{#each items}}{{this}}".to_string())],
+        )
+        .unwrap_err();
+        assert!(err.contains("unclosed block"), "{err}");
+        assert!(err.contains("(in partial 'broken')"), "{err}");
+    }
+
+    #[test]
+    fn emit_error_inside_a_used_partial_is_located_and_tagged() {
+        // An emit error (unknown helper) inside an inlined partial locates against the
+        // partial's OWN source (col 3, the `{{bogus` tag) and is tagged with the partial.
+        let err = emit_with_partials(
+            "render",
+            "Ctx",
+            "{{> p}}",
+            &[],
+            TruthMode::NonEmpty,
+            &[("p".to_string(), "x {{bogus y}}".to_string())],
+        )
+        .unwrap_err();
+        assert!(err.contains("unknown helper 'bogus'"), "{err}");
+        assert!(err.contains("1:3:"), "{err}");
+        assert!(err.contains("(in partial 'p')"), "{err}");
     }
 
     #[test]
