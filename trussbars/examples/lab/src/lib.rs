@@ -5,14 +5,12 @@
 //! serve. Built with [`ratatui`] over the crossterm backend; the editable panes are
 //! [`tui_textarea`] widgets (selection, undo/redo, word motions, internal scrolling).
 //!
-//! Two rendering modes, proving patterns from `docs/11`:
-//! 1. **Helper-based VM** — `{{t …}}/{{number …}}/…` via host helpers registered at runtime
-//!    ([`i18n::register`]). The `receipt` sample. Cycling the locale flips the localized
-//!    dimensions — title, plural noun, month name, and the `number` group/decimal
-//!    separators (only `relative` phrasing stays an en-US fallback). VM-only — host
-//!    helpers can't work in AOT.
-//! 2. **AOT-compat proxy** — Toggle [`Mode::Compat`]: strict mode, rejects host helpers.
-//!    The `receipt` is rejected. The plain `greeting` (no i18n) renders byte-identically.
+//! The render path is the lenient VM, proving patterns from `docs/11`: a **helper-based
+//! VM** — `{{t …}}/{{number …}}/…` via host helpers registered at runtime
+//! ([`i18n::register`]). The `receipt` sample. Cycling the locale flips the localized
+//! dimensions — title, plural noun, month name, and the `number` group/decimal
+//! separators (only `relative` phrasing stays an en-US fallback). VM-only — host
+//! helpers can't work in AOT.
 //!
 //! (The data-driven catalog pattern — catalog as data, looked up by declared helpers,
 //! identical on AOT + VM — has its own focused example, `examples/i18n-data`.)
@@ -85,43 +83,6 @@ impl Locale {
             Locale::De => Locale::Fr,
             Locale::Fr => Locale::Pl,
             Locale::Pl => Locale::En,
-        }
-    }
-}
-
-/// Which render backend the lab drives.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Mode {
-    /// Lenient VM render with the i18n host-helper pack wired in.
-    Render,
-    /// AOT-compat (strict) proxy — no host helpers; errors on what AOT rejects.
-    Compat,
-}
-
-impl Mode {
-    pub const ALL: [Mode; 2] = [Mode::Render, Mode::Compat];
-
-    #[must_use]
-    pub fn key(self) -> &'static str {
-        match self {
-            Mode::Render => "render",
-            Mode::Compat => "compat",
-        }
-    }
-
-    #[must_use]
-    pub fn label(self) -> &'static str {
-        match self {
-            Mode::Render => "render (VM, lenient)",
-            Mode::Compat => "render_compat (AOT proxy)",
-        }
-    }
-
-    #[must_use]
-    pub fn toggle(self) -> Mode {
-        match self {
-            Mode::Render => Mode::Compat,
-            Mode::Compat => Mode::Render,
         }
     }
 }
@@ -240,32 +201,29 @@ fn area_from(text: &str) -> TextArea<'static> {
 }
 
 /// The whole lab state: the editable template, data, and i18n-catalog text areas, plus
-/// the selected sample, locale, mode, focus, and the Output scroll offset.
+/// the selected sample, locale, focus, and the Output scroll offset.
 pub struct Lab {
     pub sample: Sample,
     pub locale: Locale,
-    pub mode: Mode,
     pub focus: Focus,
     pub template: TextArea<'static>,
     pub data: TextArea<'static>,
     pub i18n: TextArea<'static>,
     pub output_scroll: u16,
     /// Memoized last render, keyed on a hash of every input that feeds it (the three pane
-    /// texts + locale + mode + sample). A `ui()` frame renders once and the scroll clamp
+    /// texts + locale + sample). A `ui()` frame renders once and the scroll clamp
     /// reuses it instead of re-rendering; any input change moves the key, so the cache
     /// can't go stale — the exact failure this example otherwise teaches against.
     render_cache: RefCell<Option<(u64, String)>>,
 }
 
 impl Lab {
-    /// Seed the lab from a sample (English, lenient render, template focused, default
-    /// i18n catalog).
+    /// Seed the lab from a sample (English, template focused, default i18n catalog).
     #[must_use]
     pub fn from_sample(sample: Sample) -> Self {
         let mut lab = Lab {
             sample,
             locale: Locale::En,
-            mode: Mode::Render,
             focus: Focus::Template,
             template: area_from(sample.template()),
             data: area_from(sample.data_yaml()),
@@ -294,23 +252,18 @@ impl Lab {
         area.lines().join("\n")
     }
 
-    /// Render the current template against the current (YAML) data.
+    /// Render the current template against the current (YAML) data, with the i18n
+    /// host-helper pack wired in.
     ///
     /// # Errors
-    /// A YAML parse error for the data or catalog, the template parse error, or — in compat
-    /// mode — the reason AOT would reject the template (e.g. a host helper).
+    /// A YAML parse error for the data or catalog, or the template parse error.
     pub fn render(&self) -> Result<String, String> {
         let template = Template::parse(&Self::pane_text(&self.template))?;
         let data = data::parse(&Self::pane_text(&self.data))?;
-        match self.mode {
-            Mode::Compat => template.render_compat(&data),
-            Mode::Render => {
-                let catalog = Rc::new(i18n::parse_catalog(&Self::pane_text(&self.i18n))?);
-                let mut helpers = Helpers::new();
-                i18n::register(&mut helpers, self.locale, &catalog);
-                template.render_with(&data, &Rc::new(helpers))
-            }
-        }
+        let catalog = Rc::new(i18n::parse_catalog(&Self::pane_text(&self.i18n))?);
+        let mut helpers = Helpers::new();
+        i18n::register(&mut helpers, self.locale, &catalog);
+        template.render_with(&data, &Rc::new(helpers))
     }
 
     /// A hash of every input [`Lab::render`] reads — the cache key. Lines are hashed with a
@@ -325,7 +278,6 @@ impl Lab {
             }
         }
         self.locale.code().hash(&mut h);
-        self.mode.key().hash(&mut h);
         self.sample.key().hash(&mut h);
         h.finish()
     }
@@ -353,12 +305,8 @@ impl Lab {
         self.locale = self.locale.next();
     }
 
-    pub fn toggle_mode(&mut self) {
-        self.mode = self.mode.toggle();
-    }
-
-    /// Load the next sample, reseeding the template + data panes (keeps the i18n catalog,
-    /// locale, and mode).
+    /// Load the next sample, reseeding the template + data panes (keeps the i18n catalog
+    /// and locale).
     pub fn cycle_sample(&mut self) {
         let next = self.sample.next();
         self.sample = next;
@@ -456,12 +404,7 @@ pub fn ui(frame: &mut Frame, lab: &Lab) {
             Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
         ),
         Span::styled(
-            format!(
-                "· {} · {} · {}",
-                lab.sample.label(),
-                lab.locale.label(),
-                lab.mode.label()
-            ),
+            format!("· {} · {}", lab.sample.label(), lab.locale.label()),
             Style::new().fg(Color::DarkGray),
         ),
     ]);
@@ -511,7 +454,7 @@ pub fn ui(frame: &mut Frame, lab: &Lab) {
     frame.render_widget(
         Paragraph::new(out_lines)
             .scroll((scroll, 0))
-            .block(Block::bordered().title(format!(" Output · {} ", lab.mode.key()))),
+            .block(Block::bordered().title(" Output ")),
         p.output,
     );
     maybe_scrollbar(frame, p.output, out_len, scroll);
@@ -539,7 +482,7 @@ pub fn ui(frame: &mut Frame, lab: &Lab) {
                 Style::new().fg(Color::Cyan),
             ),
             Span::styled(
-                " [Tab/click] focus  [F2] locale  [F3] mode  [F4] sample  [wheel/PgUp/PgDn] scroll  [Esc] quit ",
+                " [Tab/click] focus  [F2] locale  [F4] sample  [wheel/PgUp/PgDn] scroll  [Esc] quit ",
                 Style::new().fg(Color::DarkGray),
             ),
         ])),

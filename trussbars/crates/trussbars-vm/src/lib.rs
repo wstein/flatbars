@@ -12,7 +12,7 @@
 //! helpers, the collection ops (where/reject/some/every/find/pluck/sortBy/groupBy),
 //! `dict`, and partials (`{% inline %}`/`{{> }}`/`{% partial %}`/`{{yield}}`). Anything
 //! genuinely unimplemented returns `Err` (never a wrong answer). Shipped since the
-//! spike (docs/11): the lenient + AOT-compat (strict) render modes, host-helper
+//! spike (docs/11): the lenient render path, host-helper
 //! registration (value *and* block helpers — `{% name %}…{% endname %}`, docs/09 §3.1),
 //! a **selectable truthiness policy** ([`Template::with_truthiness`] — the dynamic
 //! backend's home for a runtime-swappable rule, parity with AOT's
@@ -89,8 +89,7 @@ impl Value {
 
     /// Truthiness under a selected policy — the dynamic mirror of the AOT
     /// `trussbars_core::TruthyIn<Mode>` (`docs/16-truthiness-modes.md`). `NonEmpty` is
-    /// the default rule above (a number is truthy when rendered leniently; the §5.3
-    /// compile error is an AOT/strict concern — see [`truthy_at`]). `Liquid` treats only
+    /// the default rule above (a number is truthy). `Liquid` treats only
     /// `false`/`null` as falsy; `Handlebars` treats `0`/`NaN`/`""`/`[]` as falsy, but an
     /// object `{}` as truthy.
     #[must_use]
@@ -243,10 +242,6 @@ struct Env {
     yield_html: Option<Rc<str>>,
     /// Partial names currently expanding (recursion guard).
     expanding: Vec<String>,
-    /// AOT-compat (strict) mode: reject what the AOT backend would reject — numeric
-    /// truthiness, bare-object output, unknown fields — so this render is a
-    /// *verifying proxy* for "would this compile under AOT, identically?" (docs/11 §7).
-    strict: bool,
     /// The truthiness policy this render uses (the load-time setting on [`Template`];
     /// docs/16). The dynamic backend's home for a *runtime*-swappable rule.
     mode: TruthMode,
@@ -280,8 +275,7 @@ type HostBlockHelper =
 /// A host-helper registry (F3, docs/11 §8). The dynamic backend's answer to custom
 /// helpers and the i18n/locale pack: a runtime `name → fn(&[Value]) -> Value` table —
 /// trivial here, where the AOT backend would need monomorphized codegen. Build one and
-/// pass it to [`Template::render_with`]. Host helpers are **rejected in AOT-compat
-/// mode** (the AOT backend doesn't register them — docs/11 §7/§8).
+/// pass it to [`Template::render_with`].
 #[derive(Default)]
 pub struct Helpers {
     map: BTreeMap<String, HostHelper>,
@@ -354,7 +348,7 @@ impl Template {
     /// The parse-error reason.
     pub fn parse(src: &str) -> Result<Template, String> {
         let (registry, nodes) = hoist(parse(src).map_err(|e| e.message)?);
-        // Try the bytecode fast path (no host helpers / strict — the tree-walk owns those).
+        // Try the bytecode fast path (no host helpers — the tree-walk owns those).
         let bytecode = registry
             .is_empty()
             .then(|| bytecode::Program::from_nodes(&nodes).ok())
@@ -387,7 +381,7 @@ impl Template {
     /// # Errors
     /// A reason string for an unimplemented construct/helper (never a wrong answer).
     pub fn render(&self, data: &Value) -> Result<String, String> {
-        self.render_string(data, &Rc::new(Helpers::new()), false)
+        self.render_string(data, &Rc::new(Helpers::new()))
     }
 
     /// Render with a host-helper registry (lenient mode, F3 / docs/11 §8). Unknown
@@ -396,34 +390,15 @@ impl Template {
     /// # Errors
     /// As [`Template::render`], plus any error a host helper returns.
     pub fn render_with(&self, data: &Value, helpers: &Rc<Helpers>) -> Result<String, String> {
-        self.render_string(data, helpers, false)
+        self.render_string(data, helpers)
     }
 
-    /// Render in **AOT-compat (strict) mode** — a verifying proxy for the AOT backend
-    /// (docs/11 §7): byte-identical to lenient on what the AOT accepts, but an `Err`
-    /// on what AOT would reject (numeric truthiness, bare-object output, an unknown
-    /// field against the data shape). "If it renders here, it compiles under
-    /// AOT and renders identically" — 100% modulo schema fidelity (it checks the data
-    /// shape, not the host's real Rust types).
-    ///
-    /// # Errors
-    /// The reason an AOT-rejected construct was used, located at the offending value.
-    pub fn render_compat(&self, data: &Value) -> Result<String, String> {
-        self.render_string(data, &Rc::new(Helpers::new()), true)
-    }
-
-    fn render_string(
-        &self,
-        data: &Value,
-        helpers: &Rc<Helpers>,
-        strict: bool,
-    ) -> Result<String, String> {
-        // Fast path: a fully-compiled template renders via bytecode (lenient, default
-        // policy only — the tree-walk owns strict/AOT-compat and any non-`NonEmpty`
-        // policy). It uses no host helpers and no out-of-subset construct, so it needs
-        // neither `helpers` nor strict checks; its truthiness is `NonEmpty`.
-        if !strict
-            && self.mode == TruthMode::NonEmpty
+    fn render_string(&self, data: &Value, helpers: &Rc<Helpers>) -> Result<String, String> {
+        // Fast path: a fully-compiled template renders via bytecode (default policy
+        // only — the tree-walk owns any non-`NonEmpty` policy). It uses no host helpers
+        // and no out-of-subset construct, so it needs no `helpers`; its truthiness is
+        // `NonEmpty`.
+        if self.mode == TruthMode::NonEmpty
             && let Some(bc) = &self.bytecode
         {
             let out = bc.render(data);
@@ -431,7 +406,7 @@ impl Template {
             return Ok(out);
         }
         let mut out = String::with_capacity(self.cap_hint.get().max(16));
-        self.eval_root(data, &mut out, helpers, strict)?;
+        self.eval_root(data, &mut out, helpers)?;
         self.cap_hint.set(out.len());
         Ok(out)
     }
@@ -442,7 +417,7 @@ impl Template {
     /// # Errors
     /// As [`Template::render`].
     pub fn render_into(&self, data: &Value, out: &mut String) -> Result<(), String> {
-        self.eval_root(data, out, &Rc::new(Helpers::new()), false)
+        self.eval_root(data, out, &Rc::new(Helpers::new()))
     }
 
     fn eval_root(
@@ -450,7 +425,6 @@ impl Template {
         data: &Value,
         out: &mut String,
         helpers: &Rc<Helpers>,
-        strict: bool,
     ) -> Result<(), String> {
         let env = Env {
             this: data.clone(),
@@ -462,7 +436,6 @@ impl Template {
             partials: Rc::clone(&self.partials),
             yield_html: None,
             expanding: Vec::new(),
-            strict,
             mode: self.mode,
             helpers: Rc::clone(helpers),
         };
@@ -558,12 +531,6 @@ fn eval_node(env: &Env, n: &Node, out: &mut String) -> Result<(), String> {
         Node::RawBlock { body, .. } => out.push_str(body),
         Node::Output { expr, raw, .. } => {
             let v = eval_expr(env, expr)?;
-            if env.strict && matches!(v, Value::Object(_)) {
-                return Err(
-                    "AOT-compat: a struct/object has no text form (AOT rejects `{{object}}`)"
-                        .into(),
-                );
-            }
             if *raw {
                 v.raw_text(out);
             } else {
@@ -608,8 +575,7 @@ fn eval_node(env: &Env, n: &Node, out: &mut String) -> Result<(), String> {
         },
         // Host block helpers (docs/09 §3.1): the runtime mirror of AOT's body-as-closure.
         // Evaluate the args, hand the helper a `body` thunk that renders the inner nodes in
-        // this scope, and write its (markup) return raw. Rejected in AOT-compat — the proxy
-        // registers no helpers — with the same marker shape as a value helper.
+        // this scope, and write its (markup) return raw.
         Node::HelperBlock(b) => {
             let args: Vec<Value> = b
                 .args
@@ -617,7 +583,7 @@ fn eval_node(env: &Env, n: &Node, out: &mut String) -> Result<(), String> {
                 .map(|a| eval_expr(env, a))
                 .collect::<Result<_, _>>()?;
             match env.helpers.get_block(&b.head) {
-                Some(f) if !env.strict => {
+                Some(f) => {
                     let body = || -> Result<String, String> {
                         let mut s = String::new();
                         eval_nodes(env, &b.body, &mut s)?;
@@ -666,30 +632,19 @@ fn expand_partial(
         partials: Rc::clone(&env.partials),
         yield_html,
         expanding,
-        strict: env.strict,
         mode: env.mode,
         helpers: Rc::clone(&env.helpers),
     };
     eval_nodes(&child, body, out)
 }
 
-/// Truthiness at a boolean-decision site, under the render's policy (docs/16). In
-/// AOT-compat (strict) mode under the default `NonEmpty` policy a number is an error —
-/// AOT has no `TruthyIn<NonEmpty>` for numbers (docs/01 §5.3); write a comparison. Under
-/// a `Liquid`/`Handlebars` policy numbers *are* truthy/comparable, so the rejection does
-/// not apply.
-fn truthy_at(env: &Env, v: &Value) -> Result<bool, String> {
-    if env.strict && env.mode == TruthMode::NonEmpty && matches!(v, Value::Num(_)) {
-        return Err(
-            "AOT-compat: a number in boolean position — write an explicit comparison (e.g. `> 0`)"
-                .into(),
-        );
-    }
-    Ok(v.truthy_in(env.mode))
+/// Truthiness at a boolean-decision site, under the render's policy (docs/16).
+fn truthy_at(env: &Env, v: &Value) -> bool {
+    v.truthy_in(env.mode)
 }
 
 fn eval_cond(env: &Env, c: &Cond, out: &mut String) -> Result<(), String> {
-    let mut test = truthy_at(env, &eval_expr(env, &c.cond)?)?;
+    let mut test = truthy_at(env, &eval_expr(env, &c.cond)?);
     if c.negated {
         test = !test;
     }
@@ -697,7 +652,7 @@ fn eval_cond(env: &Env, c: &Cond, out: &mut String) -> Result<(), String> {
         return eval_nodes(env, &c.body, out);
     }
     for (econd, ebody) in &c.elifs {
-        if truthy_at(env, &eval_expr(env, econd)?)? {
+        if truthy_at(env, &eval_expr(env, econd)?) {
             return eval_nodes(env, ebody, out);
         }
     }
@@ -721,7 +676,7 @@ fn eval_case(env: &Env, c: &Case, out: &mut String) -> Result<(), String> {
 
 fn eval_with(env: &Env, w: &With, out: &mut String) -> Result<(), String> {
     let subj = eval_expr(env, &w.subject)?;
-    if truthy_at(env, &subj)? {
+    if truthy_at(env, &subj) {
         eval_nodes(&env.rerooted(subj), &w.body, out)
     } else {
         eval_nodes(env, &w.otherwise, out)
@@ -729,14 +684,6 @@ fn eval_with(env: &Env, w: &With, out: &mut String) -> Result<(), String> {
 }
 
 fn eval_each(env: &Env, e: &Each, out: &mut String) -> Result<(), String> {
-    // AOT compiles a dict literal to a struct, which has no `Each` impl — so in
-    // AOT-compat (strict) mode, iterating one is rejected (mirroring the AOT emitter);
-    // lenient mode still iterates the dynamic map.
-    if env.strict && matches!(&e.subject, Expr::App(n, _) if n == "dict") {
-        return Err(
-            "AOT-compat: cannot iterate a dict literal — bind it and read its fields".into(),
-        );
-    }
     let subj = eval_expr(env, &e.subject)?;
     // (key, element) pairs — arrays have no key, objects carry their field name.
     // Element clones are refcount bumps (Rc-backed Value), not deep copies.
@@ -789,7 +736,7 @@ fn eval_expr(env: &Env, e: &Expr) -> Result<Value, String> {
         ("null", []) => Ok(Value::Null),
         ("loop", []) => Err("'loop' used outside an each / in output position".into()),
         ("lookup", _) => eval_path(env, args),
-        ("not", [a]) => Ok(Value::Bool(!truthy_at(env, &eval_expr(env, a)?)?)),
+        ("not", [a]) => Ok(Value::Bool(!truthy_at(env, &eval_expr(env, a)?))),
         ("and", _) => Ok(Value::Bool(all_truthy(env, args, true)?)),
         ("or", _) => Ok(Value::Bool(all_truthy(env, args, false)?)),
         ("eq", [a, b]) => Ok(Value::Bool(eval_expr(env, a)? == eval_expr(env, b)?)),
@@ -804,7 +751,7 @@ fn eval_expr(env: &Env, e: &Expr) -> Result<Value, String> {
         ("divide", [a, b]) => num_op(env, a, b, |x, y| x / y),
         ("modulo", [a, b]) => num_op(env, a, b, rem_euclid),
         ("ternary", [c, a, b]) => {
-            if truthy_at(env, &eval_expr(env, c)?)? {
+            if truthy_at(env, &eval_expr(env, c)?) {
                 eval_expr(env, a)
             } else {
                 eval_expr(env, b)
@@ -820,7 +767,7 @@ fn eval_expr(env: &Env, e: &Expr) -> Result<Value, String> {
         }
         ("firstTruthy", [a, b]) => {
             let av = eval_expr(env, a)?;
-            if truthy_at(env, &av)? {
+            if truthy_at(env, &av) {
                 Ok(av)
             } else {
                 eval_expr(env, b)
@@ -865,8 +812,6 @@ fn eval_expr(env: &Env, e: &Expr) -> Result<Value, String> {
             Ok(Value::Object(Rc::new(obj)))
         }
         ("dict", _) => {
-            // Dict literals compile under AOT (v2 synthesizes a typed struct), so they
-            // are in the AOT-compat subset too — strict mode renders them like lenient.
             let mut obj = BTreeMap::new();
             for pair in args.chunks(2) {
                 if let [Expr::Lit(Lit::Str(k)), v] = pair {
@@ -974,7 +919,6 @@ fn navigate_ref(env: &Env, base: &Value, keys: &[Expr]) -> Result<Value, String>
         cur = match (cur, &key) {
             (Value::Object(o), Value::Str(s)) => match o.get(&**s) {
                 Some(v) => v,
-                None if env.strict => return Err(format!("AOT-compat: unknown field '{s}'")),
                 None => return Ok(Value::Null),
             },
             (Value::Array(a), Value::Num(n)) => match a.get(*n as usize) {
@@ -1005,7 +949,7 @@ fn parent_index(e: &Expr) -> Option<usize> {
 
 fn all_truthy(env: &Env, args: &[Expr], require_all: bool) -> Result<bool, String> {
     for a in args {
-        let t = truthy_at(env, &eval_expr(env, a)?)?;
+        let t = truthy_at(env, &eval_expr(env, a)?);
         if require_all && !t {
             return Ok(false);
         }
@@ -1068,7 +1012,7 @@ fn order(a: &Value, b: &Value) -> core::cmp::Ordering {
 /// `"key" "cmp" value` (compare the field).
 fn pred(env: &Env, elem: &Value, pargs: &[Expr]) -> Result<bool, String> {
     match pargs {
-        [Expr::Lit(Lit::Str(key))] => truthy_at(env, &field(elem, key)),
+        [Expr::Lit(Lit::Str(key))] => Ok(truthy_at(env, &field(elem, key))),
         [Expr::Lit(Lit::Str(key)), Expr::Lit(Lit::Str(cmp)), val] => {
             cmp_values(&field(elem, key), cmp, &eval_expr(env, val)?)
         }
@@ -1202,10 +1146,10 @@ fn eval_helper(env: &Env, name: &str, args: &[Expr]) -> Result<Value, String> {
         ("toFixed", [Value::Num(n), Value::Num(d)]) => {
             Ok(str_val(format!("{:.*}", *d as usize, n)))
         }
-        // A host helper (F3) — but not in AOT-compat, where AOT registers none.
+        // A host helper (F3).
         _ => match env.helpers.get(name) {
-            Some(f) if !env.strict => f(&vs),
-            _ => Err(format!("unsupported: helper '{name}' / {} args", vs.len())),
+            Some(f) => f(&vs),
+            None => Err(format!("unsupported: helper '{name}' / {} args", vs.len())),
         },
     }
 }
@@ -1346,10 +1290,8 @@ mod tests {
         let t = Template::parse("{{name | shout}}").unwrap();
         let d = obj(&[("name", s("hi"))]);
         assert_eq!(t.render_with(&d, &h).unwrap(), "HI!");
-        // Unknown helper without the registry still errors…
+        // Unknown helper without the registry still errors.
         assert!(t.render(&d).is_err());
-        // …and a host helper is rejected in AOT-compat (AOT registers none).
-        assert!(t.render_compat(&d).is_err());
     }
 
     #[test]
@@ -1384,49 +1326,8 @@ mod tests {
         let esc = obj(&[("name", s("<b>"))]);
         assert_eq!(framed.render_with(&esc, &h).unwrap(), "[hi &lt;b&gt;]");
 
-        // Undeclared block head errors without a registry, and is rejected in AOT-compat.
+        // Undeclared block head errors without a registry.
         assert!(framed.render(&d).is_err());
-        assert!(framed.render_compat(&d).is_err());
-    }
-
-    #[test]
-    fn aot_compat_mode() {
-        let d = obj(&[("n", Value::Num(5.0))]);
-        // What AOT accepts renders identically in strict mode…
-        assert_eq!(
-            Template::parse("{% if n > 0 %}pos{% endif %}")
-                .unwrap()
-                .render_compat(&d)
-                .unwrap(),
-            "pos"
-        );
-        // …including a dict literal (AOT synthesizes a typed struct for it):
-        assert_eq!(
-            Template::parse(r#"{% with (dict "a" 1) %}{{a}}{% endwith %}"#)
-                .unwrap()
-                .render_compat(&d)
-                .unwrap(),
-            "1"
-        );
-        // …and what AOT rejects is an Err (a verifying proxy):
-        let rejects = [
-            "{% if n %}x{% endif %}", // numeric truthiness
-            "{{this}}",               // bare-object output
-            "{{missing}}",            // unknown field
-        ];
-        for t in rejects {
-            assert!(
-                Template::parse(t).unwrap().render_compat(&d).is_err(),
-                "should reject in AOT-compat: {t}"
-            );
-            // …but lenient mode still renders them.
-            assert!(
-                Template::parse(t)
-                    .unwrap()
-                    .render(&obj(&[("n", Value::Num(5.0)), ("missing", Value::Null)]))
-                    .is_ok()
-            );
-        }
     }
 
     #[test]
@@ -1489,16 +1390,6 @@ mod tests {
                 .render(&zero)
                 .unwrap(),
             "t"
-        );
-        // Strict (AOT-compat) rejects a numeric condition only under NonEmpty; under a
-        // policy where numbers are truthy/comparable it is accepted.
-        assert!(Template::parse(src).unwrap().render_compat(&zero).is_err());
-        assert!(
-            Template::parse(src)
-                .unwrap()
-                .with_truthiness(TruthMode::Handlebars)
-                .render_compat(&zero)
-                .is_ok()
         );
     }
 }

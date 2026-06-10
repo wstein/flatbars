@@ -1664,7 +1664,7 @@
       // so the editor paints helper names exactly like the LSP / VS Code — NOT the
       // 12-entry user-facing Transformers-panel subset (renderer.allTransformers()).
       import { OPERATION_NAMES } from "./operation-names.mjs?v=1";
-      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=125";
+      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=126";
       import { createHelperSandbox } from "./helper-sandbox.mjs?v=1";
       import { renderTransformers as renderTransformersPanel } from "./panels/transformers.mjs";
       import { renderPartials as renderPartialsPanel } from "./panels/partials.mjs";
@@ -3173,7 +3173,6 @@
       let lastAnalyse = { ok: true, findings: [] }; // ADR-022: truthiness portability (Truthiness panel)
       let lastAnalyseSuppressed = 0; // ADR-030: count of potential/miss findings the pathSchema removed
       let lastLint = { ok: true, findings: [] }; // ADR-019: canonicalization lint findings (Lint panel)
-      let lastCompat = { ok: true, compatible: true, findings: [] }; // Trussbars AOT-compat (MaxBars only)
       let lastRequiredAssigns = []; // engine reflection: assign names the program reads
       let lastMissingAssigns = [];  // intersection: requiredAssigns NOT in current data
 
@@ -3535,7 +3534,6 @@
         lastDeps = null; lastCalls = []; lastEscapeRuns = null; lastCoverage = [];
         lastAnalyse = { ok: true, findings: [] };
         lastLint = { ok: true, findings: [] };
-        lastCompat = { ok: true, compatible: true, findings: [] };
         lastRequiredAssigns = []; lastMissingAssigns = [];
         const dataSource = yamlSrc; // the YAML tab's source (editor may show the transform)
         const mainSource = tabs[0].source;
@@ -3695,12 +3693,6 @@
         lastLint = typeof renderer.lint === "function"
           ? renderer.lint(mainSource)
           : { ok: true, findings: [] };
-        // Trussbars AOT-compat (MaxBars only): would this MaxBars build under the
-        // production Rust AOT compiler? Structural verdict from the real front-end;
-        // numeric-truthiness / struct-output observed against the rendered data.
-        lastCompat = engineFeatures.includes("trussbars-compat") && typeof renderer.compatCheck === "function"
-          ? renderer.compatCheck({ source: mainSource, partials: partialsMap() }, data)
-          : { ok: true, compatible: true, findings: [] };
         refreshCoverageGutter();
         // Engine-reported assigns that aren't present at the data root — a
         // tight, false-positive-free "missing assigns" signal (Data Access).
@@ -5320,15 +5312,6 @@
             return lastLint.findings.length ? "warn" : "success";
           },
           render: renderLint },
-        // Trussbars AOT-compat (MaxBars only): MaxBars constructs the production
-        // Rust AOT compiler rejects — the verdict + each located incompatibility.
-        { id: "trussbars-compat", label: "Trussbars", requires: ["trussbars-compat"],
-          count: () => lastCompat.findings.length,
-          badge: () => {
-            if (!lastCompat.ok) return "";
-            return lastCompat.compatible ? "success" : "warn";
-          },
-          render: renderTrussbarsCompat },
         // The read-only inspectors (moved here from the Sources pane). They are
         // not analyses with a count — `noBadge` suppresses the badge — and follow
         // the active file / last render (re-rendered by renderDock after each run).
@@ -5924,55 +5907,6 @@
         for (const f of rows) {
           const row = makeEl("div", { class: "cv-row" }, [
             makeEl("span", { class: "cv-kind" }, f.name || f.severity),
-            makeEl("span", { class: "cv-label" }, plain(f.message)),
-            makeEl("span", { class: "cv-where" }, `main:${f.line}:${f.column}`),
-          ]);
-          row.title = "jump to source";
-          row.addEventListener("click", () => openProblem({ file: "main", line: f.line, col: f.column }));
-          list.append(row);
-        }
-        section.append(list);
-        body.append(section);
-      }
-
-      // Trussbars AOT-compat: does this MaxBars template build under the Trussbars
-      // production AOT compiler? The structural verdict is the real AOT front-end's
-      // (drift-proof); numeric-truthiness / struct-output are observed against the
-      // sample data. Advisory — MaxBars and the Trussbars VM still run it; only the
-      // AOT (max-speed) backend rejects it.
-      const COMPAT_RULE_LABEL = {
-        "aot-structural": "structural",
-        "numeric-truthiness": "numeric truthiness",
-        "struct-output": "struct output",
-      };
-      function renderTrussbarsCompat(body) {
-        const a = lastCompat;
-        const section = makeEl("div", { class: "cv-section" });
-        const plain = (s) => String(s).replace(/`/g, "");
-        if (!a.ok) {
-          section.append(makeEl("div", { class: "cv-empty" },
-            "Compatibility unavailable: " + (a.error || "the template did not parse.")));
-          body.append(section);
-          return;
-        }
-        const rows = a.findings;
-        section.append(makeEl("div", { class: "cv-head" }, [
-          makeEl("strong", {}, "Trussbars AOT"),
-          " — ",
-          a.compatible ? "compatible" : `${rows.length} incompatibilit${rows.length === 1 ? "y" : "ies"}`,
-        ]));
-        if (a.compatible) {
-          section.append(makeEl("div", { class: "cv-empty" },
-            "This template compiles under the Trussbars production AOT compiler — names are static, data is dynamic, the two never cross."));
-          body.append(section);
-          return;
-        }
-        section.append(makeEl("div", { class: "cv-hint" },
-          "These render fine under MaxBars (and the Trussbars VM), but the typed AOT backend rejects them. The VM backend runs them unchanged."));
-        const list = makeEl("div", { class: "cv-rows" });
-        for (const f of rows) {
-          const row = makeEl("div", { class: "cv-row" }, [
-            makeEl("span", { class: "cv-kind" }, COMPAT_RULE_LABEL[f.rule] || f.rule),
             makeEl("span", { class: "cv-label" }, plain(f.message)),
             makeEl("span", { class: "cv-where" }, `main:${f.line}:${f.column}`),
           ]);

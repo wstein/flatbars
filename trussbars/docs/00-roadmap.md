@@ -91,6 +91,47 @@ re-scoped when the editor phase starts. **14** stays parked.
 - `docs/13` own status is **not** stale (the survey's "Draft" hit was §5 quoting *docs/01*'s header); its Decision was amended to the ratified **(C)**.
 - ✅ done (was `docs/13 §3` residual): `docs/08`/`docs/11` counters normalized to 71/71 (freeze-era 56/56 kept only where the text is about the freeze).
 
+## Strict-native cutover — legacy `{{#…}}` + the AOT-compat layer removed (2026-06-10)
+
+Two coupled removals, both **deliberate scope reductions** (no replacement), landing the
+strict-native direction:
+
+1. **Legacy `{{#…}}` block control deleted from the Rust parser.** The strict native
+   dialect (docs/19) makes `{{ … }}` **output-only**; control flow is the Django-style
+   `{% … %}` statement tag. The Handlebars block-open (`{{#x}}`) / block-close (`{{/x}}`)
+   sigils were removed from the lexer dispatch — such a tag now falls through to an
+   ordinary (invalid) output expression; **no rejection path was added** (the code is just
+   gone). Kept by design: the quad-raw block `{{{{#raw}}}}…{{{{/raw}}}}` (its own syntax),
+   `{{> }}` partials, `{{! }}` comments, `{{yield}}`, the `{{else if}}` clause.
+   `trussbars-import` is untouched (it parses *foreign* Handlebars on purpose).
+
+2. **The AOT-compat layer removed end-to-end.** Rationale: the AOT backend's "subset"
+   is enforced by **compilation itself** — an incompatible MaxBars template simply fails to
+   build under AOT with a located front-end/`rustc` error. A *separate* runtime verifying
+   proxy (`render_compat`) plus a cross-language drift gate that kept a PureScript lint and
+   the Rust proxy in lock-step was standing maintenance for a preview of "would this
+   compile?" that the compiler answers directly. With strict-native there is no broader
+   "compat surface" to assess, so the whole apparatus goes. Removed:
+   - **Rust:** `Template::render_compat`, the `truss-vm --compat` flag, the VM's `strict`
+     field + all AOT-reject branches (numeric truthiness, bare-struct output, unknown
+     field, host-helper-in-strict, dict-iteration), the `aot_compat_mode` test; and the
+     `examples/lab` TUI's `Mode::Compat` toggle. The VM is now **lenient-only**.
+   - **PureScript:** the whole `MaxBars.Compat` module; the `maxbarsCompat` /
+     `maxbarsCompatWithPartials` / `CompatResult` facade in `ClassicBars.JS`; the MaxBars
+     compat test block.
+   - **Harness/gates:** the `--vm-compat` and `--compat-parity` modes + `compat-parity.json`;
+     the `test:trussbars-vm-compat` and `check:trussbars-compat` npm scripts.
+   - **Lab:** the "Trussbars" AOT-compat Studio panel + its renderer wiring.
+
+   **Kept (unrelated, despite the shared word):** MinBars **mustache-js compat**
+   (`renderMinbarsCompat` / `compileMinbarsCompat` / `flatbars --mustache-js`) — the
+   `0`/`""`-falsy truthiness mode, a different feature entirely.
+
+   Verification at landing: `npm test` green (incl. `check:bundle` + `check:lab-cachebust`);
+   Rust `cargo test --workspace` 370/0; `trussbars-vm` 13/0. The scattered `--vm-compat`
+   axis mentions in docs/12·14·16·17·18·19 are **historical** (point-in-time gate lists) and
+   superseded by this record.
+
 ## Reference docs
 
 - `01-subset-spec.md` — the language. `02-runtime-api.md` — the runtime surface

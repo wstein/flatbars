@@ -1,4 +1,4 @@
-//! Golden snapshots of the render core across the full {sample × locale × mode} matrix
+//! Golden snapshots of the render core across the full {sample × locale} matrix
 //! — the headless gate over the VM Lab (the interactive `main.rs` is just I/O).
 //!
 //! Regenerate after an intentional change with:
@@ -6,12 +6,11 @@
 
 use std::fs;
 
-use trussbars_lab::{Lab, Locale, Mode, samples::Sample};
+use trussbars_lab::{Lab, Locale, samples::Sample};
 
-fn seeded(sample: Sample, locale: Locale, mode: Mode) -> Lab {
+fn seeded(sample: Sample, locale: Locale) -> Lab {
     let mut lab = Lab::from_sample(sample);
     lab.locale = locale;
-    lab.mode = mode;
     lab
 }
 
@@ -27,22 +26,15 @@ fn golden_matrix() {
     let mut missing = Vec::new();
     for sample in Sample::ALL {
         for locale in Locale::ALL {
-            for mode in Mode::ALL {
-                let lab = seeded(sample, locale, mode);
-                let path = format!(
-                    "tests/golden/{}_{}_{}.txt",
-                    sample.key(),
-                    locale.code(),
-                    mode.key()
-                );
-                let got = lab.render_or_reject();
-                match fs::read_to_string(&path) {
-                    Ok(want) => assert_eq!(
-                        got, want,
-                        "drift in {path} — re-bless with `cargo run --bin lab -- --bless tests/golden`"
-                    ),
-                    Err(_) => missing.push(path),
-                }
+            let lab = seeded(sample, locale);
+            let path = format!("tests/golden/{}_{}.txt", sample.key(), locale.code());
+            let got = lab.render_or_reject();
+            match fs::read_to_string(&path) {
+                Ok(want) => assert_eq!(
+                    got, want,
+                    "drift in {path} — re-bless with `cargo run --bin lab -- --bless tests/golden`"
+                ),
+                Err(_) => missing.push(path),
             }
         }
     }
@@ -68,7 +60,7 @@ fn plural_switches_with_count() {
         (Locale::Pl, 5, "5 elementów"),
     ];
     for (locale, count, expected) in cases {
-        let mut lab = seeded(Sample::Receipt, locale, Mode::Render);
+        let mut lab = seeded(Sample::Receipt, locale);
         lab.set_data(&receipt_data(count));
         let out = lab.render_or_reject();
         assert!(
@@ -81,7 +73,7 @@ fn plural_switches_with_count() {
 #[test]
 fn edited_catalog_changes_output() {
     // The i18n pane is live: overriding the en title flows straight into the render.
-    let mut lab = seeded(Sample::Receipt, Locale::En, Mode::Render);
+    let mut lab = seeded(Sample::Receipt, Locale::En);
     lab.set_i18n("en:\n  title: INVOICE\n");
     assert!(lab.render_or_reject().contains("== INVOICE =="));
 }
@@ -96,14 +88,14 @@ fn editing_a_pane_flows_into_the_render() {
 
 #[test]
 fn invalid_data_is_reported_not_panicked() {
-    let mut lab = seeded(Sample::Greeting, Locale::En, Mode::Render);
+    let mut lab = seeded(Sample::Greeting, Locale::En);
     lab.set_data("a: [1, 2\nb: oops");
     assert!(lab.render_or_reject().starts_with("⟂ invalid data YAML:"));
 }
 
 #[test]
 fn invalid_catalog_is_reported() {
-    let mut lab = seeded(Sample::Receipt, Locale::En, Mode::Render);
+    let mut lab = seeded(Sample::Receipt, Locale::En);
     lab.set_i18n("en: [not, a, map]");
     assert!(
         lab.render_or_reject()

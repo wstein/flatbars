@@ -5,8 +5,8 @@
 //! prints the reason to stderr and exits `1` (so the conformance harness can tally
 //! coverage). Drives the `harness.mjs --vm` gate (docs/11 §9).
 //!
-//! Flags: `--compat` renders in AOT-compat (strict) mode; `--truthiness=<Mode>` selects
-//! the truthiness policy (`NonEmpty` default, `Liquid`, `Handlebars`; docs/16).
+//! Flags: `--truthiness=<Mode>` selects the truthiness policy (`NonEmpty` default,
+//! `Liquid`, `Handlebars`; docs/16).
 
 use std::collections::BTreeMap;
 use std::io::Read;
@@ -32,8 +32,6 @@ fn main() {
     let template = req.get("template").and_then(Json::as_str).unwrap_or("");
     let data = from_json(req.get("data").unwrap_or(&Json::Null));
 
-    // `--compat` renders in AOT-compat (strict) mode — the verifying proxy.
-    let strict = std::env::args().any(|a| a == "--compat");
     // `--truthiness=<Mode>` selects the truthiness policy (default NonEmpty; docs/16).
     let mode = match truthiness_arg() {
         Ok(m) => m,
@@ -45,14 +43,7 @@ fn main() {
         }
     };
     let result = match Template::parse(template) {
-        Ok(t) => {
-            let t = t.with_truthiness(mode);
-            if strict {
-                t.render_compat(&data)
-            } else {
-                t.render(&data)
-            }
-        }
+        Ok(t) => t.with_truthiness(mode).render(&data),
         Err(e) => Err(e),
     };
     match result {

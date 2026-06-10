@@ -2,11 +2,11 @@
 //!
 //! A [`ratatui`] draw loop over the crossterm backend (`ratatui::crossterm`, so there's
 //! a single crossterm version). Edit the focused pane (template, YAML data, or i18n
-//! catalog) and watch the VM re-render; cycle locale/mode/sample with the function keys;
+//! catalog) and watch the VM re-render; cycle locale/sample with the function keys;
 //! click to focus a pane and use the wheel / `PageUp`/`PageDown` to scroll.
 //!
 //! Headless modes (no terminal):
-//!   * `--demo`         print every {sample × locale × mode} combo and exit.
+//!   * `--demo`         print every {sample × locale} combo and exit.
 //!   * `--bless [DIR]`  (re)write the golden snapshots used by `tests/golden.rs`.
 
 #![forbid(unsafe_code)]
@@ -26,7 +26,7 @@ use ratatui::crossterm::{
 };
 use ratatui::layout::Rect;
 
-use trussbars_lab::{Focus, Lab, Locale, Mode, panes, samples::Sample};
+use trussbars_lab::{Focus, Lab, Locale, panes, samples::Sample};
 use tui_textarea::CursorMove;
 
 fn main() -> io::Result<()> {
@@ -84,7 +84,7 @@ fn interactive() -> io::Result<()> {
     Ok(())
 }
 
-/// Handle a key press. Returns `true` to quit. Lab controls (focus/locale/mode/sample/
+/// Handle a key press. Returns `true` to quit. Lab controls (focus/locale/sample/
 /// scroll) are intercepted; everything else goes to the focused `tui-textarea`, which
 /// owns editing (insert, delete, selection, undo/redo, motions) and its own scrolling.
 fn handle_key(lab: &mut Lab, key: KeyEvent, area: Rect) -> bool {
@@ -92,7 +92,6 @@ fn handle_key(lab: &mut Lab, key: KeyEvent, area: Rect) -> bool {
         (KeyCode::Esc, _) | (KeyCode::Char('q'), KeyModifiers::CONTROL) => return true,
         (KeyCode::Tab, _) => lab.cycle_focus(),
         (KeyCode::F(2), _) => lab.cycle_locale(),
-        (KeyCode::F(3), _) => lab.toggle_mode(),
         (KeyCode::F(4), _) => lab.cycle_sample(),
         (KeyCode::PageDown | KeyCode::PageUp, _) => {
             let pane = lab.focus.pane();
@@ -176,19 +175,11 @@ fn demo() -> String {
     let mut out = String::new();
     for sample in Sample::ALL {
         for locale in Locale::ALL {
-            for mode in Mode::ALL {
-                let mut lab = Lab::from_sample(sample);
-                lab.locale = locale;
-                lab.mode = mode;
-                out.push_str(&format!(
-                    "### {} · {} · {}\n",
-                    sample.key(),
-                    locale.code(),
-                    mode.key()
-                ));
-                out.push_str(&lab.render_or_reject());
-                out.push('\n');
-            }
+            let mut lab = Lab::from_sample(sample);
+            lab.locale = locale;
+            out.push_str(&format!("### {} · {}\n", sample.key(), locale.code()));
+            out.push_str(&lab.render_or_reject());
+            out.push('\n');
         }
     }
     out
@@ -200,19 +191,11 @@ fn bless(dir: &str) -> io::Result<usize> {
     let mut written = 0;
     for sample in Sample::ALL {
         for locale in Locale::ALL {
-            for mode in Mode::ALL {
-                let mut lab = Lab::from_sample(sample);
-                lab.locale = locale;
-                lab.mode = mode;
-                let path = format!(
-                    "{dir}/{}_{}_{}.txt",
-                    sample.key(),
-                    locale.code(),
-                    mode.key()
-                );
-                std::fs::write(&path, lab.render_or_reject())?;
-                written += 1;
-            }
+            let mut lab = Lab::from_sample(sample);
+            lab.locale = locale;
+            let path = format!("{dir}/{}_{}.txt", sample.key(), locale.code());
+            std::fs::write(&path, lab.render_or_reject())?;
+            written += 1;
         }
     }
     Ok(written)

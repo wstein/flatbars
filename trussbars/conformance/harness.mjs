@@ -33,7 +33,7 @@ for (const p of [enginePath, emitterPath]) {
   }
 }
 
-const { renderMaxbars, maxbarsCompat, inferMaxbarsData } = await import(enginePath);
+const { renderMaxbars, inferMaxbarsData } = await import(enginePath);
 
 // Ctx source (docs/03 G2 step): prefer schema *inference* from the template
 // (Kernel.Schema), falling back to the data-only `genCtx` only where the case
@@ -114,126 +114,6 @@ if (process.argv.includes("--vm")) {
   }
   // Spike gate: every COVERED case must match; unsupported is reported, not failed.
   process.exit(fails.length === 0 && oracleErrors === 0 ? 0 : 1);
-}
-
-// `--vm-compat`: render through the VM's AOT-compat (strict) mode and assert it is a
-// VERIFYING PROXY for AOT (docs/11 §7/§9) — it ACCEPTS iff AOT accepts (`compileMaxRust`),
-// and on the accepted cases its output byte-matches the golden. A construct AOT rejects
-// (numeric truthiness, bare-struct output) must be rejected here too, and every accepted
-// case must render identically.
-if (process.argv.includes("--vm-compat")) {
-  console.error("building truss-vm (VM CLI)…");
-  execFileSync("cargo", ["+1.96.0", "build", "--quiet", "--bin", "truss-vm"], {
-    cwd: resolve(root, "trussbars/crates/trussbars-vm"),
-    stdio: ["ignore", "inherit", "inherit"],
-  });
-  const binPath = resolve(root, "trussbars/target/debug/truss-vm");
-  const snapPath = resolve(here, "snapshots.json");
-  const golden = existsSync(snapPath) ? JSON.parse(readFileSync(snapPath, "utf8")) : {};
-
-  let agreed = 0;
-  const divergences = [];
-  for (const c of cases) {
-    const o = renderMaxbars(c.template, c.data);
-    if (!o.ok) continue;
-    const aotAccepts = compileMaxRust("Ctx")(c.template).ok; // AOT's verdict
-    let vmOut = null;
-    let vmAccepts = true;
-    try {
-      vmOut = execFileSync(binPath, ["--compat"], {
-        input: JSON.stringify({ template: c.template, data: c.data }),
-        encoding: "utf8",
-      });
-    } catch {
-      vmAccepts = false;
-    }
-    const expected = c.id in golden ? golden[c.id] : o.value;
-    if (vmAccepts !== aotAccepts) {
-      divergences.push({ id: c.id, kind: "accept/reject", aot: aotAccepts, vm: vmAccepts });
-    } else if (aotAccepts && vmOut !== expected) {
-      divergences.push({ id: c.id, kind: "byte", expected, vm: vmOut });
-    } else {
-      agreed++;
-    }
-  }
-  console.log(
-    `Trussbars VM AOT-compat (verifying proxy): ${agreed}/${cases.length} agree with AOT ` +
-      `(accept⇔accept + byte-identical), ${divergences.length} divergence(s).`,
-  );
-  for (const d of divergences) {
-    if (d.kind === "accept/reject") {
-      console.error(`  DIVERGENCE ${d.id}: AOT accepts=${d.aot} but VM-compat accepts=${d.vm}`);
-    } else {
-      console.error(`  BYTE DIVERGENCE ${d.id}: expected ${JSON.stringify(d.expected)} got ${JSON.stringify(d.vm)}`);
-    }
-  }
-  process.exit(divergences.length === 0 ? 0 : 1);
-}
-
-// `--compat-parity`: the *drift gate* between the two AOT-compat verdicts — the
-// PureScript Lab lint (`MaxBars.Compat` via `maxbarsCompat`, the verdict the
-// "FlatBars Studio" Trussbars panel shows) and the Rust VM's verifying proxy
-// (`truss-vm --compat`, i.e. `render_compat`). For every case the two must AGREE on
-// accept/reject, so the lint can never tell a Lab author "AOT-compatible" when the
-// production engine would reject it (or vice-versa). Unlike `--vm-compat` (which
-// keys on `compileMaxRust.ok`, the *structural* front-end verdict only), this keys
-// on the FULL lint verdict — structural PLUS the data-driven rules (numeric
-// truthiness, struct output) — so it needs cases that exercise those, which the
-// shared `cases` corpus cannot hold (a numeric-truthiness positive would fail the
-// byte-emit gate's batched `cargo build`). Hence the extra curated negatives below.
-if (process.argv.includes("--compat-parity")) {
-  console.error("building truss-vm (VM CLI)…");
-  execFileSync("cargo", ["+1.96.0", "build", "--quiet", "--bin", "truss-vm"], {
-    cwd: resolve(root, "trussbars/crates/trussbars-vm"),
-    stdio: ["ignore", "inherit", "inherit"],
-  });
-  const binPath = resolve(root, "trussbars/target/debug/truss-vm");
-
-  // The shared corpus plus negatives that exercise the two *data-driven* rules the
-  // structural front-end can't see without a value (numeric truthiness, struct output).
-  const extra = [
-    { id: "compat-numeric-truthiness", template: "{{#if count}}x{{/if}}", data: { count: 3 } },
-    { id: "compat-numeric-truthiness-zero", template: "{{#if count}}x{{/if}}", data: { count: 0 } },
-    { id: "compat-struct-output", template: "{{user}}", data: { user: { name: "Ada" } } },
-    { id: "compat-host-helper", template: '{{t "hi"}}', data: {} },
-    { id: "compat-ok-bool", template: "{{#if active}}{{name}}{{/if}}", data: { active: true, name: "Ada" } },
-    // A dict literal is AOT-compatible, but *iterating* one is not (no `Each` impl) —
-    // both the lint and render_compat must reject it.
-    { id: "compat-each-over-dict", template: "{{#each {a: 1}}}{{this}}{{/each}}", data: {} },
-  ];
-  const parityCases = [...cases, ...extra];
-
-  let agreed = 0;
-  const divergences = [];
-  for (const c of parityCases) {
-    // The PureScript Lab lint verdict (what the Studio panel reports).
-    const ps = maxbarsCompat(c.template, c.data);
-    const psCompatible = ps.ok && ps.compatible;
-    // The Rust verifying-proxy verdict: render_compat accepts iff it does not throw.
-    let vmAccepts = true;
-    try {
-      execFileSync(binPath, ["--compat"], {
-        input: JSON.stringify({ template: c.template, data: c.data }),
-        encoding: "utf8",
-      });
-    } catch {
-      vmAccepts = false;
-    }
-    if (psCompatible === vmAccepts) agreed++;
-    else divergences.push({ id: c.id, ps: psCompatible, vm: vmAccepts, rules: ps.findings?.map((f) => f.rule) ?? [] });
-  }
-  console.log(
-    `Trussbars AOT-compat drift gate (PureScript lint ⇔ Rust render_compat): ` +
-      `${agreed}/${parityCases.length} agree, ${divergences.length} divergence(s).`,
-  );
-  for (const d of divergences) {
-    console.error(`  DIVERGENCE ${d.id}: PS compatible=${d.ps} but VM-compat accepts=${d.vm} (PS rules: ${d.rules.join(", ") || "none"})`);
-  }
-  writeFileSync(
-    resolve(here, "compat-parity.json"),
-    JSON.stringify({ agreed, total: parityCases.length, divergences }, null, 2) + "\n",
-  );
-  process.exit(divergences.length === 0 ? 0 : 1);
 }
 
 // `--v2`: emit through the Rust pipeline (`trussbars-template`, docs/08) instead of

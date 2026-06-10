@@ -193,6 +193,15 @@ the VM's guarantee is that *running* a parsed template can't be made to eval dat
 
 ## 7. Host-data binding & the render modes
 
+> **Superseded (2026-06-10) — the AOT-compat (strict) render mode below was removed.**
+> See the roadmap, *"Strict-native cutover — legacy `{{#…}}` + the AOT-compat layer
+> removed."* Rationale: the AOT backend's subset is enforced by **compilation itself** —
+> an incompatible MaxBars template fails to build under AOT with a located error — so a
+> separate runtime *verifying proxy* (`render_compat`) plus the cross-language drift gate
+> that kept it honest were dead weight. **The VM is now lenient-only** (mode 1); modes 2
+> (schema-checked, `docs/03`) and 3 (AOT-compat) are no longer VM render modes. The
+> design rationale below is kept as the historical record of why the proxy once existed.
+
 The host hands the VM **data** (a `Value`, or `serde_json::Value`, or a value behind a
 trait) plus the template. **Open decision (D3):** the binding surface —
 `render(template: &str, data: &Value) -> Result<String, RenderError>` is the minimum.
@@ -286,9 +295,10 @@ the VM is the second half.
 mini-Lab already exercises this exact surface minus the browser: it **live-edits** a
 template and its (JSON) data and re-renders through `trussbars-vm` on each keystroke,
 switches locale via i18n **host helpers** (`t`/`number`/`plural`/`date`/`relative`, §8 —
-the language drives a localized month name too), and toggles `render_compat` to show the
-AOT-parity verdict (§7) — host-helper templates are rejected (VM-only), plain ones render
-byte-identically. It is the runnable VM northstar today, and the state model (`Lab` + a
+the language drives a localized month name too). (It once toggled `render_compat` to show
+an AOT-parity verdict; that mode was removed with the AOT-compat layer — see §7's
+superseded banner — so the TUI is now lenient-render only.) It is the runnable VM
+northstar today, and the state model (`Lab` + a
 pure `render()` core + `ui()`, golden- and `TestBackend`-tested) ports directly to the
 WASM Studio panel — there, `ratatui`'s draw is swapped for the browser DOM but the core
 is unchanged.
