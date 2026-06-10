@@ -27,7 +27,7 @@ runtime.
 
 The **same desugared AST the v1 emitter consumes** — `Node`/`Expr` (core skeleton)
 *after* `desugarSurfaceWith`. The acceptance test is mechanical: **v2's
-parse+desugar+emit must reproduce the conformance corpus byte-for-byte** (56/56),
+parse+desugar+emit must reproduce the conformance corpus byte-for-byte** (71/71; 56/56 at freeze),
 because that corpus pins the v1 pipeline's output. Any divergence in the parser
 shows up there.
 
@@ -85,7 +85,7 @@ direct port of the desugar *rules*.** Rationale:
   the PS span model.
 - **Zero parser dependencies** keeps the proc-macro lean (vs C) and matches the
   "small, auditable substrate" ethos.
-- **The corpus is the safety net:** parse+desugar+emit must hit 56/56. Build the
+- **The corpus is the safety net:** parse+desugar+emit must hit 71/71 (56/56 at freeze). Build the
   parser test-first against it; divergence is mechanically visible.
 
 Hand-written recursive descent for `{{ }}`-style templates is well-trodden (the
@@ -120,7 +120,7 @@ non-trivial part (precedence-climbing for the operators).
    drop), if/elif/else, with (+ `find`), sequential `let`, partials/`yield`, the
    collection filters (`where`/`reject`/`some`/`every`/`find`). Gate: the
    conformance harness `--v2` flag emits through this Rust pipeline instead of the
-   v1 PureScript emitter and asserts the SAME golden — **64/64 byte-identical**, 0
+   v1 PureScript emitter and asserts the SAME golden — **71/71 byte-identical**, 0
    excluded, 0 drift (the `dict-*` and `standalone-*` cases included). Dict literals
    now compile to a synthesized generic struct (both emitters).
 5. **Diagnostics — ✅ DONE (class A + the gate)** (`crates/trussbars-macros`). The

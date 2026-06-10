@@ -232,9 +232,8 @@ severances plus owning the spec — not a directory move.
    project that cannot keep one counter synced inside the monorepo cannot defend two
    normative surfaces — so this was fixed first: `docs/04` + `docs/00` now read **71/71**
    against `report.json` (reconciled to 65/65 at review time; re-synced as the corpus grew
-   to 71). *Residual:* `docs/08`/`docs/11` still carry "56/56"/"64/64" in
-   historical/design context (56 was true at freeze) — normalize when those docs are next
-   touched.
+   to 71). *Residual:* ✅ done — `docs/08`/`docs/11` now read **71/71** (with "56/56 at freeze"
+   where the text is about the freeze moment), so every counter agrees with `report.json`.
 
 ## 4. Preconditions for the irreversible step (the real enabling event)
 
@@ -258,9 +257,8 @@ divergence* — the last act before deletion:
 - **G4 — Counter reconciliation. ✅ DONE (2026-06-09; re-synced 2026-06-10 as the corpus
   grew 65→71).** `docs/04` header, `docs/00` roadmap, and `report.json` now agree on
   **71/71, 0 excluded, 0 oracle drift** (`report.json` is the single source). No promotion
-  of a spec that contradicts its own gate. *Residual:*
-  `docs/08`/`docs/11` carry the freeze-era "56/56"/"64/64" in historical context — normalize
-  on next edit; not a live status contradiction.
+  of a spec that contradicts its own gate. *Residual:* ✅ done — `docs/08`/`docs/11` normalized
+  to **71/71** (freeze-era 56/56 kept only where the text is explicitly about the freeze).
 - **G5 — Negative/injection parity.** v2 holds the `--compat-parity 71/71` and the
   reject/injection-boundary classes (`docs/04 §2` buckets) that the JS gate never tested,
   so severing-with-v2 does not strand the rejection contract.

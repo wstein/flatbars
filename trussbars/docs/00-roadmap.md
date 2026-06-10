@@ -89,7 +89,7 @@ re-scoped when the editor phase starts. **14** stays parked.
 - spec **ADR-0021** (maxbars-variable-model): `Proposed` → **Accepted** (its own text says shipped 2026-06-07; referenced as live throughout CLAUDE.md). ✅ fixed.
 - spec **ADR-0026** (editor-capability-matrix): *no status line* — descriptive/settled; stamp `Accepted` on next edit.
 - `docs/13` own status is **not** stale (the survey's "Draft" hit was §5 quoting *docs/01*'s header); its Decision was amended to the ratified **(C)**.
-- Residual (noted `docs/13 §3`): `docs/08`/`docs/11` still carry freeze-era "56/56"/"64/64" — normalize on next touch.
+- ✅ done (was `docs/13 §3` residual): `docs/08`/`docs/11` counters normalized to 71/71 (freeze-era 56/56 kept only where the text is about the freeze).
 
 ## Reference docs
 

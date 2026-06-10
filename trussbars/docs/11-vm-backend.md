@@ -247,7 +247,7 @@ then just a set of host helpers (a follow-up that needs no engine change).
 ## 9. Conformance — the third axis
 
 The project's safety net extends cleanly. Today: **interpreter (oracle) ≡ AOT**
-(56/56, `docs/04`). Add **VM ≡ oracle**, reusing the *same corpus and harness shape*:
+(71/71, `docs/04`). Add **VM ≡ oracle**, reusing the *same corpus and harness shape*:
 render each case through the VM, assert byte-equality against the committed golden —
 exactly as `harness.mjs` does for AOT (a `--vm` flag beside `--v2`). Then **VM ≡ AOT**
 follows transitively on the shared subset.
@@ -268,7 +268,7 @@ AOT-compat *reject* oracle.
 ```text
         MaxBars oracle (PureScript, reference)
           ║                         ║
-          ║ 56/56 (done)            ║ NEW: --vm gate, same corpus + the dynamic-only cases
+          ║ 71/71 (done)            ║ NEW: --vm gate, same corpus + the dynamic-only cases
           ▼                         ▼
         AOT  ───────── ≡ ───────── VM        (transitive on the shared subset)
 ```
