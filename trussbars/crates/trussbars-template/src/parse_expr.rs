@@ -140,8 +140,12 @@ fn read_string(src: &str, b: &[u8], n: usize, i: usize) -> Result<(String, usize
     while k < n {
         match b[k] {
             b'\\' if k + 1 < n => {
-                out.push(src[k + 1..].chars().next().unwrap());
-                k += 2;
+                // The escaped char may be multibyte (`\é`): advance past the
+                // backslash + the char's UTF-8 width, not a fixed 2 bytes, or `k`
+                // lands mid-codepoint and the next `src[k..]` slice panics.
+                let esc = src[k + 1..].chars().next().unwrap();
+                out.push(esc);
+                k += 1 + esc.len_utf8();
             }
             c if c == quote => return Ok((out, k + 1)),
             _ => {
@@ -505,6 +509,16 @@ mod tests {
     }
     fn this() -> Expr {
         Expr::nullary("this")
+    }
+
+    #[test]
+    fn string_escape_handles_multibyte_without_panicking() {
+        // `\é` — the escaped char is multibyte; the parser must advance by the
+        // char's UTF-8 width, not a fixed 2 bytes, or it slices mid-codepoint and
+        // panics. The escape drops the backslash and keeps the (multibyte) char.
+        assert_eq!(p(r#""a\éb""#), Expr::str("aéb"));
+        assert_eq!(p(r#""\é""#), Expr::str("é"));
+        assert_eq!(p(r#""\\""#), Expr::str("\\"));
     }
 
     #[test]

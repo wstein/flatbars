@@ -12,7 +12,7 @@
 
 use crate::ast::Node;
 use crate::parse_expr::ParseError;
-use alloc::collections::BTreeMap;
+use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec;
@@ -52,7 +52,7 @@ pub fn resolve_inheritance_with(
     } else {
         // A child: thread overrides up the chain onto the root, then keep the child's own
         // inline definitions (so a later `{% partial %}` / `{% include %}` still resolves).
-        let flat = flatten_with(&bases, &Registry::new(), &nodes)?;
+        let flat = flatten_with(&bases, &Registry::new(), &nodes, &mut BTreeSet::new())?;
         let mut out: Vec<Node> = nodes.iter().filter(|n| is_inline_def(n)).cloned().collect();
         out.extend(flat);
         Ok(out)
@@ -86,10 +86,17 @@ fn flatten_with(
     bases: &Registry,
     descendant: &Registry,
     nodes: &[Node],
+    visited: &mut BTreeSet<String>,
 ) -> Result<Vec<Node>, ParseError> {
     match find_extends(nodes) {
         None => Ok(fill_blocks(descendant, nodes.to_vec())),
         Some((name, off)) => {
+            // Termination: a base already on the chain means a cycle
+            // (`A extends B`, `B extends A`) — bail with a located error instead
+            // of recursing until the stack overflows.
+            if !visited.insert(name.to_string()) {
+                return Err(cyclic_extends_error(name, off));
+            }
             let mut merged = collect_overrides(nodes)?;
             // `descendant` (closer to the leaf) overrides this level on a name collision.
             for (k, v) in descendant {
@@ -98,7 +105,7 @@ fn flatten_with(
             let base = bases
                 .get(name)
                 .ok_or_else(|| unknown_base_error(name, off))?;
-            flatten_with(bases, &merged, base)
+            flatten_with(bases, &merged, base, visited)
         }
     }
 }
@@ -281,6 +288,15 @@ fn unknown_base_error(name: &str, at: usize) -> ParseError {
     ParseError {
         message: format!(
             "`{{% extends \"{name}\" %}}` names no base template (define it with `{{% inline \"{name}\" %}} … {{% endinline %}}` or register it as a partial)"
+        ),
+        at,
+    }
+}
+
+fn cyclic_extends_error(name: &str, at: usize) -> ParseError {
+    ParseError {
+        message: format!(
+            "cyclic `{{% extends \"{name}\" %}}` — the inheritance chain re-enters `{name}`; template inheritance must be acyclic"
         ),
         at,
     }

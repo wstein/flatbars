@@ -882,6 +882,25 @@ fn emit_expr(env: &Env, e: &Expr) -> Result<String, String> {
     }
 }
 
+/// Validate that a free string literal destined for Rust IDENTIFIER position — a
+/// struct-field access, a dict key, or a pluck/sortBy/groupBy/where field — is a
+/// plain identifier. Path segments come from `Tok::Ident` (already charset-checked
+/// by the lexer), but these constructs accept an arbitrary `"string"` key, which
+/// would otherwise be spliced verbatim into the generated source (a hygiene break,
+/// and an inscrutable rustc error instead of a located template diagnostic).
+fn field_ident(key: &str) -> Result<&str, String> {
+    let mut cs = key.chars();
+    let ok = cs.next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+        && cs.all(|c| c.is_ascii_alphanumeric() || c == '_');
+    if ok {
+        Ok(key)
+    } else {
+        Err(format!(
+            "`{key}` is not a valid field name — a dict key / pluck / sortBy / groupBy / where field must be a plain identifier ([A-Za-z_][A-Za-z0-9_]*)"
+        ))
+    }
+}
+
 #[allow(clippy::too_many_lines)]
 fn emit_app(env: &Env, name: &str, args: &[Expr]) -> Result<String, String> {
     match (name, args) {
@@ -919,19 +938,28 @@ fn emit_app(env: &Env, name: &str, args: &[Expr]) -> Result<String, String> {
             emit_expr(env, b)?
         )),
         ("safe", [a]) => Ok(format!("trussbars_std::safe(&({}))", emit_expr(env, a)?)),
-        ("pluck", [items, Expr::Lit(Value::Str(key))]) => Ok(format!(
-            "({}).iter().map(|__x| &__x.{key}).collect::<Vec<_>>()",
-            emit_expr(env, items)?
-        )),
-        ("sortBy", [items, Expr::Lit(Value::Str(key))]) => Ok(format!(
-            "trussbars_std::sort_by(&({}), |__x| &__x.{key})",
-            emit_expr(env, items)?
-        )),
-        ("groupBy", [items, Expr::Lit(Value::Str(key))]) => Ok(format!(
-            "trussbars_std::group_by(&({}), |__x| {{ let mut __s = String::new(); \
-             trussbars_core::ToText::write_text(&__x.{key}, &mut __s); __s }})",
-            emit_expr(env, items)?
-        )),
+        ("pluck", [items, Expr::Lit(Value::Str(key))]) => {
+            let key = field_ident(key)?;
+            Ok(format!(
+                "({}).iter().map(|__x| &__x.{key}).collect::<Vec<_>>()",
+                emit_expr(env, items)?
+            ))
+        }
+        ("sortBy", [items, Expr::Lit(Value::Str(key))]) => {
+            let key = field_ident(key)?;
+            Ok(format!(
+                "trussbars_std::sort_by(&({}), |__x| &__x.{key})",
+                emit_expr(env, items)?
+            ))
+        }
+        ("groupBy", [items, Expr::Lit(Value::Str(key))]) => {
+            let key = field_ident(key)?;
+            Ok(format!(
+                "trussbars_std::group_by(&({}), |__x| {{ let mut __s = String::new(); \
+                 trussbars_core::ToText::write_text(&__x.{key}, &mut __s); __s }})",
+                emit_expr(env, items)?
+            ))
+        }
         ("ternary", [c, a, b]) => Ok(format!(
             "(if {} {{ {} }} else {{ {} }})",
             env.truthy_ref(&format!("&({})", emit_expr(env, c)?)),
@@ -998,6 +1026,7 @@ fn emit_dict(env: &Env, args: &[Expr]) -> Result<String, String> {
     let mut decls = Vec::with_capacity(pairs.len());
     let mut inits = Vec::with_capacity(pairs.len());
     for (i, (key, val)) in pairs.iter().enumerate() {
+        let key = field_ident(key)?;
         generics.push(format!("F{i}"));
         decls.push(format!("{key}: F{i}"));
         // A literal field is held by value; any other expression (a path) by
@@ -1119,7 +1148,10 @@ fn coll_find(env: &Env, args: &[Expr]) -> Result<String, String> {
 
 fn pred_body(env: &Env, args: &[Expr]) -> Result<String, String> {
     match args {
-        [Expr::Lit(Value::Str(key))] => Ok(env.truthy_ref(&format!("&__x.{key}"))),
+        [Expr::Lit(Value::Str(key))] => {
+            let key = field_ident(key)?;
+            Ok(env.truthy_ref(&format!("&__x.{key}")))
+        }
         [Expr::Lit(Value::Str(key)), Expr::Lit(Value::Str(cmp)), val] => {
             cmp_body(key, cmp, &emit_expr(env, val)?)
         }
@@ -1131,6 +1163,7 @@ fn pred_body(env: &Env, args: &[Expr]) -> Result<String, String> {
 }
 
 fn cmp_body(key: &str, cmp: &str, ve: &str) -> Result<String, String> {
+    let key = field_ident(key)?;
     let field = format!("__x.{key}");
     let r = match cmp {
         "gt" => format!("{field} > {ve}"),
@@ -1387,6 +1420,37 @@ mod tests {
 
     fn e(src: &str) -> String {
         emit("Ctx", src).unwrap_or_else(|err| panic!("{src:?}: {err}"))
+    }
+
+    #[test]
+    fn rejects_non_identifier_field_keys() {
+        // A free string key in Rust identifier position (pluck/sortBy/groupBy/where
+        // field, dict key) must be a located error, never spliced verbatim into the
+        // generated source.
+        for bad in [
+            r#"{{ pluck xs "bad key" }}"#,
+            r#"{{ sortBy xs "x; fn evil() {" }}"#,
+            r#"{{ where xs "k-1" }}"#,
+            r#"{{ { "bad key": 1 } }}"#,
+        ] {
+            let err = emit("Ctx", bad).expect_err(bad);
+            assert!(err.contains("valid field name"), "{bad}: {err}");
+        }
+        // a well-formed identifier key still compiles
+        assert!(e(r#"{{ pluck xs "name" }}"#).contains("__x.name"));
+    }
+
+    #[test]
+    fn cyclic_extends_errors_instead_of_overflowing() {
+        // `a` extends `b`, `b` extends `a` — must be a located "cyclic" error, not a
+        // compile-time stack overflow (the AOT termination ceiling).
+        let src = concat!(
+            r#"{% inline "a" %}{% extends "b" %}{% endinline %}"#,
+            r#"{% inline "b" %}{% extends "a" %}{% endinline %}"#,
+            r#"{% extends "a" %}"#,
+        );
+        let err = emit("Ctx", src).expect_err("cyclic extends");
+        assert!(err.contains("cyclic"), "{err}");
     }
 
     #[test]
