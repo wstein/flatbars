@@ -244,12 +244,6 @@ impl Blocks<'_> {
                 "the context re-root is renamed `scope` (ADR-039) — write `{% scope … %}` … `{% endscope %}`",
                 span.start,
             ),
-            // ADR-25: the block filter is `apply`, not `filter` (which collides with the
-            // collection filter / value pipes — Twig's correction).
-            "filter" => err(
-                "the block filter is `apply` (ADR-25) — write `{% apply upper | truncate 50 %}` … `{% endapply %}` to pipe the body",
-                span.start,
-            ),
             // `{% local … %}` is the bounded block binding (docs-17). The retired `let`
             // head is NOT recognized — it falls through to `helper_block` and fails as a
             // plain "unknown helper" error (no compat mapping).

@@ -39,6 +39,7 @@ import Kernel.Env (RefEnv)
 import Kernel.Inspect (Snapshot, Target)
 import Kernel.Provenance (Segment)
 import Kernel.Schema (InferResult, inferTemplate, inferTemplateData)
+import Kernel.SetSugar (liftSet)
 import Kernel.Walk (Issue)
 import MaxBars.Lint (booleanInOutputWarnings, labelShadowWarnings)
 import MaxBars.Parser as Parser
@@ -76,7 +77,7 @@ inferMax src = do
   parsed <- lmap (show <<< NEA.head) (Parser.parse src)
   -- ADR-040: infer over the flattened template, so block bodies' fields are seen.
   inherited <- lmap show (resolveInheritance parsed.nodes)
-  pure (inferTemplate (desugarSurfaceWith maxLoopVars (renameSurfaceHeads inherited)))
+  pure (inferTemplate (desugarSurfaceWith maxLoopVars (renameSurfaceHeads (liftSet inherited))))
 
 -- | `inferMax` refined by sample data (docs/03 §2): under-determined scalars
 -- | (a bare `{{x}}` defaulted to `String`) are pinned to the type the samples
@@ -86,7 +87,7 @@ inferMaxData samples src = do
   parsed <- lmap (show <<< NEA.head) (Parser.parse src)
   inherited <- lmap show (resolveInheritance parsed.nodes)
   pure
-    (inferTemplateData samples (desugarSurfaceWith maxLoopVars (renameSurfaceHeads inherited)))
+    (inferTemplateData samples (desugarSurfaceWith maxLoopVars (renameSurfaceHeads (liftSet inherited))))
 
 -- | Render MaxBars source with a set of named *external* (host-threaded) partials,
 -- | each given as MaxBars surface source — the MaxBars twin of

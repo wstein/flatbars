@@ -20,7 +20,7 @@
 // may advertise a SMALLER engineInfo().features vector; the capability gate then
 // hides the panels it doesn't back (honest by construction).
 
-import { createRenderer } from "../../renderer.mjs?v=4281a14b";
+import { createRenderer } from "../../renderer.mjs?v=448b21fb";
 
 // The oracle provider — the PureScript flatbars-js engine, the spec/reference
 // engine. create(dialect, opts) is the existing ADR-0020 factory, unchanged.

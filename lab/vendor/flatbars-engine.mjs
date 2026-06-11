@@ -22756,7 +22756,7 @@ var inferMaxData = function(samples) {
       return show16(head2($9));
     })(parse2(src)))(function(parsed) {
       return bind14(lmap4(show16)(resolveInheritance(parsed.nodes)))(function(inherited) {
-        return pure13(inferTemplateData(samples)(desugarSurfaceWith(maxLoopVars)(renameSurfaceHeads(inherited))));
+        return pure13(inferTemplateData(samples)(desugarSurfaceWith(maxLoopVars)(renameSurfaceHeads(liftSet(inherited)))));
       });
     });
   };
@@ -22766,7 +22766,7 @@ var inferMax = function(src) {
     return show16(head2($10));
   })(parse2(src)))(function(parsed) {
     return bind14(lmap4(show16)(resolveInheritance(parsed.nodes)))(function(inherited) {
-      return pure13(inferTemplate(desugarSurfaceWith(maxLoopVars)(renameSurfaceHeads(inherited))));
+      return pure13(inferTemplate(desugarSurfaceWith(maxLoopVars)(renameSurfaceHeads(liftSet(inherited)))));
     });
   });
 };

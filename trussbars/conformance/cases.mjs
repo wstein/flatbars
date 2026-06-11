@@ -571,25 +571,21 @@ export const cases = [
     data: {},
   },
   // {% capture %} (ADR-25 / docs/18): render the body once into a forward-bound Safe value.
-  // inference gap (docs/03 §Not-yet): the captured *binding* (`by`/`b`) is read as `{{ … }}`
-  // output, so schema inference mis-classifies it as a context field instead of a `{% local %}`
-  // shadow — use the data shape, which omits it (the binding is generated, not a ctx field).
+  // Inferred cleanly now that `liftSet` runs before schema inference (the binding desugars to a
+  // `{% local %}` shadow, so it is no longer a phantom context field).
   {
     id: "capture-reuse",
-    ctxFromData: true,
     template:
       "{% capture by %}{{author}}{% if vip %} ★{% endif %}{% endcapture %}<h>{{by}}</h><f>{{by}}</f>",
     data: { author: "Ann", vip: true },
   },
   {
     id: "capture-no-double-escape",
-    ctxFromData: true,
     template: "{% capture b %}{{html}}{% endcapture %}{{b}}",
     data: { html: "<i>x</i>" },
   },
   {
     id: "capture-pipeable",
-    ctxFromData: true,
     template: "{% capture b %}  hi  {% endcapture %}[{{b | trim}}]",
     data: {},
   },
@@ -605,24 +601,20 @@ export const cases = [
   // {% apply %} (ADR-25): render the body, pipe it through the filter (body = leading
   // subject), output the result. The body's interpolations were escaped while rendering, so
   // the filtered markup is emitted verbatim (raw) — matching the oracle's VSafe-preserving ops.
-  // inference gap (docs/03 §Not-yet): the parser injects an `__applybody__` placeholder subject
-  // (substituted by SetSugar before render), which schema inference mis-reads as a context
-  // field — use the data shape (same class as the capture bindings).
+  // Inferred cleanly now that `liftSet` runs before inference (the `__applybody__` placeholder
+  // is substituted to `(partial …)` first, so it is no longer a phantom context field).
   {
     id: "apply-single",
-    ctxFromData: true,
     template: "{% apply uppercase %}hi {{name}}{% endapply %}",
     data: { name: "ann" },
   },
   {
     id: "apply-pipeline",
-    ctxFromData: true,
     template: "{% apply uppercase | truncate 4 %}hello{% endapply %}",
     data: {},
   },
   {
     id: "apply-html-verbatim",
-    ctxFromData: true,
     template: "{% apply uppercase %}<b>{{x}}</b>{% endapply %}",
     data: { x: "a" },
   },

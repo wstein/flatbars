@@ -22,7 +22,7 @@
 // supplies the prelude vocabulary — the Lab from `lab/operation-names.mjs`, the
 // tutorials from editors/operations.json, both projections of the same prelude),
 // keeping it self-contained and browser-safe.
-import { tokenize } from "./vendor/flatbars-engine.mjs?v=94529c81";
+import { tokenize } from "./vendor/flatbars-engine.mjs?v=a944874f";
 
 // Per-tag-kind operation position — HARDCODED from the LSP token vocabulary
 // (`operationPosition`), since the browser Lab can't import editors/ JSON at
