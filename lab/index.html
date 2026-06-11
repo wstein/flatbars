@@ -1656,15 +1656,15 @@
       // Cache-bust query (like playground_utils.mjs): bump on any change to the
       // engine adapters so a reload never pairs a fresh index.html / example
       // file with a stale cached adapter module.
-      import { getProvider } from "./app/engines/registry.mjs?v=ec26fe62";
+      import { getProvider } from "./app/engines/registry.mjs?v=dc5c8070";
       // Engine-derived INNER-TOKEN highlighting (ADR-014 amendment): the shared
       // painter + the lexer's own tokenizer, in place of a hand-written tag regex.
-      import { flatbarsHighlight } from "./cm-flatbars.mjs?v=0516138d";
+      import { flatbarsHighlight } from "./cm-flatbars.mjs?v=8b64cff7";
       // The full prelude vocabulary (vendored projection of editors/operations.json)
       // so the editor paints helper names exactly like the LSP / VS Code — NOT the
       // 12-entry user-facing Transformers-panel subset (renderer.allTransformers()).
       import { OPERATION_NAMES } from "./operation-names.mjs?v=31ba00fd";
-      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=3f232c8c";
+      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=94529c81";
       import { createHelperSandbox } from "./helper-sandbox.mjs?v=3b31be18";
       import { renderTransformers as renderTransformersPanel } from "./panels/transformers.mjs?v=ab148fe1";
       import { renderPartials as renderPartialsPanel } from "./panels/partials.mjs?v=2bcce028";
@@ -1916,7 +1916,7 @@
       // safe (never their ambiguous value, never absent). Set in config.yaml
       // (`analyse.pathSchema`); drives `analyzeWith` so the Truthiness panel
       // suppresses those paths' potential + miss findings. Empty ⇒ plain `analyze`.
-      const helperSandbox = createHelperSandbox("./helpers-worker.mjs?v=ba979a50");
+      const helperSandbox = createHelperSandbox("./helpers-worker.mjs?v=8814fd29");
       function helperKey(tmpl, partials, data, src, catalog, locale, dialect) {
         try { return JSON.stringify([tmpl, partials, data, src, catalog, locale, dialect]); } catch { return null; }
       }

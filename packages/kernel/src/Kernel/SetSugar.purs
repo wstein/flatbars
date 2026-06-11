@@ -29,7 +29,7 @@ module Kernel.SetSugar
 import Prelude
 
 import Data.Array as Array
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (Pattern(..), contains)
 import Data.String.CodeUnits (takeWhile)
 import FlatBars.Syntax (Expr(..), Node(..), Sigil(..), Template)
@@ -59,6 +59,20 @@ liftSet nodes = case Array.uncons nodes of
                 [ App (name <> "=") [], App "partial" [ Lit (VString capName) ] ]
                 (liftSet tail)
             ]
+    -- `{% apply PIPELINE %}body{% endapply %}` (ADR-25): render the body, pipe it
+    -- through PIPELINE (the body is its leading subject), output the result. The
+    -- parser left the pipeline in `args[0]` with an `__applybody__` placeholder subject; we
+    -- emit an inline holding the body and an `Output` of the pipeline with `__applybody__`
+    -- substituted by `(partial <that>)` (the rendered, `VSafe` body). Unlike capture
+    -- it does NOT wrap the tail — apply outputs and binds nothing.
+    Block sp Section "apply" args body ->
+      let
+        appName = "@app$" <> show sp.start
+        subj = App "partial" [ Lit (VString appName) ]
+      in
+        [ Block sp Section "inline" [ Lit (VString appName) ] (liftSet body)
+        , Output sp (substApplyBody subj (fromMaybe subj (Array.head args)))
+        ] <> liftSet tail
     -- recurse into a block body (a `set` there scopes to that block), keep walking.
     Block sp sig name args body ->
       Array.cons (Block sp sig name args (liftSet body)) (liftSet tail)
@@ -72,6 +86,15 @@ captureName args = case Array.head args of
   Just (App n []) -> Just n
   Just (Lit (VString n)) -> Just n
   _ -> Nothing
+
+-- | Substitute the `__applybody__` placeholder (the `{% apply %}` pipeline's subject, which
+-- | the parser injected) with `repl` — the rendered-partial call. Walks the whole
+-- | expression so the subject is replaced wherever the pipe chain placed it.
+substApplyBody :: Expr -> Expr -> Expr
+substApplyBody repl = case _ of
+  App "__applybody__" [] -> repl
+  App n as -> App n (map (substApplyBody repl) as)
+  other -> other
 
 -- | The first `{% set %}` / `{% local %}` binding whose NAME shadows a reserved
 -- | name — its offset and a located-error "shape" (docs-17 §2; `Nothing` when clean).

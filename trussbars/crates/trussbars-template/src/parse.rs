@@ -588,10 +588,13 @@ impl Blocks<'_> {
             params: Vec::new(),
             body,
         });
+        // raw output: the body's interpolations were already HTML-escaped while rendering it,
+        // so the filtered result is safe markup — emit it verbatim (no re-escape), matching the
+        // oracle, whose string ops preserve the body's `VSafe`-ness (Jinja `Markup`-like). ADR-25.
         nodes.push(Node::Output {
             span,
             expr,
-            raw: false,
+            raw: true,
         });
         Ok(())
     }

@@ -303,6 +303,10 @@ headedRecovering pe span = case _ of
     -- ordinary head-argument expression. A plain `{% inline "name" %}` (no `(`)
     -- returns `Nothing` and falls through to the generic head parse below.
     | Just sig <- parseInlineHead toks -> sig
+    -- a `{% apply PIPELINE %}` head (ADR-25): the body is the pipeline's leading
+    -- subject, so it is parsed through the pipe-enabled value grammar, not the head
+    -- grammar (which forbids `|`). Falls through (`Nothing`) for every other head.
+    | Just app <- parseApplyHead toks -> app
     | otherwise -> case pe (partialHead toks) of
         Right (App name args) -> { name: Just name, args, error: Nothing }
         Right _ -> { name: Nothing, args: [], error: Just (HeadNotIdent span.start) }
@@ -374,6 +378,38 @@ splitFirstEq s = case indexOf (Pattern "=") s of
 salvageName :: Array PosToken -> Maybe String
 salvageName toks = case Array.head toks of
   Just { tok: TIdent n } -> Just n
+  _ -> Nothing
+
+-- | Parse a `{% apply PIPELINE %}` head (ADR-25). The block's rendered body is the
+-- | pipeline's leading subject, so we parse `__applybody__ | PIPELINE` through the full
+-- | value grammar (`parseMaxExpr`, pipe-enabled — the head grammar forbids `|`):
+-- | `{% apply upper | truncate 50 %}` ⇒ `truncate(upper(__applybody__), 50)`. `__applybody__` is a
+-- | placeholder `Kernel.SetSugar` substitutes with the rendered partial; it can't
+-- | collide with author syntax (the lexer never emits an `@`-led ident). The result
+-- | rides the existing `Block "apply" [pipeline] body` shape (no new AST node);
+-- | `Nothing` for any non-apply head, so the generic head parse handles those.
+parseApplyHead
+  :: Array PosToken
+  -> Maybe { name :: Maybe String, args :: Array Expr, error :: Maybe ParseError }
+parseApplyHead toks = case Array.uncons toks of
+  Just { head: pt, tail }
+    | pt.tok == TIdent "apply" ->
+        if Array.null tail then
+          Just
+            { name: Just "apply"
+            , args: []
+            , error: Just (LexError "{% apply %} needs a filter pipeline (e.g. {% apply upper %})" pt.at)
+            }
+        else
+          let
+            subjToks =
+              [ { tok: TIdent "__applybody__", at: pt.at, end: pt.at }
+              , { tok: TOp "|", at: pt.at, end: pt.at }
+              ] <> tail
+          in
+            case parseMaxExpr subjToks of
+              Right e -> Just { name: Just "apply", args: [ e ], error: Nothing }
+              Left err -> Just { name: Just "apply", args: [], error: Just err }
   _ -> Nothing
 
 --------------------------------------------------------------------------------

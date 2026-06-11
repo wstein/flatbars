@@ -19,7 +19,7 @@
 // `tk-delim`/`tk-error`, plus `tk-in` for the bold in-tag default), mapped to the
 // `--c-*` palette — the SAME classes the tutorials use, so the two front-ends
 // share one look.
-import { paintKinds, KIND_CLASS, tagRanges } from "./highlight-paint.mjs?v=9ffc7b50";
+import { paintKinds, KIND_CLASS, tagRanges } from "./highlight-paint.mjs?v=8cf10c03";
 
 // Build a CodeMirror extension that decorates FlatBars template syntax for one
 // dialect. `cm` supplies the CM6 primitives `{ ViewPlugin, Decoration }`;

@@ -602,4 +602,28 @@ export const cases = [
       "{% for xs %}{% capture c %}<{{this}}>{% endcapture %}{{c}}{{c}}{% endfor %}",
     data: { xs: ["a", "b"] },
   },
+  // {% apply %} (ADR-25): render the body, pipe it through the filter (body = leading
+  // subject), output the result. The body's interpolations were escaped while rendering, so
+  // the filtered markup is emitted verbatim (raw) — matching the oracle's VSafe-preserving ops.
+  // inference gap (docs/03 §Not-yet): the parser injects an `__applybody__` placeholder subject
+  // (substituted by SetSugar before render), which schema inference mis-reads as a context
+  // field — use the data shape (same class as the capture bindings).
+  {
+    id: "apply-single",
+    ctxFromData: true,
+    template: "{% apply uppercase %}hi {{name}}{% endapply %}",
+    data: { name: "ann" },
+  },
+  {
+    id: "apply-pipeline",
+    ctxFromData: true,
+    template: "{% apply uppercase | truncate 4 %}hello{% endapply %}",
+    data: {},
+  },
+  {
+    id: "apply-html-verbatim",
+    ctxFromData: true,
+    template: "{% apply uppercase %}<b>{{x}}</b>{% endapply %}",
+    data: { x: "a" },
+  },
 ];

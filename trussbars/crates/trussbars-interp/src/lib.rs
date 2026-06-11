@@ -1504,12 +1504,13 @@ mod tests {
             .unwrap(),
             "HELL…"
         );
-        // the result is escaped on output (uppercase returns a plain String, not Safe), so a
-        // literal `<b>` in the body re-escapes after the filter (the type-driven output rule).
+        // the result is emitted verbatim (raw): the body's interpolation was escaped while
+        // rendering, so the filtered markup is safe — a literal `<b>` stays `<B>` (matches the
+        // oracle, whose ops preserve VSafe). `{{x}}` (x="a") had no specials to escape.
         let d2 = obj(&[("x", s("a"))]);
         assert_eq!(
             render("{% apply uppercase %}<b>{{x}}</b>{% endapply %}", d2).unwrap(),
-            "&lt;B&gt;A&lt;/B&gt;"
+            "<B>A</B>"
         );
     }
 

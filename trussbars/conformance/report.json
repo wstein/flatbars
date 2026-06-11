@@ -1,9 +1,9 @@
 {
   "profile": "perf (ecma-float, default)",
-  "total": 91,
+  "total": 94,
   "positive": {
-    "count": 80,
-    "byte_matched": 80,
+    "count": 94,
+    "byte_matched": 94,
     "mismatched": 0
   },
   "excluded": {
