@@ -26,15 +26,15 @@ async function waitFor(fn, { timeout = 20000, interval = 100 } = {}) {
 
 exports.run = async function run() {
   // `{{ a ?? "b" }}` → an `operator` + a `string` semantic token; `{{#if x}}`
-  // (unclosed) → a MismatchedBlock diagnostic. The `.maxbars` extension picks the
-  // MaxBars dialect via the auto-generated language association.
-  const fixture = path.resolve(__dirname, "..", "fixtures", "activation.maxbars");
+  // (unclosed) → a MismatchedBlock diagnostic. The `.truss` extension picks the
+  // Trussbars language (engine dialect `maxbars`) via the auto-generated association.
+  const fixture = path.resolve(__dirname, "..", "fixtures", "activation.truss");
   const doc = await vscode.workspace.openTextDocument(fixture);
   await vscode.window.showTextDocument(doc);
-  assert.equal(doc.languageId, "maxbars", "the .maxbars extension resolves to the maxbars language");
+  assert.equal(doc.languageId, "trussbars", "the .truss extension resolves to the trussbars language");
 
   // Activation must be automatic — no command, no explicit activationEvents.
-  const ext = vscode.extensions.getExtension("flatbars.flatbars");
+  const ext = vscode.extensions.getExtension("flatbars.trussbars");
   assert.ok(ext, "the flatbars extension is present");
   const activated = await waitFor(() => ext.isActive || null);
   assert.ok(activated, "the extension auto-activated on opening a FlatBars document");
