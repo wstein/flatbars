@@ -88,7 +88,7 @@ import FlatBars.Highlight (HSpan, HighlightConfig, TSpan, highlightSpans, tokeni
 import FlatBars.Json (fromJson, toJson)
 import FlatBars.Lexer (defaultLexConfig)
 import FlatBars.Span (Span, lineColumn, spanText)
-import FlatBars.Token (defaultLexOptions, infixOperatorChars)
+import FlatBars.Token (defaultLexOptions)
 import FlatBars.Value (Value(..))
 import Foreign.Object as FO
 import Kernel.Analyse (Finding, PathSchema) as Analyse
@@ -102,6 +102,7 @@ import Linter.Aliases (aliasWarnings, scopedCanonWarnings)
 import Linter.Migrate (migrateToMaxBars)
 import MaxBars (maxLoopVars)
 import MaxBars as MaxBars
+import MaxBars.Highlight as MaxHighlight
 import MaxBars.Parser as MaxParser
 import MinBars as MinBars
 import MinBars.Analyse as MinAnalyse
@@ -756,7 +757,10 @@ compileResultAt src = case _ of
 -- | dialect's tag boundaries and clause keywords (`{{else}}`/`{{elif}}`). See
 -- | `FlatBars.Highlight`.
 highlightSpans :: Fn2 String String (Array Highlight.HSpan)
-highlightSpans = mkFn2 \tpl dialect -> Highlight.highlightSpans (highlightConfig dialect) tpl
+highlightSpans = mkFn2 \tpl dialect -> case dialect of
+  -- MaxBars owns its highlighter (ADR-041), running the owned lexer.
+  "maxbars" -> MaxHighlight.highlightSpans tpl
+  _ -> Highlight.highlightSpans (highlightConfig dialect) tpl
 
 -- | Tokenize template source into the full ADR-017 token vocabulary for the given
 -- | dialect: `tokenize(template, dialect)` returns a plain JS array of
@@ -765,7 +769,10 @@ highlightSpans = mkFn2 \tpl dialect -> Highlight.highlightSpans (highlightConfig
 -- | interior `string`/`number`/`operator` literals); the `flatbars-lsp`
 -- | semantic-tokens server consumes it. See `FlatBars.Highlight`.
 tokenize :: Fn2 String String (Array Highlight.TSpan)
-tokenize = mkFn2 \tpl dialect -> Highlight.tokenizeSpans (highlightConfig dialect) tpl
+tokenize = mkFn2 \tpl dialect -> case dialect of
+  -- MaxBars owns its highlighter (ADR-041), running the owned lexer.
+  "maxbars" -> MaxHighlight.tokenizeSpans tpl
+  _ -> Highlight.tokenizeSpans (highlightConfig dialect) tpl
 
 -- | Located parse diagnostics for `src` under `dialect` (ADR-023):
 -- | `diagnostics(template, dialect)` runs the RECOVERING parser with that
@@ -798,23 +805,9 @@ diagnostics = mkFn2 \src dialect ->
 -- | rejects is coloured `error` rather than painted valid: RawBars/MaxBars set
 -- | `extras = false`; only MinBars enables `inheritance` (the Mustache
 -- | `{{<}}`/`{{$}}` shapes).
+-- | (MaxBars is not here — it owns its highlighter, `MaxBars.Highlight`, ADR-041.)
 highlightConfig :: String -> Highlight.HighlightConfig
 highlightConfig = case _ of
-  "maxbars" ->
-    -- MaxBars's baked lex config, inlined (ADR-041 — no `maxOptions` dependency): output-only
-    -- `{{ }}` (`bracesOutputOnly`), `{% %}` statement tags, the infix / `..` / `[…]`·`{k:v}`
-    -- interior lexer, and the `else`/`elif`/`when` clause markers. Highlighting still runs the
-    -- shared `tokenizeSpans`; only the parser is MaxBars-owned.
-    { lexConfig:
-        defaultLexConfig { statementTags = true, bracesOutputOnly = true, keepLongComments = true }
-    , clauseSeps: [ "else", "elif", "when" ]
-    , lexOptions:
-        { operatorChars: infixOperatorChars, rangeOperator: true, collectionLiterals: true }
-    , extras: false
-    , inheritance: false
-    , rawBlockHbs: false
-    , rawBlockHash: true
-    }
   "rawbars" ->
     -- RawBars does not enable set-delim (per ADR-015 amendment); use the
     -- default lex config so highlighting agrees with parsing and the
