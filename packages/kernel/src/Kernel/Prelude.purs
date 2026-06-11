@@ -1902,9 +1902,12 @@ partialH ctl args = case args of
   -- the context is optional: omitted, it defaults to the *current* context
   -- (like Handlebars `{{> layout}}`), so `{{#partial "layout"}}` / `(partial
   -- "layout")` work in RawBars/MaxBars without spelling out `this`.
-  [ VString name ] -> renderPartial name (refContext ctl.env)
-  [ VString name, ctx ] -> renderPartial name ctx
-  [ VString name, ctx, opts ] -> renderPartial name (mergeHash ctx opts)
+  [ VString name ] -> renderPartial name (refContext ctl.env) Map.empty
+  [ VString name, ctx ] -> renderPartial name ctx Map.empty
+  -- a hash both merges onto the context (so a plain `{% include "nav" title=… %}`
+  -- body's `{{title}}` context lookup resolves) AND installs each key as a scoped
+  -- helper (so a typed-signature body's scoped `{{p}}` resolves) — ADR-042 §8.
+  [ VString name, ctx, opts ] -> renderPartial name (mergeHash ctx opts) (hashFrame opts)
   _ -> throwError (TypeError "partial: expected (name string, [context], [options])")
   where
   -- the caller's block body, rendered in the caller's context — exposed inside
@@ -1922,7 +1925,7 @@ partialH ctl args = case args of
         Map.singleton (refYieldName ctl.env) body
   -- every partial renders under the engine's single truthiness rule (ADR-022):
   -- there is no per-partial mode to switch into anymore.
-  renderPartial name ctx = case lookupPartial name ctl.env of
+  renderPartial name ctx frame = case lookupPartial name ctl.env of
     Just tmpl
       | refDepth ctl.env >= recursionBudget -> throwError (RecursionLimit recursionBudget)
       | otherwise ->
@@ -1931,7 +1934,8 @@ partialH ctl args = case args of
             -- budget instead of overflowing the stack (threaded like pushFrame); and
             -- shift the source-map file scope so the partial's emits index its own
             -- source (ADR-035 — a no-op for the non-mapped render).
-            entered = withPartialFileScope name (enterPartial (pushFrame blockFrame ctx ctl.env))
+            entered = withPartialFileScope name
+              (enterPartial (pushFrame (Map.union frame blockFrame) ctx ctl.env))
           in
             VSafe <$> ctl.render entered tmpl
     Nothing
@@ -1944,6 +1948,11 @@ partialH ctl args = case args of
       VObject c -> VObject (Map.union o c)
       _ -> VObject o
     _ -> ctx
+  -- each hash key as a scoped nullary helper returning its value (ADR-042 §8 — the
+  -- include-site binding a typed-signature body's `{{p}}` resolves through).
+  hashFrame opts = case opts of
+    VObject o -> map (\v _ _ -> pure v) o
+    _ -> Map.empty
 
 -- | `inline` defines a partial (`{{#inline "name"}}body{{/inline}}`). The
 -- | definition is hoisted into the partial registry *before* rendering (see

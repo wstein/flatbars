@@ -71,7 +71,9 @@ import Prelude
 import Data.Array as Array
 import Data.Foldable (foldl)
 import Data.Int as Int
-import Data.Maybe (Maybe(..), isJust, maybe)
+import Data.Map (Map)
+import Data.Map as Map
+import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
 import Data.Number as Number
 import Data.String (Pattern(..), Replacement(..), contains, replaceAll, stripPrefix)
 import Data.String.CodeUnits (drop, indexOf, singleton, take, toCharArray)
@@ -129,8 +131,13 @@ desugar = desugarWith noLoopVars
 -- | Desugar with a dialect `LoopVars` resolver (see `LoopVars`). MaxBars passes
 -- | its loop-variable map; ClassicBars passes `noLoopVars` (via `desugar`).
 desugarWith :: LoopVars -> Array Ident -> Template -> Template
-desugarWith lv clauseNames = go []
+desugarWith lv clauseNames tmpl = go [] tmpl
   where
+  -- ADR-042 §8: every `{% inline "name" (params) %}` signature, collected before the
+  -- walk so an `{% include %}` can fill omitted optional defaults regardless of
+  -- definition order.
+  sigs = collectInlineSigs tmpl
+
   -- the block-parameter spelling is dialect-specific: MaxBars drops the pipes
   -- (`as a b`), ClassicBars keeps the Handlebars bars (`as |a b|`). The dialect is
   -- read from the ADR-021 reserved-variable capability — MaxBars wraps its
@@ -162,45 +169,33 @@ desugarWith lv clauseNames = go []
       Nothing -> Nothing
     Nothing -> Nothing
 
-  -- ADR-042: a `{% inline "name" (p, q=default) %}` carries its parameter signature
-  -- as marker args after the partial name — `App p []` (required) / `App p [default]`
-  -- (optional). Each parameter is bound as a body-local sourced from the `{% include
-  -- %}` hash (which already merges onto the partial context): a required parameter
-  -- passes through (the hash provides it), an optional one is wrapped in a
-  -- `{% local q = (q ?? default) %}` so an *omitted* argument falls back to its
-  -- default. The names enter the body scope so a bare `{{q}}` resolves to the
-  -- binding, and the signature is stripped from the stored partial (only the name
-  -- reaches `hoistInline`). A signature-less inline takes the plain path unchanged.
+  -- ADR-042 §8: a `{% inline "name" (p, q=default) %}` carries its parameter
+  -- signature as marker args after the partial name — `App p []` (required) /
+  -- `App p [default]` (optional). The signature binds at the *include site*: the
+  -- markers are stripped here (only the name reaches `hoistInline`, the body is
+  -- stored clean and desugared normally, so `{{p}}` is a `lookup this "p"`), and
+  -- `partialCall` fills each *omitted* optional parameter's default into the
+  -- include's hash. The body then resolves a parameter through the hash — the oracle
+  -- via `mergeHash` (the merged context), the AOT via the hash bound in `env.params`
+  -- (a `this`-rooted lookup of a bound key). A required argument the call omits has
+  -- no hash entry, so the AOT compiles a missing context field — the typed-macro
+  -- check. A signature-less inline takes the plain path unchanged.
   inlineSigDesugar :: Span -> Scope -> Array Expr -> Template -> Node
   inlineSigDesugar sp scope args body = case Array.uncons args of
     Just { head: nameArg, tail: params } | not (Array.null params) ->
+      -- the parameter names enter the body scope, so a bare `{{p}}` lowers to a
+      -- scoped `App p []` — the AOT resolves it via `env.params`, the oracle via the
+      -- scoped helper `partialH` installs from the hash, and inference treats it as a
+      -- binding (no spurious context field). The markers are stripped.
       let
-        -- only *optional* (defaulted) params enter the body scope: each gets a
-        -- `local` binding, so a bare `{{q}}` resolves to it. A *required* param is
-        -- left out of scope so `{{title}}` lowers to a context lookup that reads the
-        -- `{% include %}` hash directly (no binding needed).
-        innerScope = scope <> Array.mapMaybe optionalName params
-        wrapped = Array.foldr wrapDefault (go innerScope (expandElseIf body)) params
+        innerScope = scope <> Array.mapMaybe paramName params
       in
-        Block sp Section "inline" [ nameArg ] wrapped
+        Block sp Section "inline" [ nameArg ] (go innerScope (expandElseIf body))
     _ -> Block sp Section "inline" (inlineArgs lv scope args) (go scope (expandElseIf body))
     where
-    optionalName = case _ of
-      App n [ _ ] -> Just n
+    paramName = case _ of
+      App n _ -> Just n
       _ -> Nothing
-    -- an optional `App n [default]` → `{% local n = (n ?? default) %}` around the
-    -- body. The coalesce value is rewritten in the *outer* `scope` (n is not bound
-    -- there), so its `n` reads the merged hash; the `local` then shadows it for the
-    -- body. A required `App n []` → no wrapper (it reads the hash directly).
-    wrapDefault param inner = case param of
-      App n [ def ] ->
-        [ Block sp Section "local"
-            [ App "@hash"
-                [ Lit (VString n), rewrite lv scope (App "coalesce" [ App n [], def ]) ]
-            ]
-            inner
-        ]
-      _ -> inner
 
   go :: Scope -> Template -> Template
   go scope = map node
@@ -218,13 +213,13 @@ desugarWith lv clauseNames = go []
         | Array.elem name clauseNames -> Sep sp name (rewriteArgs lv scope args)
         | otherwise -> case stripPrefix (Pattern ">") name of
             -- a partial reference `{{> name [ctx]}}` ⇒ unescaped `partial` call.
-            Just rest -> Output sp (partialExpr lv scope rest args)
+            Just rest -> Output sp (partialExpr sigs lv scope rest args)
             -- everything else is `{{ E }}` ⇒ escaped output (canonical escaper).
             Nothing -> Output sp (App "escapeHtml" [ rewriteHead lv scope name args ])
       -- `{{#partial name …}}` / `{{#inline name}}` (§5.7): a bare first argument
       -- is the partial *name* (a string), like `{{> name}}`.
       Block sp Section "partial" args body ->
-        Block sp Section "partial" (partialArgs lv scope args) (go scope (expandElseIf body))
+        Block sp Section "partial" (partialArgs sigs lv scope args) (go scope (expandElseIf body))
       -- bare `{{#inline name}}` reaches here only on the *lenient* path (MaxBars,
       -- which gates the `{{#*inline}}` decorator off so the bare form is its only
       -- inline-partial spelling). ClassicBars rejects it before desugar (it requires
@@ -239,7 +234,7 @@ desugarWith lv clauseNames = go []
       -- sigil; the partial name is the head). Prepend the head to the args so it
       -- reuses `partialArgs` — exactly the `{{#partial}}` construct.
       Block sp PartialBlock name args body ->
-        Block sp Section "partial" (partialArgs lv scope (Array.cons (App name []) args))
+        Block sp Section "partial" (partialArgs sigs lv scope (Array.cons (App name []) args))
           (go scope (expandElseIf body))
       -- the inverted section `{{^x}}…{{/x}}` desugars to `{{#unless x}}…{{/unless}}`
       -- (the ClassicBars way to "render when falsy"); the head becomes the condition.
@@ -367,8 +362,8 @@ rewriteHead lv scope name args
 -- | dynamic name), or the name itself for the no-space `{{>name …}}` form. After
 -- | the name come an optional positional context (default `this`) and `key=value`
 -- | hash pairs, which collect into a trailing options `dict`.
-partialExpr :: LoopVars -> Scope -> String -> Array Expr -> Expr
-partialExpr lv scope rest args =
+partialExpr :: InlineSigs -> LoopVars -> Scope -> String -> Array Expr -> Expr
+partialExpr sigs lv scope rest args =
   let
     { nameExpr, valueArgs } = case rest of
       "" -> case Array.uncons args of
@@ -379,24 +374,65 @@ partialExpr lv scope rest args =
     case nameExpr of
       -- `{{> @partial-block}}` yields the enclosing block partial's body.
       Lit (VString "@partial-block") -> App "partial-block" []
-      _ -> App "partial" (partialCall lv scope nameExpr valueArgs)
+      _ -> App "partial" (partialCall sigs lv scope nameExpr valueArgs)
 
 -- | Build the `partial` helper's arguments from its name and the value arguments
 -- | (an optional positional context, default `this`, then `key=value` hash pairs
--- | collected into a trailing options `dict`).
-partialCall :: LoopVars -> Scope -> Expr -> Array Expr -> Array Expr
-partialCall lv scope nameExpr valueArgs =
+-- | collected into a trailing options `dict`). ADR-042 §8: if the named partial has
+-- | a signature, fill the default of every *optional* parameter the call omits into
+-- | the hash, so the partial body's scoped `{{q}}` resolves to that default.
+partialCall :: InlineSigs -> LoopVars -> Scope -> Expr -> Array Expr -> Array Expr
+partialCall sigs lv scope nameExpr valueArgs =
   let
     h = collectHash lv scope valueArgs
     ctx = maybe (App "this" []) (rewrite lv scope) (Array.head h.positional)
+    provided = map _.key h.pairs
+    sig = case nameExpr of
+      Lit (VString n) -> fromMaybe [] (Map.lookup n sigs)
+      _ -> []
+    defaults = Array.mapMaybe
+      ( \p -> case p.default of
+          Just d | not (Array.elem p.name provided) -> Just { key: p.name, val: rewrite lv scope d }
+          _ -> Nothing
+      )
+      sig
+    pairs = h.pairs <> defaults
   in
-    if Array.null h.pairs then [ nameExpr, ctx ] else [ nameExpr, ctx, dictExpr h.pairs ]
+    if Array.null pairs then [ nameExpr, ctx ] else [ nameExpr, ctx, dictExpr pairs ]
 
 -- | Arguments for a `{{#partial name …}}` block (name + context + hash).
-partialArgs :: LoopVars -> Scope -> Array Expr -> Array Expr
-partialArgs lv scope args = case Array.uncons args of
-  Just { head, tail } -> partialCall lv scope (partialName lv scope head) tail
+partialArgs :: InlineSigs -> LoopVars -> Scope -> Array Expr -> Array Expr
+partialArgs sigs lv scope args = case Array.uncons args of
+  Just { head, tail } -> partialCall sigs lv scope (partialName lv scope head) tail
   Nothing -> [ Lit (VString ""), App "this" [] ]
+
+-- | ADR-042 §8: a `{% inline %}` parameter signature — the name and its optional
+-- | literal default (a marker arg `App name []` / `App name [default]`).
+type InlineSigs = Map String (Array { name :: String, default :: Maybe Expr })
+
+-- | Collect every inline signature in a (pre-desugar) template into a name → params
+-- | map. A pre-pass, so an `{% include %}` resolves its partial's defaults whether
+-- | the definition precedes or follows it (inline definitions are global).
+collectInlineSigs :: Template -> InlineSigs
+collectInlineSigs = Array.foldl step Map.empty
+  where
+  step acc = case _ of
+    Block _ _ "inline" args body
+      | Just name <- nameOf args ->
+          let
+            params = Array.mapMaybe asParam (Array.drop 1 args)
+            acc' = if Array.null params then acc else Map.insert name params acc
+          in
+            Map.union acc' (collectInlineSigs body)
+    Block _ _ _ _ body -> Map.union acc (collectInlineSigs body)
+    _ -> acc
+  nameOf args = case Array.head args of
+    Just (Lit (VString n)) -> Just n
+    _ -> Nothing
+  asParam = case _ of
+    App n [] -> Just { name: n, default: Nothing }
+    App n [ d ] -> Just { name: n, default: Just d }
+    _ -> Nothing
 
 -- | Arguments for a `{{#inline name}}` block — just the (literal) partial name.
 inlineArgs :: LoopVars -> Scope -> Array Expr -> Array Expr

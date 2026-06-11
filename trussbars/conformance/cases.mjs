@@ -368,6 +368,26 @@ export const cases = [
     data: { section: { title: "Intro" } },
   },
 
+  // ── typed inline signatures (ADR-042 §8): `{% inline "n" (p, q=default) %}` ────
+  {
+    id: "inline-sig-default-omitted",
+    template:
+      '{% inline "card" (title, badge="") %}<h3>{{title}}</h3>{% if badge %}<b>{{badge}}</b>{% endif %}{% endinline %}{% include "card" title=name %}',
+    data: { name: "Hi" },
+  },
+  {
+    id: "inline-sig-default-provided",
+    template:
+      '{% inline "card" (title, badge="") %}<h3>{{title}}</h3>{% if badge %}<b>{{badge}}</b>{% endif %}{% endinline %}{% include "card" title=name badge="new" %}',
+    data: { name: "Hi" },
+  },
+  {
+    id: "inline-sig-reused",
+    template:
+      '{% inline "c" (t, b="-") %}[{{t}}/{{b}}]{% endinline %}{% include "c" t="a" %}{% include "c" t="x" b="y" %}',
+    data: {},
+  },
+
   // ── template inheritance (ADR-040: {% extends %}/{% block %}/{% super %}) ─────
   // Statically flattened in both the interpreter and the emitter/VM, so byte-identical.
   {

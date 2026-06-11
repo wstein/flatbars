@@ -357,16 +357,31 @@ useExpr sc cs expr = case expr of
       , not (Set.member nm sc.visiting) ->
           let
             ctxCanon = Array.head tail >>= exprCanon sc
+            -- a hash-argument include (ADR-042) binds its keys at the call site, so
+            -- a `{{key}}` in the body is a *binding*, not a context field — shadow the
+            -- hash keys (the value's own use, recorded in `acc1`, still types it).
             sc' = sc
               { current = fromMaybe sc.current ctxCanon
               , parents = Array.cons sc.current sc.parents
               , binds = Map.empty
+              , shadowed = Set.union sc.shadowed (Set.fromFoldable (hashKeys tail))
               , visiting = Set.insert nm sc.visiting
               }
             acc1 = foldl (useExpr sc) acc tail
           in
             walk sc' acc1 body
     _ -> foldl (useExpr sc) acc args
+  -- the keys of an include's trailing `dict` (`App "dict" [Lit k, v, …]`).
+  hashKeys tail = case Array.find isDict tail of
+    Just (App "dict" kvs) -> keysOf kvs
+    _ -> []
+    where
+    isDict = case _ of
+      App "dict" _ -> true
+      _ -> false
+    keysOf kvs = case Array.uncons kvs of
+      Just { head: Lit (VString k), tail: rest } -> Array.cons k (keysOf (Array.drop 1 rest))
+      _ -> []
 
 -- | Walk a template body, threading scope + constraints.
 walk :: Scope -> Constraints -> Template -> Constraints

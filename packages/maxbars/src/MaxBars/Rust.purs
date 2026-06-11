@@ -373,7 +373,8 @@ hashPairs = go []
 -- value), and an optional pre-rendered `yield` body. Loop metadata and block params
 -- do not cross into a partial; `root` (a function-level binding) does. Recursion is
 -- rejected.
-inlinePartial :: Env -> String -> Expr -> Array (Tuple String Expr) -> Maybe String -> Either String String
+inlinePartial
+  :: Env -> String -> Expr -> Array (Tuple String Expr) -> Maybe String -> Either String String
 inlinePartial env name ctxE hash yieldCode = case Map.lookup name env.partials of
   Nothing -> Left ("unsupported: unknown partial '" <> name <> "'")
   Just body
