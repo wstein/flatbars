@@ -304,14 +304,45 @@ function flatbarsRenderer(activeDialect, _opts) {
   }
 
   // required-assigns (EXACT): the root of every `{t:"path"}`. Helpers are explicit
-  // calls and block params are `(param)` calls, so neither leaks in.
+  // calls and ClassicBars block params lower to calls, so neither leaks in. The
+  // MaxBars binding surfaces, however, carry their bound name into the lowered AST
+  // AS A PATH: `{% for x in y %}` is a `for` node with raw [x, "in", y] path args
+  // (`each … in` / `with … as` lower correctly and don't), and `{% let n = v %}`
+  // names `n` in a @hash and references it as a path in the body. So we collect the
+  // for/let bound names — and skip the for-header `in` keyword — and exclude them,
+  // leaving only the iterable / value / real reads. (Other dialects have no
+  // for/let nodes, so `bound` stays empty and behaviour is unchanged.)
   function requiredAssigns(program) {
+    const nodes = nodesOf(program);
+    const bound = new Set();
+    walk(nodes, (node) => {
+      if (node.t === "for" && node.args && node.args[0]) {
+        const b = node.args[0].value;
+        if (b && b.t === "path" && b.segments && b.segments.length) bound.add(b.segments[0]);
+      } else if (node.t === "let" && Array.isArray(node.args)) {
+        for (const a of node.args) {
+          const h = a.value;
+          if (h && h.t === "call" && h.name === "@hash" && h.args && h.args[0]) {
+            const nameLit = h.args[0].value;
+            if (nameLit && nameLit.t === "lit") bound.add(String(nameLit.value));
+          }
+        }
+      }
+    });
     const out = new Set();
-    walk(nodesOf(program), (node) =>
-      eachExpr(node, (e) => walkExpr(e, (x) => {
-        if (x.t === "path" && x.segments && x.segments.length) out.add(x.segments[0]);
-      })),
-    );
+    const collect = (e) => walkExpr(e, (x) => {
+      if (x.t === "path" && x.segments && x.segments.length && !bound.has(x.segments[0])) out.add(x.segments[0]);
+    });
+    walk(nodes, (node) => {
+      if (node.t === "for" && Array.isArray(node.args)) {
+        // Skip the binding (args[0]) and the `in` keyword (args[1]); only the
+        // iterable (args[2..]) reads data. Body reads are visited via walk() and
+        // filtered by `bound`.
+        for (const a of node.args.slice(2)) collect(a.value);
+      } else {
+        eachExpr(node, collect);
+      }
+    });
     return [...out].sort();
   }
   // used-transformers: block-helper node types + every `{t:"call"}` head.

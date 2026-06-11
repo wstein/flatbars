@@ -625,3 +625,21 @@ test("MinBars compileToJs seeds the chosen truthiness rule", async () => {
   assert.ok(compat.ok, compat.error);
   assert.match(compat.value, /truthyHandlebars/);
 });
+
+test("requiredAssigns excludes MaxBars for/let bound names + the for-header `in` keyword", async () => {
+  const r = await createRenderer("maxbars");
+  const ra = (src) => r.requiredAssigns({ dialect: "maxbars", source: src, partials: {} });
+  // `{% for x in y %}` parses to a for node with raw [x, "in", y] path args, and
+  // body refs to x are paths — none of x/in/(nested bindings) are data assigns.
+  assert.deepEqual(ra("{% for x in items %}{{x}}{% endfor %}"), ["items"]);
+  assert.deepEqual(
+    ra("{% for node in outline %}{{node.name}}{% for child in node.children %}{{child}}{% endfor %}{% endfor %}"),
+    ["outline"], // not node/child/in — those are loop bindings + the keyword
+  );
+  // `{% let n = v %}` names n in a @hash and references it as a path in the body.
+  assert.deepEqual(ra("{% let n = total %}{{n}}{% endlet %}"), ["total"]);
+  assert.deepEqual(ra("{% let n = 5 %}{{n}}{% endlet %}"), []);
+  // already-correct forms stay correct (engine lowers each/with bindings to calls)
+  assert.deepEqual(ra("{% each x in items %}{{x}}{% endeach %}"), ["items"]);
+  assert.deepEqual(ra("{{user.name}} {{title}}"), ["title", "user"]);
+});

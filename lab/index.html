@@ -1656,7 +1656,7 @@
       // Cache-bust query (like playground_utils.mjs): bump on any change to the
       // engine adapters so a reload never pairs a fresh index.html / example
       // file with a stale cached adapter module.
-      import { createRenderer } from "./renderer.mjs?v=2";
+      import { createRenderer } from "./renderer.mjs?v=3";
       // Engine-derived INNER-TOKEN highlighting (ADR-014 amendment): the shared
       // painter + the lexer's own tokenizer, in place of a hand-written tag regex.
       import { flatbarsHighlight } from "./cm-flatbars.mjs?v=7";
