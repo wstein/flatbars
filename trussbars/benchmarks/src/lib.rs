@@ -384,6 +384,42 @@ pub fn liquid_teams(tmpl: &liquid::Template, ctx: &Teams) -> String {
     tmpl.render(&globals).expect("liquid teams renders")
 }
 
+// ─── 5c. Tera (Jinja2-like interpreter; the engine Zola's SSG renders with) ───
+// The other runtime engine the Rust ecosystem reaches for, and the closest dynamic
+// surface peer to MaxBars (`{% for %}` / `{{ }}` / `loop.first`). Like handlebars and
+// liquid, the templates are added ONCE (out of the timed loop) and the `Serialize`
+// context is marshalled into a `tera::Context` per render. Templates are named without
+// an `.html`/`.htm`/`.xml` suffix so Tera's suffix-gated auto-escape stays off — and the
+// workloads have no HTML-special data anyway, so output is byte-identical to the peers.
+
+pub fn tera_engine() -> tera::Tera {
+    let mut tera = tera::Tera::default();
+    tera.add_raw_template(
+        "big_table",
+        "<table>{% for row in table %}<tr>{% for v in row %}<td>{{ v }}</td>{% endfor %}</tr>{% endfor %}</table>",
+    )
+    .expect("tera big-table parses");
+    tera.add_raw_template(
+        "teams",
+        "<html><head><title>{{ year }}</title></head><body><h1>CSL {{ year }}</h1><ul>\
+         {% for team in teams %}<li class=\"{% if loop.first %}champion{% endif %}\"><b>{{ team.name }}</b>: {{ team.score }}</li>{% endfor %}\
+         </ul></body></html>",
+    )
+    .expect("tera teams parses");
+    tera
+}
+
+pub fn tera_big_table(tera: &tera::Tera, ctx: &BigTable) -> String {
+    let c = tera::Context::from_serialize(ctx).expect("big-table → tera context");
+    tera.render("big_table", &c)
+        .expect("tera big-table renders")
+}
+
+pub fn tera_teams(tera: &tera::Tera, ctx: &Teams) -> String {
+    let c = tera::Context::from_serialize(ctx).expect("teams → tera context");
+    tera.render("teams", &c).expect("tera teams renders")
+}
+
 // ─── 6. Trussbars VM (dynamic backend, docs/11) ───────────────────────────────
 // The SAME MaxBars language as the AOT column, run through the dynamic tree-walk
 // interpreter instead of compiled to Rust. Like handlebars, the template is parsed

@@ -18,6 +18,7 @@ serde = { version = "1", features = ["derive"] }
 # HTML macro DSL — pre-sized, single-allocation).
 handlebars = "6"
 liquid = "0.26.11"
+tera = "1"
 askama = "0.16"
 sailfish = "0.11"
 vy = "0.2"

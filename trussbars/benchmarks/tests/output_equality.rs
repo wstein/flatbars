@@ -7,9 +7,10 @@ use trussbars_benchmarks::{
     askama_big_table, askama_teams, big_table_data, big_table_value, handlebars_big_table,
     handlebars_big_table_registry, handlebars_teams, handlebars_teams_registry, liquid_big_table,
     liquid_big_table_template, liquid_teams, liquid_teams_template, sailfish_big_table,
-    sailfish_teams, teams_data, teams_value, trussbars_big_table, trussbars_teams, vm_bc_big_table,
-    vm_bc_big_table_program, vm_bc_teams, vm_bc_teams_program, vm_big_table, vm_big_table_template,
-    vm_teams, vm_teams_template, vy_big_table, vy_teams, write_big_table, write_teams,
+    sailfish_teams, teams_data, teams_value, tera_big_table, tera_engine, tera_teams,
+    trussbars_big_table, trussbars_teams, vm_bc_big_table, vm_bc_big_table_program, vm_bc_teams,
+    vm_bc_teams_program, vm_big_table, vm_big_table_template, vm_teams, vm_teams_template,
+    vy_big_table, vy_teams, write_big_table, write_teams,
 };
 
 #[test]
@@ -46,6 +47,11 @@ fn big_table_all_engines_agree() {
         baseline,
         "liquid vs write"
     );
+    assert_eq!(
+        tera_big_table(&tera_engine(), &ctx),
+        baseline,
+        "tera vs write"
+    );
 }
 
 #[test]
@@ -74,4 +80,5 @@ fn teams_all_engines_agree() {
         baseline,
         "liquid vs write"
     );
+    assert_eq!(tera_teams(&tera_engine(), &ctx), baseline, "tera vs write");
 }
