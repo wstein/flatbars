@@ -1705,6 +1705,10 @@
         viewKind,
         applyView,
       } from "./output-view.mjs?v=3";
+      // App shell modules extracted from this file (Phase 0, engine-registry
+      // plan). Pure leaves first — engine resolution + the DOM lookup helpers.
+      import { resolveEngine, engineLabel, templateExt, templateFence } from "./app/engine-config.mjs?v=1";
+      import { byId, qs } from "./app/dom.mjs?v=1";
       import { EditorState, Annotation, StateField, StateEffect, Compartment } from "https://esm.sh/@codemirror/state@6.5.2/es2022/state.mjs";
       import {
         Decoration,
@@ -1749,8 +1753,7 @@
       const LS_TWEAKS = "stem-playground:tweaks";
       const LS_OUTLANG = "stem-playground:outlang";
 
-      const byId = (id) => document.getElementById(id);
-      const qs   = (sel) => document.querySelector(sel);
+      // byId / qs now come from ./app/dom.mjs (imported above).
 
       // Boot defence: if a required asset fails to load (the engine bundle, the
       // example catalog), show a visible message instead of a blank page. Styled
@@ -1795,26 +1798,14 @@
       // (below) hides whatever the chosen engine doesn't back.
       const ENGINE_PARAM = (new URLSearchParams(location.search).get("engine") || "").toLowerCase();
       const DIALECT_PARAM = (new URLSearchParams(location.search).get("dialect") || "").toLowerCase();
-      let ENGINE =
-        ["rawbars", "raw", "core"].includes(ENGINE_PARAM) ? "rawbars"
-        : ["minbars", "mustache"].includes(ENGINE_PARAM) ? "minbars"
-        : ["classicbars", "full", "surface"].includes(ENGINE_PARAM) ? "classicbars"
-        : ["maxbars", "max"].includes(ENGINE_PARAM) ? "maxbars"
-        // back-compat: old `?engine=flatbars[&dialect=…]` links → dialect engine.
-        : ["flatbars", "bb"].includes(ENGINE_PARAM)
-            ? (["core", "rawbars"].includes(DIALECT_PARAM) ? "rawbars"
-               : DIALECT_PARAM === "maxbars" ? "maxbars" : "classicbars")
-        // Default to ClassicBars — the Handlebars-like FlatBars surface.
-        : "classicbars";
+      // Engine resolution (aliases + `?engine=flatbars&dialect=` back-compat) now
+      // lives in ./app/engine-config.mjs.
+      const ENGINE = resolveEngine(ENGINE_PARAM, DIALECT_PARAM);
       // One adapter backs every engine; createRenderer maps the engine name to its
       // dialect (rawbars→core, classicbars→surface, maxbars, minbars).
       const renderer = await createRenderer(ENGINE).catch(bootFail);
       // Show the engine + its version (from the bundled FlatBars/MinBars engine).
-      const ENGINE_LABEL =
-        ENGINE === "rawbars" ? "RawBars"
-        : ENGINE === "classicbars" ? "ClassicBars"
-        : ENGINE === "maxbars" ? "MaxBars"
-        : "MinBars";
+      const ENGINE_LABEL = engineLabel(ENGINE);
       byId("brand-ver").textContent = ENGINE_LABEL + " v" + renderer.version;
 
       // MinBars truthiness is set in the config.yaml view (minbars.truthiness),
@@ -1840,13 +1831,10 @@
       // Handlebars-flavoured ClassicBars, `.maxbars`). Used wherever a file name is
       // displayed or downloaded. (The on-disk *example* files keep the catalog's
       // own extension — see the example loader — so this is purely the label.)
-      const TEMPLATE_EXT =
-        ({ rawbars: "rawbars", minbars: "mustache", classicbars: "hbs", maxbars: "maxbars" })[ENGINE] ||
-        "hbs";
-      // The Markdown code-fence language for an exported template: only `mustache`
-      // and `handlebars` are languages a Markdown highlighter knows, so MinBars
-      // uses `mustache` and the rest fall back to the Handlebars-flavoured tag.
-      const TEMPLATE_FENCE = ENGINE === "minbars" ? "mustache" : "handlebars";
+      const TEMPLATE_EXT = templateExt(ENGINE);
+      // The Markdown code-fence language for an exported template (see
+      // ./app/engine-config.mjs): MinBars → `mustache`, the rest → `handlebars`.
+      const TEMPLATE_FENCE = templateFence(ENGINE);
       // Engine reflection: canonical built-in list and capability metadata,
       // live from the loaded WASM binary. Used to drive the cheat-sheet section
       // in the Transformers dock tab and validate the risk-tier map below.
