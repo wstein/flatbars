@@ -194,6 +194,46 @@ The body is already-rendered, escape-safe output (a `VSafe` value), so MaxBars'
 shadowed (read it with an explicit `{{lookup this "yield"}}`), and a loop
 `label yield` is flagged by the MaxBars lint.
 
+## Template inheritance (`{% extends %}` / `{% block %}` / `{% super %}`)
+
+`{% yield %}` is the *single, anonymous* layout slot. Its named, multi-slot
+generalization is **template inheritance** (ADR-040): a base defines named
+`{% block name %}…{% endblock %}` slots with default bodies, and a child
+`{% extends "base" %}` overrides the ones it names — the rest keep their defaults.
+`{% super %}` splices the parent block's body into an override.
+
+```maxbars
+{% inline "base" %}
+<title>{% block title %}Site{% endblock %}</title>
+<main>{% block content %}{% endblock %}</main>
+{% endinline %}
+{% extends "base" %}
+{% block title %}Welcome — {% super %}{% endblock %}   {# → Welcome — Site #}
+{% block content %}<h1>Hi</h1>{% endblock %}          {# title's default is overridden, kept otherwise #}
+```
+
+Inheritance is **resolved statically at compile time** — a lower-phase flatten
+(`Kernel.Inherit`, mirrored in Rust by `trussbars_template::inherit`) that walks the
+`{% extends %}` chain leaf→root over the `{% inline %}` base registry, merges block
+overrides (a leaf override wins over an ancestor's), and fills the root's slots into a
+plain template. No inheritance node survives into the interpreter, the AOT-emitted Rust,
+or the VM, so all three render byte-identically (conformance-gated). This is the
+Askama-style *compile-time* resolution, with the Django/Liquid surface — unlike
+Django/Jinja/Tera, which resolve inheritance per request at runtime.
+
+Rules (each a located error, never a silent no-op):
+
+- A child (`{% extends %}` present) may contain **only** `{% block %}` definitions at top
+  level — stray content is rejected.
+- The base name must resolve to an `{% inline %}` definition (or a registered partial).
+- The chain is single (one `{% extends %}` per template); `{% extends %}` targets and
+  `{% block %}` names are static (no computed parents) — what keeps the flatten, and the
+  typed-context inference, possible.
+
+`{% yield %}` remains the shorthand for the one-slot case:
+`{% partial "L" %}body{% endpartial %}` is exactly
+`{% extends "L" %}{% block ⟨anon⟩ %}body{% endblock %}`.
+
 ## Block conditions
 
 A block *open* parses its head as the helper name followed by arguments, each a

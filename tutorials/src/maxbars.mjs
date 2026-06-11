@@ -349,6 +349,18 @@ Subtotal {{subtotal}} + tax {{tax}} = {{total}}`,
     data: { title: "Welcome" },
   },
 
+  inheritance: {
+    engine: "maxbars",
+    label: "Advanced — Template inheritance ({% extends %} / {% block %} / {% super %})",
+    // Named, multi-slot layouts (ADR-040): a base defines {% block %} slots with default
+    // bodies; a child {% extends %} overrides the ones it names (the rest keep defaults),
+    // and {% super %} splices the parent block's body. Resolved statically at compile time
+    // — flattened to plain output before rendering, identical across interpreter/AOT/VM.
+    template: `{% inline "page" %}<h1>{% block title %}Site{% endblock %}</h1>
+<main>{% block body %}{% endblock %}</main>{% endinline %}{% extends "page" %}{% block title %}{% super %} — {{name}}{% endblock %}{% block body %}Hello {{name}}{% endblock %}`,
+    data: { name: "Ada" },
+  },
+
   helpers: {
     engine: "maxbars",
     label: "Advanced — Custom & block operations",

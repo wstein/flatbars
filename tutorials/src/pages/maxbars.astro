@@ -415,6 +415,16 @@ const t = (s) => s;
       <code>{t("{{> @partial-block}}")}</code>.
     </p>
     <OpenInLab client:visible engine="maxbars" template={ex.layoutPartials.template} data={ex.layoutPartials.data} />
+    <h3>Template inheritance &amp; <code>{t("{% extends %}")}</code> / <code>{t("{% block %}")}</code></h3>
+    <p>
+      The named, multi-slot generalization of <code>{t("{% yield %}")}</code> (ADR-040): a base
+      defines <code>{t("{% block name %}…{% endblock %}")}</code> slots with default bodies, a child
+      <code>{t("{% extends \"base\" %}")}</code> overrides the ones it names (the rest keep their
+      defaults), and <code>{t("{% super %}")}</code> splices the parent block's body. It is resolved
+      <b>statically at compile time</b> — flattened to plain output before rendering, so the
+      interpreter, the AOT-compiled Rust, and the VM all produce identical bytes.
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.inheritance.template} data={ex.inheritance.data} />
     <h3>Custom helpers</h3>
     <p>
       MaxBars reuses ClassicBars's engine, so a host registers operations with the same

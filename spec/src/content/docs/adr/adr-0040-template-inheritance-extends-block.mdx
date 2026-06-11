@@ -4,7 +4,9 @@ sidebar:
   label: ADR-040 extends/block inheritance
 ---
 
-*Status:* **Proposed.** *Date:* 2026-06-11. Applies to the *statement-tag dialects* with a layout
+*Status:* **Accepted** (implemented 2026-06-11: `Kernel.Inherit` oracle + the AOT/JS & Rust
+emitters + `trussbars_template::inherit` VM, conformance-gated oracle≡AOT≡VM). *Date:* 2026-06-11.
+Applies to the *statement-tag dialects* with a layout
 surface — *MaxBars* (the PureScript reference / oracle) and *Trussbars* (the Rust production engine).
 *RawBars* is the **desugar target**, not a surface consumer: inheritance lowers *to* its
 partial/yield primitives. *ClassicBars* and *MinBars* are **out of scope** — ClassicBars keeps
