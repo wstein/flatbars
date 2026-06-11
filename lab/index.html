@@ -1715,6 +1715,7 @@
       import { previewDoc, applyEscape, outputHasContent } from "./app/render-helpers.mjs?v=2";
       import { renderPerformance } from "./app/dock/performance.mjs?v=1";
       import { renderWhitespace } from "./app/dock/whitespace.mjs?v=1";
+      import { renderCoverage } from "./app/dock/coverage.mjs?v=1";
       import { EditorState, Annotation, StateField, StateEffect, Compartment } from "https://esm.sh/@codemirror/state@6.5.2/es2022/state.mjs";
       import {
         Decoration,
@@ -5138,7 +5139,15 @@
             const dead = lastCoverage.filter((r) => !r.executed).length;
             return dead ? "warn" : "success";
           },
-          render: renderCoverage },
+          render: (body) => renderCoverage(body, lastCoverage, {
+            rowPosition: (r) => {
+              const src = fileSource(r.file);
+              return typeof r.start === "number"
+                ? charToLineColumn(src, spanRange(src, r.start, r.end)[0])
+                : { line: 1, column: 1 };
+            },
+            openProblem,
+          }) },
         // ADR-022: conditions whose branch would differ on another engine
         // (Mustache/StringTemplate4/…), with a portable fix each.
         { id: "truthiness", label: "Truthiness", requires: ["analyse"],
@@ -5525,47 +5534,9 @@
       // dock panel migrated to the ctx form (it takes its one cache, lastTimings,
       // as an argument; the descriptor above passes it).
 
-      // ── Panel #7: Coverage map ────────────────────────────────────────
-      // Static branch coverage from the current data: each `if`/`unless`/
-      // `each`/`with` block reports whether it would execute and (for loops)
-      // how many iterations.
-      function renderCoverage(body) {
-        // Coverage counts conditional / iteration hits during the render.
-        const rows = lastCoverage;
-        const section = makeEl("div", { class: "cv-section" });
-        section.append(makeEl("div", { class: "cv-head" }, [
-          makeEl("strong", {}, "Coverage"),
-          " — ", String(rows.length), " block", rows.length === 1 ? "" : "s",
-          " · ", String(rows.filter((r) => r.executed).length), " executed",
-          " · ", String(rows.filter((r) => !r.executed).length), " skipped",
-        ]));
-        if (rows.length === 0) {
-          section.append(makeEl("div", { class: "cv-empty" },
-            "No conditional or iteration blocks in this template."));
-          body.append(section);
-          return;
-        }
-        section.append(makeEl("div", { class: "cv-hint" },
-          "Static against the current data — a block in a scoped subtree (loop body or partial-scope) is flagged unknown."));
-        const list = makeEl("div", { class: "cv-rows" });
-        for (const r of rows) {
-          const cls = r.executed ? "ok" : "dead";
-          const src = fileSource(r.file);
-          const pos = typeof r.start === "number"
-            ? charToLineColumn(src, spanRange(src, r.start, r.end)[0])
-            : { line: 1, column: 1 };
-          const row = makeEl("div", { class: `cv-row ${cls}` }, [
-            makeEl("span", { class: "cv-kind" }, r.kind),
-            makeEl("span", { class: "cv-label" }, r.label),
-            makeEl("span", { class: "cv-where" }, `${r.file}:${pos.line}:${pos.column}`),
-          ]);
-          row.title = "jump to source";
-          row.addEventListener("click", () => openProblem({ file: r.file, line: pos.line, col: pos.column }));
-          list.append(row);
-        }
-        section.append(list);
-        body.append(section);
-      }
+      // Panel #7: Coverage map now lives in ./app/dock/coverage.mjs — it takes its
+      // cache (lastCoverage) plus an injected rowPosition closure (fileSource +
+      // charToLineColumn/spanRange) and openProblem (the descriptor passes them).
 
       // ── Panel: Truthiness (ADR-022) ──────────────────────────────────
       // The conditions whose branch would differ on another engine, from the
