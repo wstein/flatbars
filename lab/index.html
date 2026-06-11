@@ -1720,6 +1720,7 @@
       import { renderCapabilities } from "./app/dock/capabilities.mjs?v=1";
       import { renderTruthiness } from "./app/dock/truthiness.mjs?v=1";
       import { renderLint } from "./app/dock/lint.mjs?v=1";
+      import { renderProblems } from "./app/dock/problems.mjs?v=1";
       import { TRANSFORMER_RISK } from "./app/transformer-risk.mjs?v=1";
       import { EditorState, Annotation, StateField, StateEffect, Compartment } from "https://esm.sh/@codemirror/state@6.5.2/es2022/state.mjs";
       import {
@@ -5051,7 +5052,7 @@
           count: () => dockProblems.length,
           badge: () => dockProblems.length === 0 ? "success" :
             (dockProblems.some((p) => p.severity === "error" || p.severity === "render") ? "danger" : "warn"),
-          render: renderProblems },
+          render: (body) => renderProblems(body, dockProblems, { openOrCreatePartial, openProblem }) },
         { id: "transformers", label: "Transformers", requires: ["catalog"],
           count: () => lastUsedTransformers.length,
           badge: () => lastUsedTransformers.length ? "" : "success",
@@ -5510,40 +5511,9 @@
         body.append(pane);
       }
 
-      function renderProblems(body) {
-        if (!dockProblems.length) {
-          body.append(makeEl("div", { class: "problem-empty" }, [
-            makeEl("b", {}, "✓ No errors. "),
-            "Compile and capability checks passed.",
-          ]));
-          return;
-        }
-        for (const p of dockProblems) {
-          const sev = p.severity === "cap" ? "cap"
-            : p.severity === "missing" ? "cap"
-            : p.severity === "render" ? "render"
-            : "error";
-          const sourceLabel = p.severity === "cap" ? "capability"
-            : p.severity === "missing" ? "missing assign"
-            : "compile";
-          const unknownPartial = p.message.match(/unknown partial ['"](.*?)['"]/);
-          const msgChildren = [p.message];
-          if (unknownPartial) {
-            const name = unknownPartial[1];
-            const btn = makeEl("button", { class: "problem-action", title: `Open or create partial "${name}"` }, "＋ Create partial");
-            btn.addEventListener("click", (e) => { e.stopPropagation(); openOrCreatePartial(name); });
-            msgChildren.push(btn);
-          }
-          const row = makeEl("div", { class: `problem ${sev}`, title: "jump to source" }, [
-            makeEl("span", { class: "sev" }, sev === "cap" ? "!" : "×"),
-            makeEl("span", { class: "where" }, `${p.file}:${p.line}:${p.col}`),
-            makeEl("span", { class: "msg" }, msgChildren),
-            makeEl("span", { class: "src" }, sourceLabel),
-          ]);
-          row.addEventListener("click", () => openProblem(p));
-          body.append(row);
-        }
-      }
+      // Problems panel now lives in ./app/dock/problems.mjs — it takes the
+      // dockProblems cache plus openOrCreatePartial + openProblem (the descriptor
+      // above passes them).
 
       // Jump from a Problems row to its source location.
       function openProblem(p) {

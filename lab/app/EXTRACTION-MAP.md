@@ -62,7 +62,7 @@ instead of re-closing over it.
 | Dock Panel #5 Capabilities | `app/dock/capabilities.mjs` | 2 caches + stem-allow-list + engineMeta + 3 policy flags | ✅ (both engine branches; DOM-fake tested) |
 | Dock Panel Truthiness (ADR-022) | `app/dock/truthiness.mjs` | lastAnalyse + suppressed + pathSchema + openProblem | ✅ (DOM-fake tested) |
 | Dock Panel Lint (ADR-019) | `app/dock/lint.mjs` | lastLint + openProblem | ✅ (DOM-fake tested) |
-| Dock Panel Problems (last inline dock tab) | `app/dock/problems.mjs` | dockProblems + openProblem | ⛔ |
+| Dock Panel Problems | `app/dock/problems.mjs` | dockProblems + openOrCreatePartial + openProblem | ✅ (DOM-fake tested) — DOCK COMPLETE: all 10 tabs modular |
 | Render Config popover (6387) | `app/config-view.mjs` | reads/writes state | ⛔ |
 | Boot (6611) | `app/boot.mjs` | entry point | ⛔ (last) |
 
