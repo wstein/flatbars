@@ -195,3 +195,8 @@ strict-native direction:
   `fmt::Write` (zero-alloc `render_into`) instead of `String`: `esc`/`ToText` → `fmt::Result`,
   uniform `?`, host-block-helper bodies become `Fn() -> Result<String, fmt::Error>`. `truss!`
   stays `String`-only public; SizeHint kept on the `String` path. Atomic; conformance-re-gated.
+- `24-northstar-migration.md` — **EXPLORATION** the proof port that demonstrates Trussbars in
+  the wild. Inheritance (ADR-040) unblocked the Jinja-family targets; the `benchmarks/` numbers
+  quantify the speed win (AOT 17–74× / VM 1.6–6× over the interpreters). Recommends a **Zola
+  theme → Trussbars** port (speed + inheritance + Rust-native `.truss`), with Askama the
+  typed-AOT head-to-head alternative.
