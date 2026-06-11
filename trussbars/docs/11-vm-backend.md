@@ -240,9 +240,35 @@ structure to bytecode driving an `Env` stack, routes every expression through th
 host block helpers, raw) through a `Delegate` op → `eval_nodes`. There is no subset and no
 fallback — `Program::compile` accepts every valid template. The `truss-vm` CLI + the
 `harness.mjs --vm` axis prove it: **75/75 rendered corpus cases byte-match the oracle**,
-identical to `--interp`. What remains is pure optimization — promoting `Delegate`d blocks and
-hot expressions to native borrow-based ops — and is gated on the perf benchmark, never on
-coverage.
+identical to `--interp`.
+
+**Status — specialized (perf-gated).** The full-coverage rewrite initially routed *every*
+expression through the shared `eval_expr`, which clones the leaf + pays dispatch — so the VM
+lost its lead and the perf gate failed (`teams`: VM 1.17 µs > interpreter 1.08 µs). The
+specialization pass restored `VM ≤ interpreter` by promoting the hot constructs to native
+borrow-based / zero-eval ops, each landed only when the benchmark justified it and each kept
+byte-identical (`--vm` stays 75/75):
+
+- **`OutPath` / `JumpUnlessPath`** — a `this`/`root` field path resolves to a leaf `&Value`
+  and is written / truth-tested directly (zero clone, no `eval_expr`). The dominant output
+  and condition forms.
+- **`JumpUnlessFirst`** — `{% if loop.first %}` reads the loop frame's `index0` straight off
+  `Env::loop_first()` (no `Value`, no path walk).
+- **`ScopeStart`/`ScopeEnd`, `LocalStart`/`LocalEnd`** — `{% scope %}` (re-root) and
+  `{% local %}` (block aliases) drive the `Env` stack natively instead of delegating.
+
+`Delegate` now carries only `case`, partials, host block helpers, and raw blocks (none hot in
+the corpus). Perf gate green, `AOT ≤ VM ≤ interpreter ≤ handlebars`: big-table VM ≈ 1.3× the
+interpreter, teams ≈ 1.9× (was 0.9× before specialization).
+
+**Declined (assessed, not built): borrowing loop elements.** `set_iter` clones the current
+element into `env.this` each iteration; the old subset VM borrowed `&items[i]` instead. Eliding
+the clone would need either lifetime-threading the shared `Env` (invasive — every `eval_*`
+reads `env.this`) or a fragile dirty-flag / lazy-sync scheme (byte-divergence risk). And it
+buys almost nothing on the actual workloads: big-table's elements are `Value::Num` (a Copy enum
+— the "clone" is free), teams' are `Value::Object` (one `Rc` bump ×4). big-table's real cost is
+`core::fmt` integer formatting + loop dispatch, which this does not touch. Per the rule above
+— promote only when the benchmark demands it — it stays unbuilt while the gate is green.
 
 [`Value`]: ../crates/trussbars-interp/src/lib.rs
 
