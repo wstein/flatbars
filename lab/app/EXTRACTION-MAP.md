@@ -54,7 +54,8 @@ instead of re-closing over it.
 | Wire events (5136) | `app/boot.mjs` (entry) | wires everything | ⛔ (last) |
 | `makeEl` (dock DOM builder, 138 uses) | `app/dom.mjs` | none | ✅ |
 | Dock Panel #6 Performance | `app/dock/performance.mjs` | reads 1 cache (`lastTimings`) | ✅ (ctx form; DOM-fake tested) |
-| Diagnostics dock + panels 1/2/3/5/7 + Truthiness (5183–6386) | `app/dock/*.mjs` (one per panel) | read analyses caches | ⛔ (migrate one at a time, ctx form + DOM-fake test each) |
+| Dock Panel #2 Whitespace | `app/dock/whitespace.mjs` | 1 cache + openProblem + standalone flag | ✅ (ctx form; DOM-fake tested) |
+| Diagnostics dock + panels 1/3/5/7 + Truthiness (5183–6386) | `app/dock/*.mjs` (one per panel) | read analyses caches | ⛔ (migrate one at a time, ctx form + DOM-fake test each) |
 | Render Config popover (6387) | `app/config-view.mjs` | reads/writes state | ⛔ |
 | Boot (6611) | `app/boot.mjs` | entry point | ⛔ (last) |
 
