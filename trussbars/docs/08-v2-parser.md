@@ -40,10 +40,10 @@ The surface to parse is exactly the **ratified freeze** (`docs/06 §1`):
   `== != < > <= >=`, `&& ||`, `??`, `?:`, `? :` ternary), pipes (`x | f arg`),
   subexpression parens, list literals `[a, b]`, string/number/`true`/`false`/`null`
   literals, and applications (`f a b`).
-- **Blocks** — Liquid `each` binding (`{{#each item [i] in coll}}`, `label NAME`),
-  `if`/`unless`/`elif`/`else`, `with`, `let` (`{{#let a=(e) b=(e)}}`), inline
-  partials (`{{#inline}}` + `{{> n [ctx]}}`), block partials (`{{#partial}}` +
-  `{{yield}}`), raw blocks.
+- **Blocks** — Liquid `each` binding (`{% for item [i] in coll %}`, `label NAME`),
+  `if`/`unless`/`elif`/`else`, `with`, `let` (`{% local a=(e) b=(e) %}`), inline
+  partials (`{% inline %}` + `{% include "n" [ctx] %}`), block partials (`{% partial %}` +
+  `{% yield %}`), raw blocks.
 
 ## 3. The desugar the emit step depends on
 
@@ -54,7 +54,7 @@ replicate them (port the rules, not the code):
   (`{{a.b}}` → `lookup (this) "a" "b"`; a block-param head roots there).
 - **Liquid `each` → the core block** with `@param` markers for the bindings
   (the emitter reads them via `splitBlockArgs`).
-- **`{{#let}}` → nested single-binding lets** with each alias added to scope, so a
+- **`{% local %}` → nested single-binding lets** with each alias added to scope, so a
   bare `{{a}}` roots at the alias (the v1 emitter relies on exactly this — one
   `name=value` `@hash` per block).
 - **Hash args → `@hash`/`dict`**; **block params → trailing string markers**
@@ -109,7 +109,7 @@ non-trivial part (precedence-climbing for the operators).
 3. **Block parser + desugar — ✅ DONE** (`src/parse.rs`). The `Lexeme` stream → a
    structured, desugared `Node` tree: if/unless (negated)/`else if`-chain, the
    Liquid `each item [i] in coll [label]` binding, `with`, sequential `let` hash,
-   inline/partial/`{{yield}}`, raw blocks; `Scope` threaded so a binding/alias roots
+   inline/partial/`{% yield %}`, raw blocks; `Scope` threaded so a binding/alias roots
    its paths at itself. Gate: 10 unit tests + **the whole 57-template corpus parses**
    (`tests/corpus.rs::parser_accepts_the_whole_corpus`).
 4. **Emit — ✅ DONE** (`src/emit.rs`, `src/bin/truss-emit.rs`). A faithful

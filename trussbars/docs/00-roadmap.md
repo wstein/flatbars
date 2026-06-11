@@ -28,7 +28,7 @@ v2 is built against a settled language, not a moving one.**
 
 ## Pre-v2 gate — CLEARED
 
-1. **Freeze ratified (docs/06).** The v1 surface is frozen — `{{#let}}`, list
+1. **Freeze ratified (docs/06).** The v1 surface is frozen — `{% local %}`, list
    literals, collection filters (`where`/`reject`/`find`/`some`/`every`), and enum
    context types are all IN; `dict` literals + data-enum dispatch are the two
    type-aware items deliberately → v2.
@@ -101,8 +101,11 @@ strict-native direction:
    `{% … %}` statement tag. The Handlebars block-open (`{{#x}}`) / block-close (`{{/x}}`)
    sigils were removed from the lexer dispatch — such a tag now falls through to an
    ordinary (invalid) output expression; **no rejection path was added** (the code is just
-   gone). Kept by design: the quad-raw block `{{{{#raw}}}}…{{{{/raw}}}}` (its own syntax),
-   `{{> }}` partials, `{{! }}` comments, `{{yield}}`, the `{{else if}}` clause.
+   gone). Kept *at this cutover*: the quad-raw block `{{{{#raw}}}}…{{{{/raw}}}}`,
+   `{{> }}` partials, `{{! }}` comments, `{{yield}}`, the `{{else if}}` clause. **A later
+   pure-grammar pass then purged those too** — the raw region is now `{% raw %}…{% endraw %}`,
+   raw output is the `safe` filter (`{{ x | safe }}`), partials are `{% include "name" %}`,
+   comments are `{# … #}`, and the clauses are `{% yield %}` / `{% elif %}`.
    `trussbars-import` is untouched (it parses *foreign* Handlebars on purpose).
 
 2. **The AOT-compat layer removed end-to-end.** Rationale: the AOT backend's "subset"
@@ -143,7 +146,7 @@ strict-native direction:
 - `09-host-helpers.md` — the typed host-helper convention (F3; value + block helpers).
 - `10-inspect.md` — the inspector / provenance design (STViz-style; Lab as blueprint).
 - `11-vm-backend.md` — the dynamic VM backend (two-backends framing, conformance axes).
-- `12-case-multiarm-blocks.md` — `{{#case}}…{{when …}}…{{else}}` multi-arm conditional: a
+- `12-case-multiarm-blocks.md` — `{% case %}…{% when … %}…{% else %}` multi-arm conditional: a
   first-class node lowered to a Rust `match` (subject evaluated once), `caseH` in the oracle.
   Implemented in RawBars/MaxBars and Trussbars.
 - `13-independence.md` — **decision doc**, now two parts. **Part I (2026-06-10):** ecosystem
@@ -155,7 +158,7 @@ strict-native direction:
   live oracle survives), **(A) sever is the escape hatch**. Under (C): G1+G3-deletion are only-if-(A),
   G2/G5/§5-grading required either way. **Part II:** the original (A) oracle-sever playbook, retained.
 - `14-typed-match.md` — **proposed** `{{#match SUBJECT "Type"}}` — the typed-exhaustive sibling
-  of `{{#case}}`: variant dispatch lowered to a Rust `match` whose exhaustiveness rustc enforces
+  of `{% case %}`: variant dispatch lowered to a Rust `match` whose exhaustiveness rustc enforces
   (no schema inference needed). Surface-freezing ADR; not yet implemented.
 - `15-migration-import.md` — the migration-tool **read half**: foreign-dialect parsers
   (`crates/trussbars-import`; Mustache / Handlebars / Liquid / StringTemplate4). Implemented;
@@ -184,7 +187,7 @@ strict-native direction:
   `> 100`) by widening to the f64 model; string ordering untouched, string-vs-number a compile
   error. v2-conformance 87/87, 0 drift.
 - `21-cross-file-partials.md` — **DONE** (#4). `truss!(…, partials = [name = "file.truss"])`
-  imports partials from other files (shared header/footer, sub-context partials, `{{yield}}`
+  imports partials from other files (shared header/footer, sub-context partials, `{% yield %}`
   layouts), resolved by the inline mechanism. Per-source error spans (`(in partial 'name')`);
   duplicate name = compile error. v2-conformance 87/87, 0 drift.
 - `22-derive-template.md` — **PROPOSED** (#5) `#[derive(Template)]` — a struct owns its template

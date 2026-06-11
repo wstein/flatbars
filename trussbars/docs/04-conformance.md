@@ -54,7 +54,7 @@ classifier *is* the spec's admissibility rule (`01` §3) made executable.
 | Bucket | Definition | Harness action |
 | --- | --- | --- |
 | **positive-admissible** | data-derived-name-free, no bare-number condition, data fits a schema | emit → compile → run → **byte-match** vs oracle (§4) |
-| **negative: injection-class** | computed partial `{{> (expr)}}`, `apply`, computed record `lookup` (§4) | assert the **Trussbars compiler rejects** it (§5) |
+| **negative: injection-class** | computed partial `{% include (expr) %}`, `apply`, computed record `lookup` (§4) | assert the **Trussbars compiler rejects** it (§5) |
 | **negative: changed-contract** | missing-key (§5.1) or bare-number condition (§5.3) | assert **`rustc` rejects** it with the expected error class (§5) |
 | **numeric-masked** | admissible, but output contains an f64 whose stringification may differ (§10) | byte-match **after numeric normalization** (§7); *logged* |
 | **coercion-divergent** | data shape the loose interpreter tolerates but strict serde rejects (`01` §8) | **excluded**, logged with reason |

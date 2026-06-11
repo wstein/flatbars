@@ -105,9 +105,9 @@ text and the statically-known context type alone, without consulting a runtime v
 | Name kind | Admissible form | Inadmissible form |
 | --- | --- | --- |
 | Field path | `{{user.name}}`, `{{loop.index0}}` (written path) | `{{lookup this k}}` where `k` is data |
-| Partial | `{{> card}}` (written name) | `{{> (lookup this "kind")}}` (computed) |
+| Partial | `{% include "card" %}` (written name) | `{% include (lookup this "kind") %}` (computed) |
 | Helper | `{{multiply price qty}}` (written name) | `{{apply opName x}}` (name from data) |
-| Block head | `{{#each items}}` (written name) | — (heads are always names in MaxBars) |
+| Block head | `{% for items %}` (written name) | — (heads are always names in MaxBars) |
 
 ---
 
@@ -117,11 +117,11 @@ All three exclusions are instances of §1. Each is **intentionally unsupported o
 injection-safety grounds**, not merely unimplemented — the conformance report (§11) must
 say so.
 
-### 4.1 Computed partial names — `{{> (expr)}}`
+### 4.1 Computed partial names — `{% include (expr) %}`
 
 **Status:** Out (injection-class).
 
-`{{> (lookup this "kind")}}` lets *data* select which partial renders. With any
+`{% include (lookup this "kind") %}` lets *data* select which partial renders. With any
 attacker-influenced field, this reaches the entire partial registry — an SSTI / confused-
 deputy hazard. It is the eval-shaped construct of the language.
 
@@ -135,7 +135,7 @@ match**, decoding the tag at the deserialization boundary:
 enum Person { Author(Author), Engineer(Engineer) }
 ```
 
-`{{> this}}` over a `Person` compiles to a `match` that calls the statically-known
+`{% include this %}` over a `Person` compiles to a `match` that calls the statically-known
 `author` / `engineer` template for each variant. This is **strictly safer and stronger**
 than the dynamic form: no string, no registry probe, and `rustc` *forces* a new `kind` to
 be handled. (Trait-object dispatch — each item implements a `Render` trait — is an
@@ -192,9 +192,9 @@ remain checked at their natural point (still in Rust, still without an interpret
 
 ### 5.3 Numeric truthiness → compile error
 
-A bare number in boolean position — `{{#if count}}`, `{{!stock}}`, `{{n ?: x}}`,
+A bare number in boolean position — `{% if count %}`, `{{!stock}}`, `{{n ?: x}}`,
 `{{n ? a : b}}` — is a **compile error**. The author must state intent with an explicit
-comparison: `{{#if count > 0}}`, `{{#if count != 0}}`.
+comparison: `{% if count > 0 %}`, `{% if count != 0 %}`.
 
 Rationale: MaxBars's `nonEmpty` rule makes `0` *truthy*; Handlebars makes `0` *falsy* — each
 surprises half its audience, and either way a bare-number condition is ambiguous. The typed
@@ -215,9 +215,9 @@ error), never a silent behaviour change.
 
 Everything below is admissible and typed. This is the bulk of the language.
 
-**Output & paths.** `{{x}}` (HTML-escaped), `{{{x}}}` (raw), dotted paths `{{user.address.city}}`,
+**Output & paths.** `{{x}}` (HTML-escaped), `{{ x | safe }}` (raw), dotted paths `{{user.address.city}}`,
 bracket segments for non-identifier keys `{{[first-name]}}` (emit with `#[serde(rename)]`).
-Comments `{{! … }}` / `{{!-- … --}}`.
+Comments `{# … #}`.
 
 **Operators (all desugar to prelude calls; emitted as monomorphized Rust):**
 arithmetic `+ - * / %` (`add`/`subtract`/`multiply`/`divide`/`modulo`, strictly numeric —
@@ -225,11 +225,11 @@ no string `+`); comparison `== != < > <= >=`; logic `&& || !`; null-coalesce `??
 (`coalesce`, first non-null, over `Option`); truthy-coalesce / Elvis `?:` (`firstTruthy`,
 first truthy under `nonEmpty`); ternary `? :` (`ternary`). Pipe `a | f x` → `f a x`
 (left value prepended). Pipe is omitted from block heads so `as |x|` parses; pipe a head
-argument by parenthesising it: `{{#each (xs | f) as |x|}}`.
+argument by parenthesising it: `{% for x in (xs | f) %}`.
 
-**Control flow** (emitted as native Rust `if` / `for`): `{{#if}}` / `{{else if}}` /
-`{{else}}` / `{{#unless}}`; `{{#each xs}}` over `Vec` and over map (`BTreeMap`, key order
-per the interpreter — see §11); `{{#each … else …}}` empty clause; `{{#with}}` re-root.
+**Control flow** (emitted as native Rust `if` / `for`): `{% if %}` / `{% elif %}` /
+`{% else %}` / `{% unless %}`; `{% for xs %}` over `Vec` and over map (`BTreeMap`, key order
+per the interpreter — see §11); `{% for … else … %}` empty clause; `{% scope %}` re-root.
 
 **Reserved scope & loop metadata** (typed structs / threaded context):
 `{{this}}`; `{{loop.index0 index1 rindex0 rindex1 first last length key this}}`;
@@ -237,16 +237,17 @@ per the interpreter — see §11); `{{#each … else …}}` empty clause; `{{#wi
 `{{parent.parent.*}}` chains; block params `as |item i|`; labelled loops
 `label outer` exposing `{{outer.index1 length first …}}`.
 
-**Partials (static names only):** `{{> name}}` and `{{> name ctx}}` as typed template-
-function calls; layout partials via `{{#inline "name"}}…{{yield}}…{{/inline}}` +
-`{{#partial "name"}}…{{/partial}}` (the hoist pre-pass + yield stack). Polymorphic
+**Partials (static names only):** `{% include "name" %}` and `{% include "name" ctx %}` as typed template-
+function calls; layout partials via `{% inline "name" %}…{% yield %}…{% endinline %}` +
+`{% partial "name" %}…{% endpartial %}` (the hoist pre-pass + yield stack). Polymorphic
 dispatch via the §4.1 enum/trait replacement.
 
 **Custom & block helpers** registered **at compile time** (as Rust functions / trait
-impls, not runtime `register`): `{{loud name}}`, `{{{link "Home" url="/home"}}}`,
-`{{#list people as |p i|}}…{{/list}}`.
+impls, not runtime `register`): `{{loud name}}`, `{{ link "Home" url="/home" | safe }}`,
+`{% list people as |p i| %}…{% endlist %}`.
 
-**Raw blocks** `{{{{#op}}}}…{{{{/op}}}}` (body passed verbatim to a known helper).
+**Verbatim region** `{% raw %}…{% endraw %}` (body captured verbatim; ADR-039 item 2 — the
+old quad-stache `{{{{#op}}}}…{{{{/op}}}}` raw-block helper was retired, and the lexer rejects it).
 
 ---
 
@@ -300,7 +301,7 @@ template emits (e.g. the `count > 0` the author was forced to write).
   emits `fn render(ctx: &T) -> String`; `rustc` type-checks the emitted accesses against `T`.
   In v2 the proc-macro sees `T` directly (`#[derive(Template)]`-style).
 - `{{user.name}}` → `ctx.user.name` (field access), **not** a runtime probe.
-- `{{#each items as |item|}}` types `item` as the element of `ctx.items`
+- `{% for item in items %}` types `item` as the element of `ctx.items`
   (`items: Vec<Item>` ⟹ `item: &Item`); loop metadata is a known `Loop` struct.
 - `root` is the top-level `&T`; `parent` / `outer` are enclosing context/loop references,
   threaded by lexical nesting.
@@ -322,7 +323,7 @@ softens the authoring cost by *deriving* a candidate `T` from the template, but 
 `T` remains the precondition.
 
 **Resource bounds live at the deserialization seam, not in the template.** A compiled
-`{{#each items}}` is a native `for` over `ctx.items`; its cost is the *cardinality of `T`*,
+`{% for items %}` is a native `for` over `ctx.items`; its cost is the *cardinality of `T`*,
 which is set when the dynamic JSON is deserialized into `T`. Trussbars deliberately emits no
 per-iteration budget or recursion guard — that overhead would contradict the zero-cost
 codegen thesis (§9), and the loop bound is not knowable AOT (it is data). The honest
@@ -416,7 +417,7 @@ Source: `tutorials/src/maxbars.mjs`. Disposition under this spec:
 | 1 | Hello (`{{name}}`) | In |
 | 2 | Dotted paths | In |
 | 3 | Missing keys → empty | **Changed** (§5.1 — compile error) |
-| 4 | Escaping (`{{html}}` / `{{{html}}}`) | In |
+| 4 | Escaping (`{{html}}` / `{{ html \| safe }}`) | In |
 | 5 | Comments | In |
 | 6 | Operator/helper/subexpr identity | In |
 | 7 | Pipes | In |
@@ -427,7 +428,7 @@ Source: `tutorials/src/maxbars.mjs`. Disposition under this spec:
 | 12 | `each` over object → `loop.key` | In (typed map) |
 | 13 | `with` re-root | In |
 | 14 | Block params + labelled loops | In (`outer` threaded, §8) |
-| 15 | External/**dynamic** partials `{{> (lookup this "kind")}}` | **Out** (§4.1) → enum/match replacement |
+| 15 | External/**dynamic** partials `{% include (lookup this "kind") %}` | **Out** (§4.1) → enum/match replacement |
 | 16 | Layout partials + `yield` | In |
 | 17 | Custom & block helpers | In (compile-time registration) |
 | 18 | Raw blocks | In |

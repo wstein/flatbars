@@ -320,7 +320,7 @@ The VM is only defensible because it **keeps the AOT invariant**. Concretely:
   Data flowing in at render time fills **values only** — it can never become a name, a
   path segment, a helper, or a partial.
 - The same constructs AOT rejects stay rejected **in the VM too**: `apply` (the
-  eval-shaped meta-helper), computed partials `{{> (expr)}}`, computed-key `lookup`.
+  eval-shaped meta-helper), computed partials `{% include (expr) %}`, computed-key `lookup`.
   This is enforced once, in the shared front-end / a shared check — not per backend.
 
 So a runtime-*authored* template is still safe to *run*: authoring fixes the names;
@@ -353,7 +353,7 @@ Three render modes, from most dynamic to a strict AOT proxy:
    and produces byte-identical output** — the VM as a *verifying proxy for AOT*. Given
    the host schema, it applies AOT's exact static rules at load:
    - every referenced path must exist (missing field → error, *not* lenient-empty);
-   - **numeric truthiness is an error** (`{{#if count}}` is rejected — AOT's Option C,
+   - **numeric truthiness is an error** (`{% if count %}` is rejected — AOT's Option C,
      no `TruthyIn<NonEmpty>` for numbers; `docs/01`);
    - **a bare struct/object in output position is an error** (AOT has no `ToText` for
      structs);
@@ -404,7 +404,7 @@ it's also dynamic), so the VM is gated everywhere, with **no silent gaps**.
 
 **AOT-compat (§7) is *gated*, not claimed.** The harness asserts, across the whole
 corpus *including the negatives*, that the VM in AOT-compat mode **accepts iff AOT
-accepts** and **outputs byte-identically** — so a bare-number `{{#if}}` and
+accepts** and **outputs byte-identically** — so a bare-number `{% if %}` and
 bare-struct output are rejected by *both* (while a `dict` literal, now AOT-supported,
 is accepted by both), and every positive renders the same bytes. "100% compat" is
 therefore a tested contract, exactly the way `interpreter ≡

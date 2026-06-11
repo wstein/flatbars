@@ -67,9 +67,9 @@ Frozen surface:
   name grammar and reservation rules (docs/17 §2: no shadowing reserved scope names or built-in
   block heads — located error).
 - **The body is an ordinary template fragment** — any construct is legal inside it (output,
-  `{% if %}`/`{% each %}`/`{% with %}`/`{% local %}`/`{% set %}`, `{{> partial}}`, nested
+  `{% if %}`/`{% for %}`/`{% scope %}`/`{% local %}`/`{% set %}`, `{% include "partial" %}`, nested
   `{% capture %}`). It renders in the surrounding context (it does **not** re-root).
-- **The result is `safe`** (pre-escaped). `{{ NAME }}` emits it without re-escaping; `{{{ NAME }}}`
+- **The result is `safe`** (pre-escaped). `{{ NAME }}` emits it without re-escaping; `{{ NAME | safe }}`
   is identical (already raw). Piping is by value: `{{ NAME | trim }}` operates on the rendered
   string.
 - **Scope is forward, to the enclosing block's close** — the binding *outlives the capture block*
@@ -84,7 +84,7 @@ Frozen surface:
 The parser builds a `Capture { name, body }` node (a sibling of the binding node; its `body` is a
 normal node list). The AOT emitter renders the body into a fresh `String` and binds it as a `safe`
 value with the forward `{% set %}` scope. (This `String` buffer is the same intermediate-buffer
-class as block helpers and `{{yield}}`; once the emitter targets `fmt::Write`, `docs/23` already
+class as block helpers and `{% yield %}`; once the emitter targets `fmt::Write`, `docs/23` already
 governs it — the body emit propagates `fmt::Result` and the buffer stays a `String`, so no
 separate decision is needed here.)
 
@@ -113,7 +113,7 @@ out.push_str("</footer>\n");
 ```
 
 The body emits with the *same* per-output escaping it would have at top level (`escape_html` for
-`{{ }}`, passthrough for `{{{ }}}`/`safe`/partials), so the captured string is "rendered output,
+`{{ }}`, passthrough for `{{ … | safe }}`/`safe`/partials), so the captured string is "rendered output,
 frozen." Wrapping it in `Safe` is what makes the later `{{ byline }}` a passthrough — the type
 *is* the escaping contract, checked by the compiler, not a runtime flag.
 
@@ -123,7 +123,7 @@ sub-render in the current frame) and installs `name` as a nullary operation retu
 frame's close discards the binding (the `{% set %}` scope). The JS compiler and the VM mirror
 render-into-buffer-then-bind; all backends are pinned byte-for-byte by the corpus. Like
 `{% set %}`/`{% local %}`/`{% case %}`, `capture` is **RawBars/MaxBars only**; **ClassicBars** rejects
-it with a located error (use `{% inline %}`/`{{> partial}}`), and in **MinBars** it is an ordinary
+it with a located error (use `{% inline %}`/`{% include "partial" %}`), and in **MinBars** it is an ordinary
 section.
 
 ## 4. Alternatives considered
@@ -131,9 +131,9 @@ section.
 | # | Alternative | Verdict | Why |
 | --- | --- | --- | --- |
 | **A1** | **Render body → `Safe` string, bound with `{% set %}` scope** | **Chosen** | The minimal faithful adaptation: one `Capture` node, a buffer, a `Safe` binding. The `safe` type encodes "already escaped" so the compiler — not a runtime flag — prevents double-escaping, and the forward scope reuses `docs/17`. |
-| **A2** | Auto-escape `{{ name }}` on output (treat the captured string as untrusted) | **Rejected** | Double-escapes — a captured `<b>x</b>` would print as `&lt;b&gt;x&lt;/b&gt;`. The body already chose its escaping per `{{ }}`/`{{{ }}}`; re-escaping the *result* is wrong. `Safe` is the correct type. |
+| **A2** | Auto-escape `{{ name }}` on output (treat the captured string as untrusted) | **Rejected** | Double-escapes — a captured `<b>x</b>` would print as `&lt;b&gt;x&lt;/b&gt;`. The body already chose its escaping per `{{ }}`/`{{ … \| safe }}`; re-escaping the *result* is wrong. `Safe` is the correct type. |
 | **A3** | Lazy capture (render only if `NAME` is used) | **Rejected for v1** | Saves the buffer when unused, but the body can read loop/scope state that has moved by the use site — capturing a *closure* over `&ctx` re-introduces lifetimes and breaks the "rendered once, here" mental model. Eager keeps semantics obvious; an unused-capture *lint* (§5.3) recovers most of the benefit. |
-| **A4** | Use `{% inline "n" %}…{% endinline %}` + `{{> n}}` instead | **Insufficient** | An inline partial is a re-invokable *fragment*, not a *value*: you cannot `{{ … }}`-pipe or compare/pass its text. Capture's whole point is a first-class string. They coexist (fragment-reuse vs value-capture). |
+| **A4** | Use `{% inline "n" %}…{% endinline %}` + `{% include "n" %}` instead | **Insufficient** | An inline partial is a re-invokable *fragment*, not a *value*: you cannot `{{ … }}`-pipe or compare/pass its text. Capture's whole point is a first-class string. They coexist (fragment-reuse vs value-capture). |
 | **A5** | Do nothing | **The baseline** | Repeat the markup, or precompute the string in a host helper (docs/09). A1 buys in-template render-and-reuse without a host round-trip. |
 
 ## 5. Consequences

@@ -3,8 +3,8 @@
 > **Status: RATIFIED** (v1 surface frozen) · **Audience:** the v2 proc-macro author.
 > **Rebaselined against current `develop`** (branch `feat/trussbars-rebaseline`):
 > develop's MaxBars dropped the `as |x|` loop form for Liquid binding
-> (`{{#each x in xs}}`) and shipped `{{#let}}` and list/dict literals. The v1 emitter
-> then closed the surface — `{{#let}}`, list literals, the collection filters
+> (`{% for x in xs %}`) and shipped `{% local %}` and list/dict literals. The v1 emitter
+> then closed the surface — `{% local %}`, list literals, the collection filters
 > (`where`/`reject`/`find`/`some`/`every`), and enum context types are all in.
 > The conformance harness is **52/52 byte-matched against develop**; the freeze
 > below is the v1 surface as it stands.
@@ -16,18 +16,19 @@
 > items still **out** of v1 are `dict` literals (need a generated struct) and
 > data-carrying-enum field dispatch (a `match`) — both type-aware, deliberately → v2.
 >
-> **Amended by docs/19 (Proposed) — surface delimiters.** §1's control-flow surface below is
-> written in the `{{ }}`/`{{#…}}` spelling. For **RawBars/MaxBars/Trussbars**, docs/19 moves all
-> control-flow keywords, separators, and binding statements to Django-style **`{% %}`** (so
-> `{{#if}}`→`{% if %}`, `{{#let}}`→`{% local %}` per docs/17, the quad-stache raw block →
-> `{% raw %}`); `{{ }}` becomes output-only. ClassicBars/MinBars keep `{{ }}`. The *language* below
+> **Amended by docs/19 — surface delimiters.** §1's control-flow surface below is now written in
+> the Django-style **`{% %}`** spelling. For **RawBars/MaxBars/Trussbars**, docs/19 moved all
+> control-flow keywords, separators, and binding statements to **`{% %}`** (the rename map:
+> `{{#if}}`→`{% if %}`, `{{#each}}`→`{% for %}`, `{{#with}}`→`{% scope %}`, `{{#let}}`→`{% local %}`
+> per docs/17, the quad-stache raw block → `{% raw %}`); `{{ }}` is now output-only.
+> ClassicBars/MinBars keep `{{ }}`. The *language* below
 > (constructs, value policy, exclusions) is unchanged — only the delimiters — so the byte-identity
 > contract holds. **Governance:** `{% %}` is a *surface* decision, which docs/12 §5.5 places with
 > the **oracle** (PureScript RawBars/MaxBars); docs/17–19 are Trussbars's conformance view of that
 > decision, not its authority. **The §1 spellings below are now the `{% %}` surface** (docs/19
 step 4 landed — the Rust `trussbars-template` lexer reads `{% %}` and the corpus is migrated;
-the literal *verbatim region* is now `{% raw %} … {% endraw %}` per ADR-039 item 2, while a
-raw-block *helper* — `{{{{#op}}}}`, head ≠ `raw`, fed to an operation — keeps the quad-stache).
+the literal *verbatim region* is now `{% raw %} … {% endraw %}` per ADR-039 item 2 — the
+quad-stache `{{{{ }}}}` raw block, helper form included, is retired; the lexer rejects it).
 
 Evidence base: the conformance corpus (`trussbars/conformance/cases.mjs`, 71
 byte-matched cases) and the blog/changelog dogfoods (`trussbars/examples/`).
@@ -38,23 +39,23 @@ Source of truth for "supported" is the v1 emitter
 
 | Area | Constructs |
 | --- | --- |
-| **Output** | `{{ x }}` (escaped), `{{{ x }}}` (raw), dotted paths `{{ a.b.c }}` |
+| **Output** | `{{ x }}` (escaped), `{{ x \| safe }}` (raw), dotted paths `{{ a.b.c }}` |
 | **Reserved scope** | `this`, `root`, `parent`, `outer` (labelled loop), `loop`, `yield` |
 | **Conditionals** | `{% if %}` / `{% else %}` / `{% unless %}`; `else if` via the `elif` chain (`{% elif … %}`) |
-| **Iteration** | `{% each xs %}` over arrays **and** maps (`groupBy` result) — map iteration binds `loop.key`; Liquid-style block binding `{% each item in xs %}` / `{% each item i in xs %}` (the `as \|…\|` form was removed on develop, ADR/commit `4729026`); `label NAME` after `in`; `{% else %}` empty arm; closes `{% endeach %}` |
+| **Iteration** | `{% for xs %}` over arrays **and** maps (`groupBy` result) — map iteration binds `loop.key`; Liquid-style block binding `{% for item in xs %}` / `{% for item i in xs %}` (the `as \|…\|` form was removed on develop, ADR/commit `4729026`); `label NAME` after `in`; `{% else %}` empty arm; closes `{% endfor %}` |
 | **Loop metadata** | `loop.index0/index1/rindex0/rindex1/first/last/length/key/depth`; `loop.parent` / `loop.root` chains; `outer` via `label NAME` |
-| **Context** | `{% with obj %}…{% endwith %}` re-root (needs `#[derive(Trussbars)]` on `obj`'s type) |
+| **Context** | `{% scope obj %}…{% endscope %}` re-root (needs `#[derive(Trussbars)]` on `obj`'s type) |
 | **Local** | `{% local a=(e) b=(e2) %}…{% endlocal %}` — block-scoped sequential aliases (`b` sees `a`), computed once, **never re-roots**; value-bound to a Rust `let` (best for computed scalars; the `let` head is retired per docs-17) |
 | **Operators (inline)** | `+ - * / %`, `== != < > <= >=`, `&& \|\| !`, `??` (coalesce), `?:` (first-truthy), `a ? b : c` (ternary) |
 | **Pipes** | `{{ x \| f arg }}` desugars to the helper call `f(x, arg)` |
-| **Partials** | inline definitions `{% inline "n" %}…{% endinline %}` + use `{{> n}}` / `{{> n ctx}}`; block partials `{% partial "n" %}…{% endpartial %}` with `{{yield}}` |
-| **Verbatim region** | `{% raw %}…{% endraw %}` (verbatim body; ADR-039 item 2 — retires the quad-stache `{{{{#raw}}}}`). A raw-block *helper* `{{{{#op}}}}` (op ≠ `raw`, fed to an operation) is the separate, unchanged form. |
+| **Partials** | inline definitions `{% inline "n" %}…{% endinline %}` + use `{% include "n" %}` / `{% include "n" ctx %}`; block partials `{% partial "n" %}…{% endpartial %}` with `{% yield %}` |
+| **Verbatim region** | `{% raw %}…{% endraw %}` (verbatim body; ADR-039 item 2 — retires the quad-stache `{{{{ }}}}` raw block, including the `{{{{#op}}}}` raw-block *helper* form; the lexer now rejects triple/quad stache). |
 | **Literals** | string, number (`f64`), `true`/`false`, `null`, **list `[a, b, c]`** (homogeneous → a Rust array; `Each`/`count` work). Dict `{k: v}` literals are **not** in v1 (see F5). |
 
 **Helper inventory** (monomorphized `trussbars_std::*` calls; `count`/`size`/`length` alias):
 - *string* — `uppercase capitalize lowercase trim trimStart trimEnd append prepend replace split startsWith endsWith includes slice truncate reverse`
 - *array* — `count at take takeRight join reverse unique includes slice pluck sortBy groupBy`
-- *collection filters* (ADR-036/037) — `where reject find some every` (`"key"` truthiness or `"key" "cmp" value`; cmp ∈ gt/gte/lt/lte/eq/ne/startsWith/endsWith/includes). `find` returns `Option`, unwrapped by an Option-aware `{% with %}` (`if let Some`).
+- *collection filters* (ADR-036/037) — `where reject find some every` (`"key"` truthiness or `"key" "cmp" value`; cmp ∈ gt/gte/lt/lte/eq/ne/startsWith/endsWith/includes). `find` returns `Option`, unwrapped by an Option-aware `{% scope %}` (`if let Some`).
 - *number* — `abs ceil floor round modulo toFixed toFloat toInt`
 - *escaping* — `escapeHtml safe raw`
 
@@ -84,7 +85,7 @@ Source of truth for "supported" is the v1 emitter
 These are **rejected on purpose** and v2 must keep rejecting them — they are the
 "no data chooses code" boundary (docs/01 §1):
 
-- **Computed partials** (`{{> (lookup …)}}`), **computed `lookup`**, **`apply`** — a
+- **Computed partials** (`{% include (lookup …) %}`), **computed `lookup`**, **`apply`** — a
   data-derived name selecting code is the SSTI shape.
 - **`{{struct}}`** — a context struct has no `ToText`, so stringifying an object is a
   compile error (the typed form of the interpreter's "cannot stringify an object").
@@ -99,11 +100,11 @@ From the blog dogfood (`examples/blog/README.md`); each needs an explicit in/out
 | **F6** | Generated module is hand-committed; a `.truss` typo is a Node error, not a `rustc` error at the call site. | **DONE (v2)** — the `truss!` proc-macro compiles templates at build time (`path = "…"` loads from a file) with diagnostics mapped to template spans (docs/07). |
 | **F2** | A field compared to a numeric literal must be `f64`. | **DONE** — a numeric literal in operator position emits as `trussbars_core::NumLit`, which coerces against any numeric field type (`views: i64` works with `> 100`); string ordering untouched, string-vs-number is a compile error (docs/20, v2-conformance 87/87). |
 | **F4** | `{% local %}` (the `{{#let}}` block, renamed per docs-17) block-scoped sequential aliases — **DONE.** The emitter emits nested `{% local name=(e) %}` as block-scoped Rust `let`s (value-bound; `local-bindings` conformance case). The one limit: binding a non-`Copy` field *directly* (`n=(user.name)`) would move out of `&ctx` — use the field instead. | **CLOSED** (this branch). |
-| **F5** | **List literals `[…]` — DONE** (homogeneous → a Rust array; `Each` via a fixed-array runtime impl, `count` via slice coercion; `list-each-int`/`-str`/`-count` cases). **Dict literals `{k: v}` — DONE:** field access (`{{#with {a:1}}}{{a}}`) compiles to a block-local **generic** struct (`struct __Dict<F0,…>`), whose field types are inferred at instantiation — so even the type-blind emitters synthesize it (both v1 and v2; `dict-*` conformance cases gated v-vs-oracle). Truthiness of a dict subject is resolved at compile time (a non-empty literal is always truthy). | **list & dict CLOSED.** |
+| **F5** | **List literals `[…]` — DONE** (homogeneous → a Rust array; `Each` via a fixed-array runtime impl, `count` via slice coercion; `list-each-int`/`-str`/`-count` cases). **Dict literals `{k: v}` — DONE:** field access (`{% scope {a:1} %}{{a}}`) compiles to a block-local **generic** struct (`struct __Dict<F0,…>`), whose field types are inferred at instantiation — so even the type-blind emitters synthesize it (both v1 and v2; `dict-*` conformance cases gated v-vs-oracle). Truthiness of a dict subject is resolved at compile time (a non-empty literal is always truthy). | **list & dict CLOSED.** |
 | **F1** | Template path == Rust identifier (no rename). | **WONTFIX** — it *is* "names are static"; document only. |
-| **F7** | A **piped or bare multi-arg application used directly as an `{{#if}}`/`{{#unless}}` condition** is rejected ("options argument") — a `startsWith` applied to the subject fails as a bare condition head, whether written as a pipe or as a prefix call. **Workaround: parenthesize** the call — `{{#if (startsWith x "f")}}` works. Applications work in every position *except* a bare condition head. | **v2, IN (fix)** — the desugar should accept a piped/applied condition without the parens. Found via the changelog dogfood (`examples/changelog`); the parens form is the v1 workaround. |
-| **F8** | **Escaping is HTML-only.** `{{ }}` always HTML-escapes, so non-HTML output targets (markdown source, JSON, CSV) get entities — e.g. a commit subject `"x"` becomes `&quot;x&quot;`. Correct when the output is later HTML-rendered (GitHub markdown), literal otherwise. No per-target escaping policy. | **v2, consider** — a target-escape policy (HTML / none / JSON) selected per template, or keep HTML-only and document. Use raw `{{{ }}}` for trusted non-HTML output (XSS-unsafe if later HTML-rendered). Found via the changelog dogfood. |
-| **F10** | **`{{#with (block-param).field}}` renders empty in the reference.** `{{#each row in rows}}{{#with row.meta}}…{{/with}}{{/each}}` — a `with` whose subject is a path off a *Liquid block binding* re-roots to nothing in the interpreter (a plain `{{#with x}}` works; a deep path `{{row.meta.lbl}}` works). The v1 emitter likely resolves it (a latent divergence); the corpus avoids it. | **v2, verify** — match the reference (whatever it is) and pin a case, or treat as a reference bug to fix upstream. Found via the corpus-hardening edges. |
+| **F7** | A **piped or bare multi-arg application used directly as an `{% if %}`/`{% unless %}` condition** is rejected ("options argument") — a `startsWith` applied to the subject fails as a bare condition head, whether written as a pipe or as a prefix call. **Workaround: parenthesize** the call — `{% if (startsWith x "f") %}` works. Applications work in every position *except* a bare condition head. | **v2, IN (fix)** — the desugar should accept a piped/applied condition without the parens. Found via the changelog dogfood (`examples/changelog`); the parens form is the v1 workaround. |
+| **F8** | **Escaping is HTML-only.** `{{ }}` always HTML-escapes, so non-HTML output targets (markdown source, JSON, CSV) get entities — e.g. a commit subject `"x"` becomes `&quot;x&quot;`. Correct when the output is later HTML-rendered (GitHub markdown), literal otherwise. No per-target escaping policy. | **v2, consider** — a target-escape policy (HTML / none / JSON) selected per template, or keep HTML-only and document. Use raw `{{ … \| safe }}` for trusted non-HTML output (XSS-unsafe if later HTML-rendered). Found via the changelog dogfood. |
+| **F10** | **`{% scope (block-param).field %}` renders empty in the reference.** `{% for row in rows %}{% scope row.meta %}…{% endscope %}{% endfor %}` — a `scope` whose subject is a path off a *Liquid block binding* re-roots to nothing in the interpreter (a plain `{% scope x %}` works; a deep path `{{row.meta.lbl}}` works). The v1 emitter likely resolves it (a latent divergence); the corpus avoids it. | **v2, verify** — match the reference (whatever it is) and pin a case, or treat as a reference bug to fix upstream. Found via the corpus-hardening edges. |
 
 ## 5. The freeze
 
@@ -115,5 +116,5 @@ From the blog dogfood (`examples/blog/README.md`); each needs an explicit in/out
 coercion rule (F2). Anything that changes §1/§2/§3 semantics requires an amendment
 to this document and a conformance-corpus update first.
 
-**Out of scope for the freeze:** `{{#let}}` (F4, undecided) and collection literals
+**Out of scope for the freeze:** `{% local %}` (F4, undecided) and collection literals
 (F5, deferred) are *not* part of the v2 target surface unless promoted here first.

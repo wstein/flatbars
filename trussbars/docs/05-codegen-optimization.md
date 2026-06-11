@@ -48,7 +48,7 @@ large real delta would have punched through. None did.
 
 ## Findings
 
-1. **The unused `Loop::at` is free (LLVM DCEs it).** `{{#each}}` bodies that never
+1. **The unused `Loop::at` is free (LLVM DCEs it).** `{% for %}` bodies that never
    reference `loop` still emit `let __l = Loop::at(...)`, but VA (frame removed) ties
    B0. The `__`-prefixed unused binding is dead-code-eliminated. → **No emitter
    change needed**; a "skip the frame when `loop` is unused" pass would add emitter

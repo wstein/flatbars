@@ -70,8 +70,8 @@ straight to `out`:
 
 - **Block helpers** (docs/09): `name(args…, || -> String { let mut out = String::new(); <body>
   out })` — the body renders into a fresh `String` the closure returns.
-- **`{{#partial}}` / `{{yield}}`** (docs/20): the block body renders into a `yield_buf:
-  String` spliced at `{{yield}}`.
+- **`{% partial %}` / `{% yield %}`** (docs/20): the block body renders into a `yield_buf:
+  String` spliced at `{% yield %}`.
 - **`{% capture %}`** (docs/18, *proposed*): renders its body into a fresh `String`, bound as a
   `safe` value — the same buffer class. When capture is built it **inherits the decision below**:
   its body emit propagates `fmt::Result` like every other body, and the buffer is a `String`

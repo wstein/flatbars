@@ -137,7 +137,7 @@ like `truss!`.
 
 **Relationship to `#[derive(Trussbars)]`:** unchanged. `#[derive(Template)]` makes a type
 *renderable*; `#[derive(Trussbars)]` makes a type usable as a truthy/sub-context value
-(`{{#with sub}}`, `{{#if this}}`). A leaf struct rendered at top level needs only `Template`; a
+(`{% scope sub %}`, `{% if this %}`). A leaf struct rendered at top level needs only `Template`; a
 struct also used as a nested context still derives `Trussbars`. (They compose; a struct may
 derive both.)
 
@@ -172,7 +172,7 @@ this derive on top.
 - **`render_into` parity (§5.1):** `render_into` into a fresh `String` equals `render()`; the
   `Display` path (which calls `render_into` on a `Formatter`) equals both — proving the primitive,
   the defaulted convenience, and the zero-alloc `Display` agree.
-- A nested case: a `#[derive(Template)]` whose body uses `{{#each}}` / `{{#with sub}}` over a
+- A nested case: a `#[derive(Template)]` whose body uses `{% for %}` / `{% scope sub %}` over a
   `#[derive(Trussbars)]` field, proving the two derives compose.
 - A `trybuild` golden: a derived template with an unknown helper is a located `compile_error!`.
 - **Clause coverage (§5.2, required):** `helpers` / `truthiness` / `partials` on a derived template

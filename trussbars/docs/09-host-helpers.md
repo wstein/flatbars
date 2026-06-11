@@ -57,22 +57,22 @@ pub fn markdown(src: &str) -> trussbars_core::Safe {
   emits (`trussbars_std::uppercase(&x)`).
 - **Return type.** `String` (escaped on output like any value) or
   [`Safe`](../crates/trussbars-core/src/text.rs) (markup, emitted raw — e.g.
-  `markdown`). The author's `{{ }}` vs `{{{ }}}` still controls escaping of a
+  `markdown`). The author's `{{ }}` vs `{{ … | safe }}` still controls escaping of a
   `String`; a `Safe` return is the *typed* way to opt a helper's output out of
-  escaping (no `{{{ }}}` needed, and it can't be forgotten).
+  escaping (no `{{ … | safe }}` needed, and it can't be forgotten).
 - **Two error tiers.** An **undeclared** head is a Trussbars-owned, located *macro-time*
   error (`unknown helper 'daet' (declare it with truss_helpers …)`). A declared head
   whose host fn is missing or mistyped is **rustc's** (wrong arg type / arity / "cannot
   find function `date`"), steered to the template span by the `docs/07` machinery.
 
-### 3.1 Block helpers (`{{#name args…}}body{{/name}}`) — shipped (AOT + VM)
+### 3.1 Block helpers (`{% name args… %}body{% endname %}`) — shipped (AOT + VM)
 
 A **block** host-helper receives its body as a closure, so it can wrap, suppress, or
 repeat the inner template instead of just transforming a value:
 
 ```
-{{#frame}}hi {{name}}{{/frame}}     →   frame(|| -> String { let mut out = …; out })
-{{#repeat 3}}{{name}}{{/repeat}}    →   repeat(&(3f64), || -> String { … })
+{% frame %}hi {{name}}{% endframe %}     →   frame(|| -> String { let mut out = …; out })
+{% repeat 3 %}{{name}}{% endrepeat %}    →   repeat(&(3f64), || -> String { … })
 ```
 
 The convention extends the value-helper one with a trailing body closure:
@@ -84,7 +84,7 @@ fn frame(body: impl Fn() -> String) -> trussbars_core::Safe {
 fn repeat(n: &f64, body: impl Fn() -> String) -> String {
     (0..*n as usize).map(|_| body()).collect()       // drive the body N times
 }
-truss!(framed, Greeting, "{{#frame}}hi {{name}}{{/frame}}", helpers = [frame]);
+truss!(framed, Greeting, "{% frame %}hi {{name}}{% endframe %}", helpers = [frame]);
 ```
 
 - **Args then body.** The positional args (after the head) are emitted as `&(expr)`
@@ -93,7 +93,7 @@ truss!(framed, Greeting, "{{#frame}}hi {{name}}{{/frame}}", helpers = [frame]);
   (`{{name}}` still resolves against the same context), so the helper controls *whether*
   and *how often* the body runs — power a pre-rendered string couldn't have.
 - **Same allow-list, same boundary.** A block head is a host call **only** if declared
-  in `helpers`/`#[truss_helpers]`; an undeclared `{{#x}}…{{/x}}` is the same located
+  in `helpers`/`#[truss_helpers]`; an undeclared `{% x %}…{% endx %}` is the same located
   `unknown helper` macro-time error. The parser is meaning-free — any non-built-in block
   head parses to a `HelperBlock` node and is resolved at emit time (§1's static-name
   guarantee is preserved).
@@ -101,28 +101,28 @@ truss!(framed, Greeting, "{{#frame}}hi {{name}}{{/frame}}", helpers = [frame]);
   raw), a block helper's return is emitted **raw** on both backends — the body's
   interpolations were already escaped when the closure rendered them, so escaping the
   helper's return would double-escape the body. `String` and `Safe` both write through.
-- **No `{{else}}` yet.** A block helper with an `{{else}}` arm is a located, forward-looking
-  parse error (`block helper \`x\`: {{else}} is not yet supported`), not a silent drop. The
+- **No `{% else %}` yet.** A block helper with an `{% else %}` arm is a located, forward-looking
+  parse error (`block helper \`x\`: {% else %} is not yet supported`), not a silent drop. The
   inverse-arm convention is **frozen below but unbuilt** — gated on a real consumer.
 - **Both backends.** AOT emits `name(args…, || -> String { <body> })`; the VM mirrors it
   via `Helpers::register_block(name, |args: &[Value], body: &dyn Fn() -> Result<String,
   String>| …)`, where `body()` renders the inner nodes in the enclosing scope. Rejected
   in AOT-compat (the proxy registers no helpers), so the AOT≡VM parity holds.
 
-#### Planned: the `{{else}}` inverse arm (frozen convention, not yet built)
+#### Planned: the `{% else %}` inverse arm (frozen convention, not yet built)
 
 The spelling and the helper convention are **frozen here so the implementation is a
 transcription, not a redesign** (the project's "decide the surface in the doc before the
 PR" rule). Built-in blocks already model an inverse arm — `Each.otherwise`,
 `Cond.otherwise`, `With.otherwise` — so `HelperBlock` simply gains `otherwise:
-Option<Vec<Node>>` (the `None`/`Some(vec![])` distinction preserves *"`{{else}}` written but
-empty"* vs *"no `{{else}}`"*).
+Option<Vec<Node>>` (the `None`/`Some(vec![])` distinction preserves *"`{% else %}` written but
+empty"* vs *"no `{% else %}`"*).
 
-- **Surface.** `{{#name args}}main{{else}}inverse{{/name}}` — the existing name-agnostic
-  `{{else}}` separator (the same one `if`/`each`/`with` split on); no new syntax.
+- **Surface.** `{% name args %}main{% else %}inverse{% endname %}` — the existing name-agnostic
+  `{% else %}` separator (the same one `if`/`for`/`scope` split on); no new syntax.
 - **Convention — a *uniform arm-selector*, not a second closure.** The body closure is
   **arm-parameterized**, and the engine **always** passes it (the `Else` arm renders the
-  `{{else}}` body, or the empty string when the template wrote none):
+  `{% else %}` body, or the empty string when the template wrote none):
 
   ```rust
   pub enum Arm { Main, Else }
@@ -133,9 +133,9 @@ empty"* vs *"no `{{else}}`"*).
   ```
 
   This is the **only** shape that lets *one* helper be called with **and** without
-  `{{else}}` and keeps AOT≡VM dispatch identical. Rejected alternatives (decided in the
+  `{% else %}` and keeps AOT≡VM dispatch identical. Rejected alternatives (decided in the
   team debate): a *dual-shape* emit (else-less `Fn()->String` vs else-ful two-closure) is
-  self-defeating — an else-capable helper would then *require* `{{else}}` at every call
+  self-defeating — an else-capable helper would then *require* `{% else %}` at every call
   site, because the engine picks the emit shape from the template alone and can't know the
   helper's arity; and a Handlebars-style `options` object re-imports the dynamic-runtime
   complexity the typed backend exists to avoid.
@@ -144,13 +144,13 @@ empty"* vs *"no `{{else}}`"*).
   break buys uniformity + "can't-misuse". The common (no-else) helper pays only
   `body(Arm::Main)` over `body()`.
 - **Still raw, still allow-listed, still rejected in AOT-compat** — unchanged from above.
-- **When built (not now):** land it *with* a real example helper that uses `{{else}}`
+- **When built (not now):** land it *with* a real example helper that uses `{% else %}`
   (e.g. a `take n` / `paginate`), rendered through AOT **and** the VM and byte-compared,
   added to the `--interp`/`--vm-compat` conformance axes — no untested convention ships.
-- **Not** this: *named, multi-arm* blocks (`{{#case}}…{{when …}}…{{else}}`) are a
+- **Not** this: *named, multi-arm* blocks (`{% case %}…{% when … %}…{% else %}`) are a
   separate feature with their own decision doc — see [`docs/12`](12-case-multiarm-blocks.md).
   `Arm` is forward-compatible (it can grow variants without changing the closure shape),
-  but `{{when}}` arms are out of scope for the binary inverse arm.
+  but `{% when %}` arms are out of scope for the binary inverse arm.
 
 ## 4. How the macro learns the allow-list (shipped)
 
@@ -214,16 +214,16 @@ pile *is* the requirements list this convention satisfies.
   auto-borrowed; a literal's `&&T` deref-coerces to the host's `&T`, so signatures are
   plain references. Matches the built-in string-pack emit.
 
-> Resolved: **block host-helpers** (`{{#name}}…{{/name}}`) shipped on **both** backends —
+> Resolved: **block host-helpers** (`{% name %}…{% endname %}`) shipped on **both** backends —
 > AOT (`name(args…, || -> String {…})`) and the VM (`Helpers::register_block`, body as a
 > `&dyn Fn() -> Result<String, String>`). The body-as-closure convention is §3.1.
 
 ### Still open (not needed yet)
 
-- **Block-helper `{{else}}`** — the inverse arm (`{{#x}}…{{else}}…{{/x}}`) is rejected with
+- **Block-helper `{% else %}`** — the inverse arm (`{% x %}…{% else %}…{% endx %}`) is rejected with
   a forward-looking located error; the convention is now **frozen** (the uniform
   arm-selector, §3.1 "Planned"), with implementation gated on a real consumer. *Multi-arm*
-  `{{#case}}…{{when …}}…{{else}}` is a separate feature — [`docs/12`](12-case-multiarm-blocks.md).
+  `{% case %}…{% when … %}…{% else %}` is a separate feature — [`docs/12`](12-case-multiarm-blocks.md).
 - **Macro-layer catalog checking** (§5) — validating `{{t "id"}}` literals against a
   host catalog at `truss!` expansion time, to recover Fluent's compile-time id check
   inside the static-name model.

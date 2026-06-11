@@ -21,7 +21,7 @@ Numeric literals emit as `f64` (`emit::rust_num` — an integer-valued literal b
 `(a op b)`). So:
 
 ```hbs
-{{#if views > 100}}popular{{/if}}
+{% if views > 100 %}popular{% endif %}
 ```
 
 emits `(ctx.views > 100.0)`. If the host declares `views: f64` it compiles; if it declares
@@ -46,7 +46,7 @@ compareValues a b = case a, b of
   _, _                 -> Nothing
 ```
 
-So `{{#if name < "m"}}` is valid MaxBars (lexicographic), and Trussbars's native `(ctx.name
+So `{% if name < "m" %}` is valid MaxBars (lexicographic), and Trussbars's native `(ctx.name
 < "m")` already matches it. Coercing `<`/`>`/`<=`/`>=` operands to `f64` would turn valid
 string ordering into a compile error — a regression. The same applies to `==`/`!=` (defined
 over strings, numbers, and bools). **Only `+ - * / %` are strictly numeric** (`docs/01` §6:
@@ -82,12 +82,12 @@ impl PartialOrd<NumLit> for i64 { … as f64 … }   impl PartialOrd<i64> for Nu
 // deliberately NO Truthy/ToText/From impl — see below.
 ```
 
-- `{{#if views > 100}}` → `(ctx.views > trussbars_core::NumLit(100.0))` — compiles for `i64`,
+- `{% if views > 100 %}` → `(ctx.views > trussbars_core::NumLit(100.0))` — compiles for `i64`,
   `f64`, `u32`, … (the field's `PartialOrd<NumLit>` impl coerces via `as f64`, *inside the
   library*, so no cast-lint reaches the user).
-- `{{#if name < "m"}}` → `(ctx.name < "m")` — a *string*-literal operand is not a `NumLit`, so
+- `{% if name < "m" %}` → `(ctx.name < "m")` — a *string*-literal operand is not a `NumLit`, so
   native string ordering is preserved.
-- `{{#if name > 100}}` → `(ctx.name > NumLit(100.0))` — no impl ⇒ a **compile error**. The
+- `{% if name > 100 %}` → `(ctx.name > NumLit(100.0))` — no impl ⇒ a **compile error**. The
   oracle returns *false* at runtime; the typed setting upgrades that latent bug to a caught
   one, consistent with §5.1/§5.3.
 - **Conformance:** `f64` fields compare/arith against `NumLit` bit-identically to today's
@@ -103,14 +103,14 @@ impl PartialOrd<NumLit> for i64 { … as f64 … }   impl PartialOrd<i64> for Nu
    *intended* type under the "numbers are `f64`" model (§8). Accepted & documented here.
 3. `name > 100` (string vs number) becomes a compile error (the interpreter renders it as a
    silent `false`) — accepted as the §5.1/§5.3 footgun-as-caught-error discipline.
-4. `NumLit` deliberately implements **no** `Truthy`/`TruthyIn`, so `{{#if 1}}` stays the §5.3
+4. `NumLit` deliberately implements **no** `Truthy`/`TruthyIn`, so `{% if 1 %}` stays the §5.3
    compile error; and it never reaches a render/helper/std-call site (operand-only), so it
    needs no `Display`/`From`.
 
 ### Option B — close F2 as by-design: numeric fields are `f64`
 
 Keep numbers `f64` end to end (§8 already says so) and **document** that a host's numeric
-context fields are `f64` (or `Option<f64>`); `{{#if views > 100}}` then "just works". F2
+context fields are `f64` (or `Option<f64>`); `{% if views > 100 %}` then "just works". F2
 becomes a one-paragraph spec note + a clearer compile error, not a feature. Zero machinery,
 zero conformance risk. The cost is borne by the host's type (an `i64` from an upstream API
 needs an `as f64`/`#[serde(...)]` at the boundary), which is the §8 "declare your schema"

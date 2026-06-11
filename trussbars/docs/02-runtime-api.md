@@ -55,7 +55,7 @@ pub struct Safe(pub String);
 /// Infinity, NaN). `--no-default-features` falls back to Rust `Display` (the f64
 /// divergence, masked only on that profile — spec §10). f32 always uses `Display`.
 pub trait ToText {
-    /// Raw text — the emission for `{{{ x }}}`.
+    /// Raw text — the emission for `{{ x | safe }}`.
     fn write_text(&self, out: &mut String);
     /// HTML-escaped text — the emission for `{{ x }}`. Default stringifies via
     /// `write_text` and escapes the result; `Safe` overrides it to write through
@@ -74,7 +74,7 @@ pub fn esc<T: ToText + ?Sized>(v: &T, out: &mut String);   // calls v.write_esca
 `Option<T: ToText>` (`None`→nothing; its `write_escaped` delegates to the inner value so a
 `Some(Safe)` still writes through), `[T]`/`Vec<T: ToText>` (join `,`), `Safe`, `()`/unit, and
 a blanket `&T`. Output sites emit `esc(&x, &mut out)` for `{{x}}` and a raw
-`x.write_text(&mut out)` for `{{{x}}}`.
+`x.write_text(&mut out)` for `{{ x | safe }}`.
 
 The per-output hot path is marked `#[inline]` (`esc`, `escape_html`, the concrete
 `ToText` impls, `Loop::at`, `Each::each_len`), so it inlines into the host crate
@@ -117,8 +117,8 @@ pub fn truthy_in<Mode, T: TruthyIn<Mode>>(v: &T) -> bool { v.truthy() } // a cho
 | numeric (`i*` / `u*` / `f*`) | *no impl* — see below | `true` | `0`/`NaN` → `false`, else `true` |
 | a context struct/enum | `true` (≥1 field) / `false` (unit); policy-independent via `#[derive(Trussbars)]`; no `ToText`, so `{{struct}}` won't compile (§12) | same | same |
 
-**Under `NonEmpty`, numbers deliberately have no impl.** `{{#if count}}` therefore fails to
-compile, forcing an explicit comparison (`{{#if count > 0}}`) — spec §5.3, the typed escape
+**Under `NonEmpty`, numbers deliberately have no impl.** `{% if count %}` therefore fails to
+compile, forcing an explicit comparison (`{% if count > 0 %}`) — spec §5.3, the typed escape
 from the `0`-truthy / `0`-falsy dilemma. Because `Option<T>` defers to the inner type,
 `Option<i64>` is likewise non-truthy under `NonEmpty` (test presence with `??`, then compare).
 The `TruthyIn` trait carries a `#[diagnostic::on_unimplemented]` message, so the raw E0277
@@ -127,7 +127,7 @@ select a policy, or impl `TruthyIn` for the type — and `rustc` additionally po
 `i64` *does* implement `TruthyIn<Liquid>`/`TruthyIn<Handlebars>`. This guidance is on the
 **trait**, so it fires identically under v1 and v2 (it does not depend on the proc-macro).
 
-`{{#if cond}}` → `if truthy(&cond) {` (default) or `if truthy_in::<Liquid, _>(&cond) {` under
+`{% if cond %}` → `if truthy(&cond) {` (default) or `if truthy_in::<Liquid, _>(&cond) {` under
 `truss!(…, truthiness = Liquid)`. Note `Option<String>` of `Some("")` is **falsy under
 `NonEmpty`** (absence *and* emptiness fall through, matching the interpreter) but **truthy
 under `Liquid`** — `Option` defers to the inner type's policy.
@@ -222,11 +222,11 @@ satisfied by construction because template nesting *is* Rust block nesting.
 Unlike the JS runtime, `trussbars-core` provides **no** `each`/`with`/`if` functions —
 they are native Rust:
 
-- `{{#if c}}…{{else if d}}…{{else}}…{{/if}}` → `if truthy(&c) { … } else if truthy(&d) { … } else { … }`.
-- `{{#unless c}}…{{/unless}}` → `if !truthy(&c) { … }`.
-- `{{#each xs as |x|}}…{{else}}…{{/each}}` →
+- `{% if c %}…{% elif d %}…{% else %}…{% endif %}` → `if truthy(&c) { … } else if truthy(&d) { … } else { … }`.
+- `{% unless c %}…{% endunless %}` → `if !truthy(&c) { … }`.
+- `{% for x in xs %}…{% else %}…{% endfor %}` →
   `if xs.is_empty() { /* else */ } else { let n = xs.len(); for (i, x) in xs.iter().enumerate() { let l = Loop{…}; … } }`.
-- `{{#each map as |v|}}` over a `BTreeMap` iterates in **key order** (matches the
+- `{% for v in map %}` over a `BTreeMap` iterates in **key order** (matches the
   interpreter's `Object.keys().sort()`; spec §11). `loop.key` = the entry key.
 - `{{#with v as |u|}}…{{else}}…{{/with}}` → `if truthy(&v) { let u = &v; … } else { … }`.
 
@@ -239,14 +239,14 @@ in scope; the codegen calls them.
 
 - **Inline helper** `{{loud name}}` → `loud(name)`, where `fn loud(s: &str) -> String`
   (host-defined). Return `Safe` for markup helpers.
-- **Block helper** `{{#list people as |p i|}}…{{/list}}` → a host
+- **Block helper** `{% list people as |p i| %}…{% endlist %}` → a host
   `fn list<T>(items: &[T], body: impl Fn(&T, usize) -> String) -> String`; the codegen
   emits the body as the closure.
-- **Static partial** `{{> card}}` / `{{> card ctx}}` → `card(&ctx)`, another emitted
+- **Static partial** `{% include "card" %}` / `{% include "card" ctx %}` → `card(&ctx)`, another emitted
   `fn card(ctx: &CardCtx) -> String`.
-- **Layout + yield** `{{#inline "frame"}}…{{yield}}…{{/inline}}{{#partial "frame"}}body{{/partial}}`
+- **Layout + yield** `{% inline "frame" %}…{% yield %}…{% endinline %}{% partial "frame" %}body{% endpartial %}`
   → `frame(ctx, || { /* body */ })`, where `fn frame(ctx: &_, yield_body: impl Fn() -> String)`
-  and `{{yield}}` → `yield_body()`. **No `yieldStack`** — the body is a parameter.
+  and `{% yield %}` → `yield_body()`. **No `yieldStack`** — the body is a parameter.
 - **Polymorphic dispatch** (the spec §4.1 replacement for dynamic partials) → a `match` over
   a `#[serde(tag)]` enum, each arm calling the variant's static partial fn.
 
@@ -301,13 +301,13 @@ calls. `{{items | pluck "name" | join ", "}}` →
 
 | Construct | Emission |
 | --- | --- |
-| `{{x}}` / `{{{x}}}` | `esc(&x, &mut out)` / `x.write_text(&mut out)` |
+| `{{x}}` / `{{ x \| safe }}` | `esc(&x, &mut out)` / `x.write_text(&mut out)` |
 | paths `a.b.c` | native field access `a.b.c` |
 | `+ - *` `/` | native Rust ops; `%` → `trussbars_std::modulo` |
 | `== != < > <= >=` | native `==`/`<`/… (unlike types ⟹ compile error) |
 | `&& \|\| !` | native over `truthy(&_)` |
 | `?? ?: ?:`-ternary | inline (§4) |
-| `#if #unless #each #with` | native control flow (§7) |
+| `if unless for scope` | native control flow (§7) |
 | `loop.* root parent outer` | borrowed refs (§5–6) |
 | string/number/array/json/i18n helpers | `trussbars_std::*` calls (§9) |
 | custom/block helpers, partials, yield | host fns / closures (§8) |
@@ -342,12 +342,12 @@ uniform-typed is a call.**
 **Template** (MaxBars):
 
 ```handlebars
-{{#each teams as |team|}}
+{% for team in teams %}
 {{team.name}} ({{root.org}}):
-{{#each team.members as |m|}}
-  {{loop.index1}}. {{m | uppercase}}{{#if loop.last}} (last){{/if}} — {{parent.name}}
-{{/each}}
-{{/each}}
+{% for m in team.members %}
+  {{loop.index1}}. {{m | uppercase}}{% if loop.last %} (last){% endif %} — {{parent.name}}
+{% endfor %}
+{% endfor %}
 ```
 
 **Context type** (host-supplied; companion derives per §12):
@@ -369,7 +369,7 @@ fn render(ctx: &Ctx) -> String {
     let root = ctx;                                   // reserved `root`
     let teams = &ctx.teams;
     let tn = teams.len();
-    for (i, team) in teams.iter().enumerate() {       // {{#each teams as |team|}}
+    for (i, team) in teams.iter().enumerate() {       // {% for team in teams %}
         let tl = Loop::at(i, tn, None, None);
         esc(&team.name, &mut out);
         out.push_str(" (");
@@ -377,13 +377,13 @@ fn render(ctx: &Ctx) -> String {
         out.push_str("):\n");
         let members = &team.members;
         let mn = members.len();
-        for (j, m) in members.iter().enumerate() {    // {{#each team.members as |m|}}
+        for (j, m) in members.iter().enumerate() {    // {% for m in team.members %}
             let ml = Loop::at(j, mn, None, Some(&tl));
             out.push_str("  ");
             esc(&ml.index1, &mut out);                // {{loop.index1}}
             out.push_str(". ");
             esc(&uppercase(m), &mut out);             // {{m | uppercase}}
-            if truthy(&ml.last) { out.push_str(" (last)"); }   // {{#if loop.last}}
+            if truthy(&ml.last) { out.push_str(" (last)"); }   // {% if loop.last %}
             out.push_str(" — ");
             esc(&team.name, &mut out);                // {{parent.name}} (enclosing ctx = team)
             out.push_str("\n");

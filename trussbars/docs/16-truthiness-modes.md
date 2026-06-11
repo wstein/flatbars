@@ -72,8 +72,8 @@ policy (`Option` defers to its inner type *under the same policy*, so `Some("")`
 ## 4. Selecting a policy
 
 ```rust
-truss!(card, Card, "{{#if tags}}…{{/if}}", truthiness = Liquid);        // a built-in policy
-truss!(note, Note, "{{#if body}}…{{/if}}", truthiness = self::NonBlank); // a host policy
+truss!(card, Card, "{% if tags %}…{% endif %}", truthiness = Liquid);        // a built-in policy
+truss!(note, Note, "{% if body %}…{% endif %}", truthiness = self::NonBlank); // a host policy
 ```
 
 The `truthiness = Mode` clause sits alongside `helpers = [..]` (any order); the default is

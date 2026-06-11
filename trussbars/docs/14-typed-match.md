@@ -2,7 +2,7 @@
 
 > **Status:** **POSTPONED** (not scheduled) — paper only, **no code**. Typed-exhaustive
 > pattern matching is an ML/Rust construct, *not* an idiom of the Handlebars/Mustache/Liquid
-> family Trussbars descends from — value dispatch (`{{#case}}`, shipped) covers the common
+> family Trussbars descends from — value dispatch (`{% case %}`, shipped) covers the common
 > need. The design below is kept on record; revive it only if a concrete consumer needs
 > compile-time variant-coverage. **If revived, the team-agreed contract is uniform *runtime*
 > exhaustiveness** (an unhandled variant ⇒ an error on *all four* surfaces — AOT, interpreter,
@@ -11,13 +11,13 @@
 > "AOT-only, runtime-ignored" wording, which broke the spirit of the `--vm-compat` gate
 > (the AOT would reject what the VM accepts). See the deferral note at the end of §6.
 >
-> This is the typed sibling of `{{#case}}` (`docs/12`); it builds on the first-class `Case`
+> This is the typed sibling of `{% case %}` (`docs/12`); it builds on the first-class `Case`
 > seam `docs/12` established. **Audience:** whoever revives the typed dispatch. Companion to
 > `docs/01` (subset spec), `docs/03` (schema inference — a *later* enabler, **not** a
 > prerequisite, see §4), `docs/04` (conformance), `docs/07` (diagnostics), and `docs/12`.
 >
-> **Why a separate construct.** `{{#case}}` is **value** dispatch: any subject, arms are value
-> literals compared by `==`, no exhaustiveness (a miss → `{{else}}`/empty). `{{#match}}` is
+> **Why a separate construct.** `{% case %}` is **value** dispatch: any subject, arms are value
+> literals compared by `==`, no exhaustiveness (a miss → `{% else %}`/empty). `{{#match}}` is
 > **variant** dispatch over a **closed enum** with **compile-time exhaustiveness**. The two
 > share the `Case`/arm shape but differ in guarantee, so they are distinct keywords (`docs/12`
 > reserved `match` for exactly this).
@@ -34,7 +34,7 @@
 ```
 
 A subject, a `"Type"` string naming the closed Rust enum, one or more `{{when …}}` arms
-carrying **variant names** (space-separated for an or-pattern, mirroring `{{case}}`'s
+carrying **variant names** (space-separated for an or-pattern, mirroring `{% case %}`'s
 multi-value arms), and an optional trailing `{{else}}`.
 
 ## 2. Decision (frozen surface)
@@ -48,7 +48,7 @@ multi-value arms), and an optional trailing `{{else}}`.
 - An optional trailing **`{{else}}`** — the catch-all. Its presence emits a Rust `_` arm and
   therefore **disables** exhaustiveness checking (the author opted out).
 - **`{{/match}}`** closes it. `when`/`else` are the same context-sensitive separators
-  `{{#case}}` uses (their standalone lines are trimmed); only whitespace may precede the first
+  `{% case %}` uses (their standalone lines are trimmed); only whitespace may precede the first
   `{{when}}` — leading content is a located error.
 - `match` becomes a **reserved built-in block head** (joining `if`/`each`/`case`/… in
   `open_block`); it can no longer name a host block helper.
@@ -70,7 +70,7 @@ two natural-looking alternatives both break:
   `(lookup this "Order")`, a data read, not a type name.
 
 A string literal `"Order"` sails through both dialects verbatim (subject + a `Lit String`
-positional), so `{{#match}}` stays **RawBars + MaxBars** like `{{#case}}`, needs no dedicated
+positional), so `{{#match}}` stays **RawBars + MaxBars** like `{% case %}`, needs no dedicated
 surface rule, and never shadows a body name. The cost is the quotes — an acceptable, honest
 trade for cross-dialect parse-cleanliness. (`docs/03` schema inference later removes the
 annotation entirely.)
@@ -81,7 +81,7 @@ annotation entirely.)
 
 - **Runtime (VM + PureScript reference)** — the subject is a value (a string: the serialized
   variant name); each `{{when Variant}}` matches when `subject == "Variant"`. This is exactly
-  `{{#case}}`'s value dispatch with bare-identifier arms read as their names. The `"TYPE"`
+  `{% case %}`'s value dispatch with bare-identifier arms read as their names. The `"TYPE"`
   annotation is **ignored at runtime** — it is an AOT-only directive. So the VM and oracle
   need **no type system**: `matchH` is `caseH` with identifier arms.
 - **AOT (Trussbars Rust)** — the subject is the typed enum; the emitter lowers to a real Rust
@@ -160,7 +160,7 @@ confines the new code to the AOT emitter.
 ### 6.1 Deferral note (team decision)
 
 `{{#match}}` is **postponed**: typed-exhaustive matching is not a template-engine idiom, and
-`{{#case}}` (shipped) covers the common multi-arm need. If revived, the agreed contract — from
+`{% case %}` (shipped) covers the common multi-arm need. If revived, the agreed contract — from
 the cross-backend debate — is:
 
 - **Runtime exhaustiveness is uniform on all four surfaces.** No `{{else}}` + an unmatched
@@ -177,11 +177,11 @@ the cross-backend debate — is:
 
 ## 7. Conformance & governance
 
-- A `{{#match}}` corpus case renders **byte-identically** to its `{{#case}}`-with-string-arms
+- A `{{#match}}` corpus case renders **byte-identically** to its `{% case %}`-with-string-arms
   twin on every axis (`--v2`/`--interp`/`--vm-compat`, `test:compile`) — the runtime dispatch is
   the same. The new thing to test is the **AOT exhaustiveness diagnostic**: a `trybuild`
   UI-snapshot (an omitted variant → rustc's non-exhaustive-`match` error) and the accept case.
-- Governed like `{{#case}}`: it is **nonEmpty-family surface** (RawBars/MaxBars), so the
+- Governed like `{% case %}`: it is **nonEmpty-family surface** (RawBars/MaxBars), so the
   oracle (`matchH`) gets it with Trussbars; ClassicBars/MinBars reject it. The oracle defines the
   *runtime* semantics; rustc owns the *static* exhaustiveness.
 
@@ -202,7 +202,7 @@ the cross-backend debate — is:
 
 - `{{#match SUBJECT "TYPE"}}{{when Variant…}}…{{else}}…{{/match}}` — variant dispatch over a
   closed enum, **exhaustive** on the AOT path.
-- It is `{{#case}}`'s typed sibling: **same runtime** (string dispatch, `matchH` ≡ `caseH`),
+- It is `{% case %}`'s typed sibling: **same runtime** (string dispatch, `matchH` ≡ `caseH`),
   plus an **AOT-only** Rust `match` whose exhaustiveness rustc enforces — so **no schema
   inference is required**, only the `"TYPE"` annotation.
 - v1 is unit variants, no rename, no field binds; those are staged. The first-class `Case`

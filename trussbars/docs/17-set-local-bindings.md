@@ -75,7 +75,7 @@ close of the *enclosing block*. Block-less: no `{% endset %}`.
 
 - `NAME` is a static identifier; `EXPR` is any expression (operators, pipes, filters, calls).
 - **Scope is the enclosing block, forward only.** A top-level `{% set %}` is live to the end of
-  the template; a `{% set %}` inside `{% each %}`/`{% if %}`/`{% with %}`/`{% local %}` is live
+  the template; a `{% set %}` inside `{% for %}`/`{% if %}`/`{% scope %}`/`{% local %}` is live
   to that block's close and **does not leak past it** — Rust lexical scope. This is a *deliberate
   divergence from **Liquid*** (whose `assign` persists into the whole document) but is
   **equivalent to Jinja's** `{% set %}`, which is already block-scoped — a `set` inside a Jinja
@@ -83,7 +83,7 @@ close of the *enclosing block*. Block-less: no `{% endset %}`.
   match Jinja and tighten only Liquid.
 - **Re-setting a name in the same block shadows** (a fresh binding), like a second Rust
   `let x = …;`. It does **not** mutate the prior binding and never reaches across a block
-  boundary — so the loop-accumulator idiom (`{% set total = total + 1 %}` inside `{% each %}`)
+  boundary — so the loop-accumulator idiom (`{% set total = total + 1 %}` inside `{% for %}`)
   is **not** expressible. Intentional (§4 A3); use a fold-style helper for accumulation.
 
 **`{% local NAME = EXPR [N2 = E2 …] %}…{% endlocal %}` — bounded.** The renamed block-`let`:
@@ -116,10 +116,10 @@ The AOT emitter:
 ```
 
 ```text
-{% each post in posts %}
+{% for post in posts %}
   {% set slug = (lowercase (replace post.title " " "-")) %}
   <a href="/{{ slug }}">{{ post.title }}</a>
-{% endeach %}
+{% endfor %}
 ```
 
 ```rust
