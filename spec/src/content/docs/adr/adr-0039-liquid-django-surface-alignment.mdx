@@ -352,11 +352,15 @@ The change is small and localised, because everything else already shipped:
    architecture doesn't support today — a larger ADR-017/026 change. So the highlighter keeps painting
    `{{{{ … }}}}` as `raw-block` in all dialects for now; the render/compile path is the source of truth
    that rejects it.
-4. **LSP diagnostic — follow-up.** Independently, the LSP `dialectDiagnostics` (a regex pass in
-   `editors/lsp/src/tokens.mjs`) does not yet publish a *squiggle* for `{{{{#op}}}}` (nor for the other
-   brace-control violations generally) — only the render/compile path rejects it. Adding those is a
-   separable editor-tooling change (a `dialectDiagnostics` rule + `check:dialect-diagnostics` pin +
-   the dialect-aware grammar above, so the floor and the squiggle agree).
+4. **LSP diagnostic — done (the editor now flags it).** The editor *does* surface `{{{{#op}}}}` (and
+   every brace-control violation: `{{#each}}`, `{{else}}`, `{{> }}`, `{{yield}}`) as an error squiggle
+   in RawBars/MaxBars — not via a regex, but **single-sourced from the engine**. `braceControlViolation`
+   (the very render-time check) is appended to the facade's `diagnostics` *and* its `astJson` error set,
+   so the Problems panel and the Lab AST view stay in lockstep (ADR-023 / `check:parse-views`), and
+   `flatbars-lsp` publishes the located `DisallowedShape`. This is the standard editor split — colour is
+   structural (the grammar floor), the *diagnostic* carries the dialect-specific rejection — so it
+   needs no grammar change. Pinned by `test:lsp` (a `{{{{#op}}}}` squiggle case) and the updated
+   `parseDiagnostics` token test. The colour recolour (3) remains the only deferred piece.
 5. **`check:hbs-conformance` / `check:mustache-conformance` inert** — ClassicBars keeps `{{{{ }}}}`
    raw blocks (Handlebars-faithful) and MinBars its Mustache sigils; `braceControlViolation` runs only
    under `statementTags`, so their byte-identical counts (49/50, 184/184) cannot move.

@@ -105,6 +105,20 @@ try {
   assert.equal(ds[0].severity, 1, "Error severity");
   assert.equal(ds[0].range.start.line, 0, "diagnostic on line 0");
 
+  // A MaxBars doc with a dropped quad-stache raw-block helper `{{{{#op}}}}` → one
+  // surface diagnostic (ADR-039 amendment): the recovering parser accepts it
+  // structurally, but `{{ }}` is output-only, so the engine's braceControlViolation —
+  // surfaced through `diagnostics` — squiggles it where render would reject it.
+  const rawUri = "file:///test/raw.maxbars";
+  const rawDiags = waitDiagnostics(rawUri);
+  await conn.sendNotification("textDocument/didOpen", {
+    textDocument: { uri: rawUri, languageId: "maxbars", version: 1, text: "{{{{#loud}}}}hi{{{{/loud}}}}" },
+  });
+  const rds = await rawDiags;
+  assert.equal(rds.length, 1, "one surface diagnostic for the dropped raw-block helper");
+  assert.match(rds[0].message, /a helper can't consume a raw body/i);
+  assert.equal(rds[0].severity, 1, "Error severity");
+
   // Hover + completion (ADR-017) over a ClassicBars doc with a real operation head.
   // Position is computed from the source so a cosmetic edit doesn't break the test.
   const hovUri = "file:///test/hov.classicbars";

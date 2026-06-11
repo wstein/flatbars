@@ -86,14 +86,20 @@ t("dialectForUri maps the Trussbars `.truss` extension; everything else -> null"
   assert.equal(dialectForUri("file:///x/page.txt"), null);
 });
 // ── Parse diagnostics (ADR-023): per-dialect, with tag-covering ranges ──────
-t("parseDiagnostics flags {{#if a == 1}} off MaxBars, clean on MaxBars", () => {
+t("parseDiagnostics: == off MaxBars; {% if %} clean; {{#if}} brace-control flagged on MaxBars", () => {
   const src = "{{#if a == 1}}x{{/if}}";
   const full = parseDiagnostics(src, "classicbars");
   assert.equal(full.length, 1, "one error off MaxBars");
   assert.match(full[0].message, /unexpected token/i);
   assert.equal(full[0].start, 8, "points at the ==");
   assert.equal(full[0].end, 14, "range extends to the tag close }}");
-  assert.deepEqual(parseDiagnostics(src, "maxbars"), [], "MaxBars accepts ==");
+  // `==` is valid in MaxBars — in its `{% if %}` form, which is clean.
+  assert.deepEqual(parseDiagnostics("{% if a == 1 %}x{% endif %}", "maxbars"), [], "MaxBars accepts == in {% if %}");
+  // …but the `{{#if}}` brace-control form is output-only-violating in MaxBars (ADR-039):
+  // the surface diagnostic now squiggles it where render rejects it (single-sourced).
+  const braceInMax = parseDiagnostics(src, "maxbars");
+  assert.equal(braceInMax.length, 1, "the {{#if}} brace control is flagged in MaxBars");
+  assert.match(braceInMax[0].message, /control flow uses Django-style/);
   assert.deepEqual(parseDiagnostics("{{name}}", "classicbars"), [], "a clean template has none");
 });
 

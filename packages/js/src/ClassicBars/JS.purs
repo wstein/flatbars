@@ -82,15 +82,17 @@ import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
 import Data.String (Pattern(..), indexOf)
 import Data.String.Common (joinWith)
 import Data.Tuple (Tuple(..))
-import FlatBars (Expr(..), ParseError, defaultParseOptions, parseErrorAt, parseRecovering, parseWith, renderParseErrorAt, renderParseErrorsAt)
-import FlatBars.Error (Error(ArityError, HelperError), ParseDiagnostic)
+import FlatBars (Expr(..), defaultParseOptions, parseErrorAt, parseRecovering, parseWith, renderParseErrorAt, renderParseErrorsAt)
+import FlatBars.Error (Error(ArityError, HelperError), ParseDiagnostic, ParseError(DisallowedShape))
 import FlatBars.Highlight (HSpan, HighlightConfig, TSpan, highlightSpans, tokenizeSpans) as Highlight
 import FlatBars.Json (fromJson, toJson)
 import FlatBars.Lexer (defaultLexConfig)
 import FlatBars.Span (Span, lineColumn, spanText)
+import FlatBars.Syntax (Template)
 import FlatBars.Value (Value(..))
 import Foreign.Object as FO
 import Kernel.Analyse (Finding, PathSchema) as Analyse
+import Kernel.CaseSugar (braceControlViolation)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, constOperation, pushFrame, refContext)
 import Kernel.Inspect (Snapshot)
@@ -793,8 +795,24 @@ diagnostics = mkFn2 \src dialect ->
       "minbars" -> parseRecovering MinBars.minOptions
       "rawbars" -> RawParser.parseRecovering
       _ -> parseRecovering defaultParseOptions -- classicbars (the default options)
+    parsed = recover src
+    surfaceErrs = case dialect of
+      "maxbars" -> surfaceViolations src parsed.nodes
+      "rawbars" -> surfaceViolations src parsed.nodes
+      _ -> []
   in
-    map (parseErrorAt src) (recover src).errors
+    map (parseErrorAt src) (parsed.errors <> surfaceErrs)
+
+-- | The brace-control surface violations (ADR-039) the statement-tag dialects (RawBars/MaxBars)
+-- | reject — a brace-origin control tag (`{{#each}}`, `{{else}}`, `{{> }}`, `{{yield}}`) and every
+-- | quad-stache `{{{{ … }}}}` (the dropped raw-block helper included). The recovering parser accepts
+-- | them structurally, so this — `braceControlViolation`, the very check the render/compile path
+-- | runs — is appended to BOTH `diagnostics` and the AST view's error set, keeping the editor
+-- | Problems panel and the Lab AST view in lockstep (ADR-023 / `check:parse-views`).
+surfaceViolations :: String -> Template -> Array ParseError
+surfaceViolations src nodes = case braceControlViolation [ "else", "elif", "when" ] src nodes of
+  Just v -> [ DisallowedShape v.shape v.off ]
+  Nothing -> []
 
 -- | Map a dialect name to its highlight seams, mirroring each dialect's own parse
 -- | settings (the single source of truth — drift is caught by `check:highlight`):
@@ -863,6 +881,13 @@ astJson = mkFn2 \dialect src ->
       "minbars" -> parseRecovering MinBars.minOptions
       _ -> parseRecovering defaultParseOptions
     r = recover src
+    -- the same ADR-039 brace-control violations `diagnostics` appends, so the AST view's
+    -- error set stays in lockstep with the Problems panel (`check:parse-views`). The Lab
+    -- AST vocabulary spells RawBars `core`.
+    surfaceErrs = case dialect of
+      "maxbars" -> surfaceViolations src r.nodes
+      "core" -> surfaceViolations src r.nodes
+      _ -> []
     -- `core` is the austere syntax (no desugar); `surface` and `maxbars` desugar
     -- (MaxBars adds bare loop variables via `maxLoopVars`). MinBars lowers Mustache
     -- sections/partials to its own operation calls (`section`/`inverted`/`mlookup`/
@@ -892,7 +917,7 @@ astJson = mkFn2 \dialect src ->
               , Tuple "nodes" (arr (map rnode nodes))
               ]
           )
-      , Tuple "errors" (arr (map errJson r.errors))
+      , Tuple "errors" (arr (map errJson (r.errors <> surfaceErrs)))
       ]
 
 --------------------------------------------------------------------------------
