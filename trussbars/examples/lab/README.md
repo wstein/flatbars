@@ -21,7 +21,6 @@ cargo test                     # editor + data units, the golden matrix, a TestB
 | `Tab` | cycle focus (Template → Data → i18n) |
 | wheel / `PageUp` / `PageDown` | scroll the pane under the cursor / the focused pane |
 | `F2` | cycle locale (en → de → fr → **pl**) |
-| `F3` | toggle render mode (`render` ⇄ `render_compat`) |
 | `F4` | load the next sample (reseeds Template + Data; keeps the catalog) |
 | `Esc` / `Ctrl-Q` | quit |
 
@@ -63,25 +62,25 @@ API (so it stays correct under scrolling and selection).
    CLDR's four cardinal forms — `1 element`, `3 elementy`, `5 elementów` — while German
    `Artikel` is invariant. Edit a message in the i18n pane and the render updates live.
 
-2. **`render_compat` is the AOT-parity proxy (§7).** Press `F3`:
-   - `receipt` → `⟂ unsupported: helper 't' / 1 args` — host helpers are VM-only.
-   - `greeting` → **byte-identical** to lenient. It uses no i18n (plain `{{field}}`
-     interpolation), so it carries no helpers — and the lab hides the i18n pane for it,
-     giving the Output the full bottom row.
+2. **Everything is live — the case AOT can't serve.** Edit the Template, Data, or
+   i18n pane and the next keystroke re-renders through the VM, over data whose shape
+   isn't known at build time. The `greeting` sample carries no host helpers (the
+   AOT-compatible shape), so the lab hides its i18n pane and gives the Output the full
+   bottom row; `receipt` keeps the pane because its host helpers are VM-only.
 
 For the **data-driven catalog** pattern (catalog as data, looked up by declared helpers,
 identical on AOT + VM), see the focused [`i18n-data`](../i18n-data) example.
 
 ## The two samples
 
-| Sample | Pattern | Modes | i18n Pane |
-| --- | --- | --- | --- |
-| **receipt** | Helper-based i18n: `{{t …}}`, `{{number …}}`, `{{plural …}}`, `{{date …}}`, `{{relative …}}` | render only (VM-exclusive) | visible ✓ |
-| **greeting** | Plain data interpolation: `{{field}}` (no i18n) | render + compat (AOT-compatible) | hidden |
+| Sample | Pattern | i18n Pane |
+| --- | --- | --- |
+| **receipt** | Helper-based i18n: `{{t …}}`, `{{number …}}`, `{{plural …}}`, `{{date …}}`, `{{relative …}}` | visible ✓ |
+| **greeting** | Plain data interpolation: `{{field}}` (no i18n) | hidden |
 
 Cycle samples with `F4`. The **receipt** uses host helpers from `src/i18n.rs` that must be
-registered at runtime — VM-only, rejected by `render_compat`. The **greeting** is pure data
-interpolation, so it works on both backends.
+registered at runtime — VM-only. The **greeting** is pure data interpolation, so it carries
+no host helpers (the AOT-compatible shape).
 
 ## i18n boundary (`docs/09 §5`)
 
