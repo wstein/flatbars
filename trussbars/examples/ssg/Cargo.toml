@@ -1,0 +1,24 @@
+# A minimal Zola-style static-site harness over Trussbars (northstar, docs/24).
+# Front-matter (TOML) + Markdown → a typed context → `truss!`-compiled render. Its own
+# workspace, independent of the `trussbars/` engine workspace, so the content-pipeline
+# deps (a Markdown parser) stay out of the engine — exactly like `benchmarks/`.
+[package]
+name = "trussbars-ssg-demo"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.96"
+publish = false
+
+[workspace]
+
+[dependencies]
+# The engine: `Safe` + the `Trussbars` derive (trussbars-core) and the `truss!`
+# AOT-codegen macro (trussbars-macros). The render fn is straight-line Rust — no
+# interpreter, no Value, `#![forbid(unsafe_code)]`.
+trussbars-core = { path = "../../crates/trussbars-core", features = ["derive"] }
+trussbars-macros = { path = "../../crates/trussbars-macros" }
+# Content pipeline (host-side, the logic-less split): CommonMark → HTML, TOML
+# front-matter. A real harness adds `chrono` for `date` and a site link index.
+pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
