@@ -81,6 +81,17 @@ When the cluster is fully in modules, `ctx` becomes their shared store and the
 `let`s leave index.html entirely (the Phase-0 finish line: index.html = HTML +
 `<script src="./app/boot.mjs">`).
 
+## ctx.state adopted (all 30 UI-state vars)
+
+The app/state.mjs primitive (built early, long unused) is now live: `ctx.state =
+createAppState(ENGINE)` holds every UI/editor var, migrated in batches via guarded,
+module-scoped word-boundary sweeps. Hazards that shaped the process: ctx must be
+declared above all consumers (TDZ); object SHORTHAND / KEYS / message-strings need
+guards or hand-fixes; the sweep must be scoped to the <script> body (never CSS/HTML);
+and `node --check` of the extracted module catches every syntax breakage before the
+smoke. The remaining UI (explorer/tabs/tweaks/config) can now read ctx.state directly
+instead of threading getters.
+
 ## Why a plain mutable ctx, not a reactive store
 
 index.html already re-renders imperatively (explicit `run()`/`renderX()` after

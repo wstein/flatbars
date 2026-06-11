@@ -1883,8 +1883,7 @@
       // already expect, so it minimises surprise — see ADR-029, "The Lab's MinBars
       // truthiness default is mustacheJs, by design". Set the rule in config.yaml.
       // Compiler & runtime options (ADR-0016).
-      // `standalone`    — strip standalone-tag lines at compile time (ADR-0016, default on).
-      let standalone      = true;
+      // `ctx.state.standalone`    — strip standalone-tag lines at compile time (ADR-0016, default on).
       // `ctx.state.allowList`      — ADR-0013 positive allow-list: when an array, only
       //                    listed transformer names are callable at render
       //                    time (the production "close unused ports" lever).
@@ -2355,7 +2354,7 @@
         const tmplActive = ctx.state.activeView === "tmpl" && templateMode === "tmpl";
         const xfActive   = ctx.state.activeView === "tmpl" && templateMode === "transform";
         const hlpActive  = ctx.state.activeView === "tmpl" && templateMode === "helpers";
-        const cfgNonDefault = !!ctx.state.escapeMode || !standalone || ctx.state.allowList !== null;
+        const cfgNonDefault = !!ctx.state.escapeMode || !ctx.state.standalone || ctx.state.allowList !== null;
 
         const groups = [
           { key: "template", label: "TEMPLATE", files: [
@@ -2785,7 +2784,7 @@
         configError = null;
         const v = res.value;
         ctx.state.escapeMode = v.escape; byId("escape-select").value = v.escape;
-        standalone = v.trim;   byId("standalone-cb").checked = v.trim;
+        ctx.state.standalone = v.trim;   byId("standalone-cb").checked = v.trim;
         ctx.state.allowList = v.allow; ctx.state.minbarsCompat = v.mustacheJs; ctx.state.labLocale = v.locale;
         ctx.state.labPathSchema = v.pathSchema;
         updateRenderStatus(); renderTabs();
@@ -3286,7 +3285,7 @@
       // resetCaretLink (the caret subsystem owns it).
       const { run, scheduleRun } = createRun(ctx, {
         getYamlSrc: () => ctx.state.yamlSrc, getTabs: () => ctx.state.tabs, getActiveTabIdx: () => ctx.state.activeTabIdx,
-        getStandalone: () => standalone, getTransformSrc: () => ctx.state.transformSrc,
+        getStandalone: () => ctx.state.standalone, getTransformSrc: () => ctx.state.transformSrc,
         getHelpersSrc: () => ctx.state.helpersSrc, getCatalogSource: () => ctx.state.catalogSource,
         getAllowList: () => ctx.state.allowList, getEscapeMode: () => ctx.state.escapeMode,
         getMinbarsCompat: () => ctx.state.minbarsCompat, getLabLocale: () => ctx.state.labLocale,
@@ -3859,7 +3858,7 @@
         showDataTab();
         ctx.state.escapeMode = "";
         byId("escape-select").value = "";
-        standalone = true;
+        ctx.state.standalone = true;
         ctx.state.minbarsCompat = true; // default mustacheJs (ADR-029)
         ctx.state.allowList = null;
         syncStandaloneUI();
@@ -3924,7 +3923,7 @@
         showDataTab();
         ctx.state.escapeMode = "";
         byId("escape-select").value = "";
-        standalone = true;
+        ctx.state.standalone = true;
         ctx.state.minbarsCompat = true; // default mustacheJs (ADR-029)
         ctx.state.allowList = null;
         syncStandaloneUI();
@@ -3981,7 +3980,7 @@
           // there are none so legacy/short links stay compact.
           ...(ctx.state.dataOverlays.length ? { do: ctx.state.dataOverlays.map((o) => ({ n: o.name, s: o.source })) } : {}),
           e: ctx.state.escapeMode, v: ctx.state.outputView,
-          sa: standalone ? 1 : 0,       // ADR-0016 standalone flag
+          sa: ctx.state.standalone ? 1 : 0,       // ADR-0016 ctx.state.standalone flag
           ...(ctx.state.allowList !== null ? { al: ctx.state.allowList } : {}), // ADR-0013 transformer allow-list
           av: ctx.state.activeView, ai: ctx.state.activeTabIdx,
           // MinBars truthiness toggle (ADR-022 S2); omitted when off so links stay compact.
@@ -4051,7 +4050,7 @@
           showDataTab();
           ctx.state.escapeMode = s.e ?? "";
           byId("escape-select").value = ctx.state.escapeMode;
-          standalone   = s.sa !== 0;  // default true; explicit 0 opts out
+          ctx.state.standalone   = s.sa !== 0;  // default true; explicit 0 opts out
           ctx.state.minbarsCompat = s.mj !== 0; // default mustacheJs; explicit mj:0 = spec (ADR-029)
           ctx.state.allowList = Array.isArray(s.al) ? s.al.map(String) : null;
           syncStandaloneUI();
@@ -4702,7 +4701,7 @@
         { id: "trim", label: "Whitespace", requires: ["standalone"],
           count: () => ctx.caches.lastWhitespace.length,
           badge: () => "",
-          render: (body) => renderWhitespace(body, ctx.caches.lastWhitespace, { openProblem, standaloneOn: standalone }) },
+          render: (body) => renderWhitespace(body, ctx.caches.lastWhitespace, { openProblem, standaloneOn: ctx.state.standalone }) },
         { id: "partials", label: "Partials", requires: ["partial-graph"],
           count: () => {
             if (!ctx.caches.lastDeps) return 0;
@@ -4736,7 +4735,7 @@
             usedTransformers: ctx.caches.lastUsedTransformers,
             stemAllowList: engineHas("stem-allow-list"),
             engineMeta,
-            escapeMode: ctx.state.escapeMode, standalone, allowList: ctx.state.allowList,
+            escapeMode: ctx.state.escapeMode, standalone: ctx.state.standalone, allowList: ctx.state.allowList,
           }) },
         { id: "perf", label: "Performance",
           count: () => ctx.caches.lastTimings ? Math.round(ctx.caches.lastTimings.totalMs) : 0,
@@ -4970,7 +4969,7 @@
       // Panel #5: Capabilities / escape provenance now lives in
       // ./app/dock/capabilities.mjs — a pure DOM build taking the two caches
       // (ctx.caches.lastEscapeRuns / ctx.caches.lastUsedTransformers), the stem-allow-list capability,
-      // engineMeta, and the render policy (ctx.state.escapeMode / standalone / ctx.state.allowList).
+      // engineMeta, and the render policy (ctx.state.escapeMode / ctx.state.standalone / ctx.state.allowList).
       // The descriptor above passes them.
 
       // Panel #6: Performance now lives in ./app/dock/performance.mjs — the first
@@ -5336,11 +5335,11 @@
 
       function syncStandaloneUI() {
         const cb = byId("standalone-cb");
-        if (cb) cb.checked = standalone;
+        if (cb) cb.checked = ctx.state.standalone;
       }
 
       byId("standalone-cb").addEventListener("change", (e) => {
-        standalone = e.target.checked;
+        ctx.state.standalone = e.target.checked;
         run(); saveHash();
       });
 
@@ -5361,7 +5360,7 @@
       function cfgLine(kv, comment) {
         return kv + " ".repeat(Math.max(1, 26 - kv.length)) + "# " + comment;
       }
-      function buildConfigYaml(v = { escape: ctx.state.escapeMode, trim: standalone, allow: ctx.state.allowList }) {
+      function buildConfigYaml(v = { escape: ctx.state.escapeMode, trim: ctx.state.standalone, allow: ctx.state.allowList }) {
         const esc = v.escape ? v.escape : '""';
         // `null` = unconstrained (the default); a real array (even empty)
         // locks the surface to that positive list. Mirrors the engine's
