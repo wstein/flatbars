@@ -17,7 +17,7 @@ path = "src/main.rs"
 [dependencies]
 # The dynamic runtime engine — this northstar renders templates the AOT path
 # structurally can't (host helpers, data shapes unknown at build time).
-trussbars-vm = { path = "../../crates/trussbars-vm" }
+trussbars-interp = { path = "../../crates/trussbars-interp" }
 # The blessed i18n format primitives (number / date / selectPlural / relative). The
 # lab is the *host*: it owns the message catalog for `t` and wires `&[Value]` shims.
 trussbars-i18n = { path = "../../crates/trussbars-i18n" }

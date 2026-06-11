@@ -166,7 +166,7 @@ pub fn page_with_catalog(locale: &str, catalog: Catalog) -> Page {
 mod tests {
     use std::rc::Rc;
 
-    use trussbars_vm::{Helpers, Template, Value};
+    use trussbars_interp::{Helpers, Template, Value};
 
     use super::*;
 

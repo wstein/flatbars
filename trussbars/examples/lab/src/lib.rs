@@ -1,6 +1,6 @@
-//! # trussbars-lab — the VM northstar (Ratatui TUI)
+//! # trussbars-lab — the dynamic-backend northstar (Ratatui TUI)
 //!
-//! A terminal **mini-Lab** on the dynamic VM ([`trussbars_vm`]): edit a template and its
+//! A terminal **mini-Lab** on the dynamic interpreter ([`trussbars_interp`]): edit a template and its
 //! data live and watch it re-render — the case the AOT (`truss!`) path structurally can't
 //! serve. Built with [`ratatui`] over the crossterm backend; the editable panes are
 //! [`tui_textarea`] widgets (selection, undo/redo, word motions, internal scrolling).
@@ -38,7 +38,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
 };
-use trussbars_vm::{Helpers, Template};
+use trussbars_interp::{Helpers, Template};
 use tui_textarea::TextArea;
 
 use crate::samples::Sample;

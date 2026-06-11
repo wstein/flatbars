@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use serde_yaml::Value as Yaml;
-use trussbars_vm::Value;
+use trussbars_interp::Value;
 
 /// Parse YAML `src` into a VM [`Value`], or a human-readable reason.
 ///

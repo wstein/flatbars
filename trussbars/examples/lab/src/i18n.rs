@@ -10,12 +10,12 @@
 //! the *format primitives* (`number`/`date`/`selectPlural`/`relative`), while the **host
 //! owns the message catalog** for `t`. Here the catalog is live-editable YAML (the i18n
 //! pane), parsed into a [`Catalog`]. The module is self-contained so it can be lifted into
-//! a future `trussbars-vm-i18n` bridge crate.
+//! a future `trussbars-interp-i18n` bridge crate.
 
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use trussbars_vm::{Helpers, Value};
+use trussbars_interp::{Helpers, Value};
 
 use crate::Locale;
 

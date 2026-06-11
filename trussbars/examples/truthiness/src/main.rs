@@ -1,7 +1,7 @@
 //! Print the truthiness-policy demos to stdout. `cargo run` from
 //! `trussbars/examples/truthiness/`.
 
-use trussbars_vm::TruthMode;
+use trussbars_interp::TruthMode;
 use truthiness_example::{
     Cart, Note, cart_default, cart_liquid, count_handlebars, count_liquid, empty_cart, non_blank,
     note_nonblank, vm_render,

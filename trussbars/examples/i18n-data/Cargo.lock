@@ -28,8 +28,8 @@ dependencies = [
  "serde_yaml",
  "trussbars-core",
  "trussbars-i18n",
+ "trussbars-interp",
  "trussbars-macros",
- "trussbars-vm",
 ]
 
 [[package]]
@@ -164,6 +164,16 @@ name = "trussbars-i18n"
 version = "0.1.0"
 
 [[package]]
+name = "trussbars-interp"
+version = "0.1.0"
+dependencies = [
+ "libm",
+ "serde_json",
+ "trussbars-core",
+ "trussbars-template",
+]
+
+[[package]]
 name = "trussbars-macros"
 version = "0.1.0"
 dependencies = [
@@ -173,16 +183,6 @@ dependencies = [
 [[package]]
 name = "trussbars-template"
 version = "0.1.0"
-
-[[package]]
-name = "trussbars-vm"
-version = "0.1.0"
-dependencies = [
- "libm",
- "serde_json",
- "trussbars-core",
- "trussbars-template",
-]
 
 [[package]]
 name = "unicode-ident"

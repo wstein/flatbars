@@ -1,7 +1,8 @@
-# lab — the Trussbars **VM** northstar (live-editing TUI + i18n)
+# lab — the Trussbars **dynamic-backend** northstar (live-editing TUI + i18n)
 
 A [ratatui](https://ratatui.rs) terminal mini-Lab (over the crossterm backend) built on
-[`trussbars-vm`](../../crates/trussbars-vm). Where `blog`/`changelog` showcase the **AOT**
+the [`trussbars-interp`](../../crates/trussbars-interp) tree-walk interpreter. Where
+`blog`/`changelog` showcase the **AOT**
 path (`truss!` compiles templates at build time), this showcases what AOT structurally
 *can't* do: **edit a template, its data, and its translations at runtime and re-render
 live.**

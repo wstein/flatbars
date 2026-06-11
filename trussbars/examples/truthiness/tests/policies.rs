@@ -1,7 +1,7 @@
 //! The example is a tested contract: each policy's divergence is asserted, so the demo
 //! cannot silently rot.
 
-use trussbars_vm::TruthMode;
+use trussbars_interp::TruthMode;
 use truthiness_example::{
     Cart, Note, cart_default, cart_liquid, count_handlebars, count_liquid, empty_cart, non_blank,
     note_nonblank, vm_render,

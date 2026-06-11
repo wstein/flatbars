@@ -14,7 +14,7 @@ trussbars-core = { path = "../../crates/trussbars-core" }
 # The i18n format primitives the helpers wrap (number / date / selectPlural).
 trussbars-i18n = { path = "../../crates/trussbars-i18n" }
 # VM: render the SAME template + data dynamically, proving AOT ≡ VM.
-trussbars-vm = { path = "../../crates/trussbars-vm" }
+trussbars-interp = { path = "../../crates/trussbars-interp" }
 serde = { version = "1", features = ["derive"] }
 # The VM side decodes the same context from YAML.
 serde_yaml = "0.9"

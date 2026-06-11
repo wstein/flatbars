@@ -12,7 +12,7 @@
 
 use trussbars_core::{TruthyIn, truthy_in};
 use trussbars_macros::truss;
-use trussbars_vm::{Template, TruthMode, Value};
+use trussbars_interp::{Template, TruthMode, Value};
 
 /// A tiny context: a list (to show the empty-collection divergence) and a number (to show
 /// numeric truthiness — which only *exists* under a policy that defines it). No

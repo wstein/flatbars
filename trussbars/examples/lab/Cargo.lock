@@ -596,8 +596,8 @@ dependencies = [
  "ratatui",
  "serde_yaml",
  "trussbars-i18n",
+ "trussbars-interp",
  "trussbars-template",
- "trussbars-vm",
  "tui-textarea-2",
 ]
 
@@ -1489,11 +1489,7 @@ name = "trussbars-i18n"
 version = "0.1.0"
 
 [[package]]
-name = "trussbars-template"
-version = "0.1.0"
-
-[[package]]
-name = "trussbars-vm"
+name = "trussbars-interp"
 version = "0.1.0"
 dependencies = [
  "libm",
@@ -1501,6 +1497,10 @@ dependencies = [
  "trussbars-core",
  "trussbars-template",
 ]
+
+[[package]]
+name = "trussbars-template"
+version = "0.1.0"
 
 [[package]]
 name = "tui-textarea-2"
