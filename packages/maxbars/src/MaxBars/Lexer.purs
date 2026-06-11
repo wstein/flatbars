@@ -39,7 +39,8 @@ import Data.String.Common (joinWith, trim)
 import FlatBars.Error (ParseError(..))
 import FlatBars.Span (Span)
 import FlatBars.Syntax (Sigil(..))
-import FlatBars.Token (Interior, LexOptions, infixOperatorChars, tokenizeInterior)
+import FlatBars.Token (Interior)
+import MaxBars.Token (tokenizeInterior)
 
 -- | A flat template token. Comments never appear (they are dropped); `~`
 -- | whitespace control has already been applied to the `Content` runs. Each tag
@@ -300,47 +301,35 @@ defaultLexConfig =
 maxLexConfig :: LexConfig
 maxLexConfig = defaultLexConfig { statementTags = true }
 
--- | The frozen MaxBars interior-lex options: the infix-operator alphabet, the `..`
--- | range operator, and `[…]`/`{k:v}` collection literals (ADR-021 / ADR-024).
-maxLexOptions :: LexOptions
-maxLexOptions =
-  { operatorChars: infixOperatorChars, rangeOperator: true, collectionLiterals: true }
-
 -- | Tokenize MaxBars source into the flat `RawTok` stream — the owned entry, no
--- | knobs (ADR-041). The MaxBars config and interior-lex options are baked in.
+-- | knobs (ADR-041). The MaxBars config is baked in; tag interiors are lexed by the
+-- | owned `MaxBars.Token.tokenizeInterior` (infix / `..` / collection literals).
 tokenize :: String -> Either ParseError (Array RawTok)
-tokenize = tokenizeTemplate maxLexConfig maxLexOptions
+tokenize = tokenizeTemplate maxLexConfig
 
 type TagResult = { mtok :: Maybe RawTok, next :: Int, trimL :: Boolean, trimR :: Boolean }
 
--- | Scan a template into the flat `RawTok` stream. `LexOptions` (the interior
--- | tokenizer's dialect seam — `operatorChars`) is threaded through so each tag's
--- | interior is lexed *here*, at scan time, and carried on the token. The
--- | structural shape is `LexOptions`-independent (tag boundaries, sigils, spans,
--- | raw bodies); `LexOptions` only governs the meaning-free interior token lexing.
-tokenizeTemplate :: LexConfig -> LexOptions -> String -> Either ParseError (Array RawTok)
-tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Nil false)
+-- | Scan a template into the flat `RawTok` stream. Each tag's interior is lexed
+-- | *here*, at scan time, by the owned `MaxBars.Token.tokenizeInterior` and carried
+-- | on the token. The structural shape (tag boundaries, sigils, spans, raw bodies)
+-- | is interior-grammar-independent.
+tokenizeTemplate :: LexConfig -> String -> Either ParseError (Array RawTok)
+tokenizeTemplate cfg src = map finalize (go 0 cfg.open cfg.close 0 [] Nil false)
   where
   cs = SCU.toCharArray src
   len = Array.length cs
 
   -- Lex a tag interior at its source offset — the pre-lexed `Interior` every
-  -- expression-bearing `RawTok` carries.
+  -- expression-bearing `RawTok` carries (the owned MaxBars interior tokenizer).
   interiorAt :: Int -> String -> Interior
-  interiorAt base s = tokenizeInterior lexOpts base s
+  interiorAt base s = tokenizeInterior base s
 
-  -- Find a tag's close delimiter from `from`. With collection literals on
-  -- (MaxBars) the scan is *brace-aware*: it balances `{ }` and skips string
-  -- literals, so a dict literal's own `}` is consumed before the tag close and
-  -- `{{#with {a: 1}}}` needs no disambiguating space (ADR-024 width detection).
-  -- Off — every other dialect, where a `{` in a tag interior is a lex error
-  -- anyway — it is the plain first-match `findFrom`, byte-identical to before. The
-  -- brace-aware scan only diverges once a `{` is seen, which those dialects never
-  -- emit, so the structural stream is unchanged for them.
+  -- Find a tag's close delimiter from `from`. MaxBars has collection literals, so
+  -- the scan is *brace-aware*: it balances `{ }` and skips string literals, so a
+  -- dict literal's own `}` is consumed before the tag close and `{{#with {a: 1}}}`
+  -- needs no disambiguating space (ADR-024 width detection).
   closeFrom :: Int -> String -> Maybe Int
-  closeFrom from close
-    | lexOpts.collectionLiterals = findClose from close
-    | otherwise = findFrom cs from close
+  closeFrom from close = findClose from close
 
   -- The brace/string-aware close finder: the `close` delimiter at brace depth 0.
   -- A `{` opens a level, a `}` closes one (a stray `}` at depth 0 is ignored), and

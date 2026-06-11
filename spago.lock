@@ -273,6 +273,7 @@
             "kernel",
             "lists",
             "maybe",
+            "numbers",
             "ordered-collections",
             "prelude",
             "strings",

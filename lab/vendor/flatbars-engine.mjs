@@ -1492,11 +1492,11 @@ var fst = function(v) {
 var eqTuple = function(dictEq) {
   var eq7 = eq(dictEq);
   return function(dictEq1) {
-    var eq18 = eq(dictEq1);
+    var eq19 = eq(dictEq1);
     return {
       eq: function(x) {
         return function(y) {
-          return eq7(x.value0)(y.value0) && eq18(x.value1)(y.value1);
+          return eq7(x.value0)(y.value0) && eq19(x.value1)(y.value1);
         };
       }
     };
@@ -3266,7 +3266,7 @@ var stepAsc = /* @__PURE__ */ (function() {
   })($$const(IterDone.value));
 })();
 var eqMapIter = function(dictEq) {
-  var eq18 = eq(dictEq);
+  var eq19 = eq(dictEq);
   return function(dictEq1) {
     var eq25 = eq(dictEq1);
     return {
@@ -3280,7 +3280,7 @@ var eqMapIter = function(dictEq) {
               var v = stepAsc(a);
               if (v instanceof IterNext) {
                 var v2 = stepAsc(b);
-                if (v2 instanceof IterNext && (eq18(v.value0)(v2.value0) && eq25(v.value1)(v2.value1))) {
+                if (v2 instanceof IterNext && (eq19(v.value0)(v2.value0) && eq25(v.value1)(v2.value1))) {
                   $tco_var_a = v.value2;
                   $copy_b = v2.value2;
                   return;
@@ -3552,7 +3552,7 @@ var keys = /* @__PURE__ */ (function() {
 var eqMap = function(dictEq) {
   var eqMapIter1 = eqMapIter(dictEq);
   return function(dictEq1) {
-    var eq18 = eq(eqMapIter1(dictEq1));
+    var eq19 = eq(eqMapIter1(dictEq1));
     return {
       eq: function(xs) {
         return function(ys) {
@@ -3566,7 +3566,7 @@ var eqMap = function(dictEq) {
           ;
           if (xs instanceof Node) {
             if (ys instanceof Node && xs.value1 === ys.value1) {
-              return eq18(toMapIter(xs))(toMapIter(ys));
+              return eq19(toMapIter(xs))(toMapIter(ys));
             }
             ;
             return false;
@@ -6464,7 +6464,6 @@ var tokenizeInterior = function(cfg) {
     };
   };
 };
-var infixOperatorChars = "+-*/%?:";
 var eqToken = {
   eq: function(x) {
     return function(y) {
@@ -19977,13 +19976,538 @@ var parseMaxHead = function(toks) {
   return new Left(new LexError("expected a block helper name", comb.posAt(0)));
 };
 
+// output/MaxBars.Token/index.js
+var elem17 = /* @__PURE__ */ elem2(eqChar);
+var eqMaybe3 = /* @__PURE__ */ eqMaybe(eqChar);
+var eq16 = /* @__PURE__ */ eq(eqMaybe3);
+var notEq6 = /* @__PURE__ */ notEq(eqMaybe3);
+var $$unescape2 = function(v) {
+  if (v === "\\") {
+    return new Just("\\");
+  }
+  ;
+  if (v === '"') {
+    return new Just('"');
+  }
+  ;
+  if (v === "'") {
+    return new Just("'");
+  }
+  ;
+  if (v === "n") {
+    return new Just("\n");
+  }
+  ;
+  if (v === "t") {
+    return new Just("	");
+  }
+  ;
+  if (v === "r") {
+    return new Just("\r");
+  }
+  ;
+  return Nothing.value;
+};
+var maxOperatorChars = "+-*/%?:";
+var isWs2 = function(c) {
+  return c === " " || (c === "	" || (c === "\n" || c === "\r"));
+};
+var isDigit2 = function(c) {
+  return c >= "0" && c <= "9";
+};
+var isNumChar2 = function(c) {
+  return isDigit2(c) || c === ".";
+};
+var isAlpha2 = function(c) {
+  return c >= "a" && c <= "z" || c >= "A" && c <= "Z";
+};
+var isIdentChar3 = function(c) {
+  return isAlpha2(c) || (isDigit2(c) || (c === "_" || (c === "-" || (c === "." || (c === "@" || (c === "/" || (c === "+" || (c === "*" || (c === "?" || c === "=")))))))));
+};
+var tokenizeInterior2 = function(base) {
+  return function(src) {
+    var push4 = function(acc) {
+      return function(t) {
+        return function(i) {
+          return function(j) {
+            return snoc(acc)({
+              tok: t,
+              at: base + i | 0,
+              end: base + j | 0
+            });
+          };
+        };
+      };
+    };
+    var opChars = toCharArray(maxOperatorChars);
+    var isOp = function(c) {
+      return elem17(c)(opChars);
+    };
+    var identChar = function(c) {
+      return isIdentChar3(c) && !isOp(c);
+    };
+    var cs = toCharArray(src);
+    var len = length(cs);
+    var slc = function(a) {
+      return function(b) {
+        return fromCharArray(slice(a)(b)(cs));
+      };
+    };
+    var bad = function(i) {
+      return new Left(new LexError("unexpected character", base + i | 0));
+    };
+    var at = function(i) {
+      return index(cs)(i);
+    };
+    var rangeAt = function(j) {
+      return eq16(at(j))(new Just(".")) && eq16(at(j + 1 | 0))(new Just("."));
+    };
+    var readString = function(start) {
+      return function(q) {
+        return function(acc) {
+          var collect2 = function($copy_j) {
+            return function($copy_chars) {
+              var $tco_var_j = $copy_j;
+              var $tco_done = false;
+              var $tco_result;
+              function $tco_loop(j, chars) {
+                var v = at(j);
+                if (v instanceof Nothing) {
+                  $tco_done = true;
+                  return new Left(new LexError("unterminated string", base + start | 0));
+                }
+                ;
+                if (v instanceof Just) {
+                  if (v.value0 === q) {
+                    $tco_done = true;
+                    return go(j + 1 | 0)(push4(acc)(new TStr(fromCharArray(reverse(chars))))(start)(j + 1 | 0));
+                  }
+                  ;
+                  if (v.value0 === "\\") {
+                    var v1 = at(j + 1 | 0);
+                    if (v1 instanceof Just) {
+                      var v2 = $$unescape2(v1.value0);
+                      if (v2 instanceof Just) {
+                        $tco_var_j = j + 2 | 0;
+                        $copy_chars = cons(v2.value0)(chars);
+                        return;
+                      }
+                      ;
+                      if (v2 instanceof Nothing) {
+                        $tco_done = true;
+                        return new Left(new LexError("invalid string escape", base + j | 0));
+                      }
+                      ;
+                      throw new Error("Failed pattern match at MaxBars.Token (line 171, column 23 - line 173, column 76): " + [v2.constructor.name]);
+                    }
+                    ;
+                    if (v1 instanceof Nothing) {
+                      $tco_done = true;
+                      return new Left(new LexError("unterminated string", base + start | 0));
+                    }
+                    ;
+                    throw new Error("Failed pattern match at MaxBars.Token (line 170, column 24 - line 174, column 76): " + [v1.constructor.name]);
+                  }
+                  ;
+                  if (otherwise) {
+                    $tco_var_j = j + 1 | 0;
+                    $copy_chars = cons(v.value0)(chars);
+                    return;
+                  }
+                  ;
+                }
+                ;
+                throw new Error("Failed pattern match at MaxBars.Token (line 165, column 23 - line 175, column 60): " + [v.constructor.name]);
+              }
+              ;
+              while (!$tco_done) {
+                $tco_result = $tco_loop($tco_var_j, $copy_chars);
+              }
+              ;
+              return $tco_result;
+            };
+          };
+          return collect2(start + 1 | 0)([]);
+        };
+      };
+    };
+    var readNumber = function(start) {
+      return function(acc) {
+        var numEnd = function($copy_j) {
+          var $tco_done1 = false;
+          var $tco_result;
+          function $tco_loop(j) {
+            if (rangeAt(j)) {
+              $tco_done1 = true;
+              return j;
+            }
+            ;
+            if (otherwise) {
+              var v2 = at(j);
+              if (v2 instanceof Just && isNumChar2(v2.value0)) {
+                $copy_j = j + 1 | 0;
+                return;
+              }
+              ;
+              $tco_done1 = true;
+              return j;
+            }
+            ;
+            throw new Error("Failed pattern match at MaxBars.Token (line 156, column 5 - line 160, column 17): " + [j.constructor.name]);
+          }
+          ;
+          while (!$tco_done1) {
+            $tco_result = $tco_loop($copy_j);
+          }
+          ;
+          return $tco_result;
+        };
+        var end = numEnd(start + 1 | 0);
+        var raw = slc(start)(end);
+        var v = fromString(raw);
+        if (v instanceof Just) {
+          return go(end)(push4(acc)(new TNum(v.value0))(start)(end));
+        }
+        ;
+        if (v instanceof Nothing) {
+          return new Left(new LexError("malformed number '" + (raw + "'"), base + start | 0));
+        }
+        ;
+        throw new Error("Failed pattern match at MaxBars.Token (line 150, column 7 - line 152, column 87): " + [v.constructor.name]);
+      };
+    };
+    var readIdent = function(start) {
+      return function(acc) {
+        var skipWs = function($copy_k) {
+          var $tco_done2 = false;
+          var $tco_result;
+          function $tco_loop(k) {
+            var v = at(k);
+            if (v instanceof Just && isWs2(v.value0)) {
+              $copy_k = k + 1 | 0;
+              return;
+            }
+            ;
+            $tco_done2 = true;
+            return k;
+          }
+          ;
+          while (!$tco_done2) {
+            $tco_result = $tco_loop($copy_k);
+          }
+          ;
+          return $tco_result;
+        };
+        var hashEqAt = function(j) {
+          var w = skipWs(j);
+          return j > start && (eq16(at(w))(new Just("=")) && notEq6(at(w + 1 | 0))(new Just("=")));
+        };
+        var bracketEnd = function($copy_k) {
+          var $tco_done3 = false;
+          var $tco_result;
+          function $tco_loop(k) {
+            if (k > len) {
+              $tco_done3 = true;
+              return Nothing.value;
+            }
+            ;
+            if (eq16(at(k))(new Just("]"))) {
+              $tco_done3 = true;
+              return new Just(k);
+            }
+            ;
+            if (otherwise) {
+              $copy_k = k + 1 | 0;
+              return;
+            }
+            ;
+            throw new Error("Failed pattern match at MaxBars.Token (line 139, column 5 - line 142, column 39): " + [k.constructor.name]);
+          }
+          ;
+          while (!$tco_done3) {
+            $tco_result = $tco_loop($copy_k);
+          }
+          ;
+          return $tco_result;
+        };
+        var scan = function($copy_j) {
+          var $tco_done4 = false;
+          var $tco_result;
+          function $tco_loop(j) {
+            var v = at(j);
+            if (v instanceof Just && (v.value0 === "[" && notEq6(at(j - 1 | 0))(new Just(".")))) {
+              $tco_done4 = true;
+              return go(j)(push4(acc)(new TIdent(slc(start)(j)))(start)(j));
+            }
+            ;
+            if (v instanceof Just && v.value0 === "[") {
+              var v1 = bracketEnd(j + 1 | 0);
+              if (v1 instanceof Just) {
+                $copy_j = v1.value0 + 1 | 0;
+                return;
+              }
+              ;
+              if (v1 instanceof Nothing) {
+                $tco_done4 = true;
+                return new Left(new LexError("unterminated [ segment", base + j | 0));
+              }
+              ;
+              throw new Error("Failed pattern match at MaxBars.Token (line 118, column 19 - line 120, column 71): " + [v1.constructor.name]);
+            }
+            ;
+            if (rangeAt(j)) {
+              $tco_done4 = true;
+              return go(j)(push4(acc)(new TIdent(slc(start)(j)))(start)(j));
+            }
+            ;
+            if (v instanceof Just && identChar(v.value0)) {
+              $copy_j = j + 1 | 0;
+              return;
+            }
+            ;
+            if (hashEqAt(j)) {
+              $tco_done4 = true;
+              return go(skipWs(j) + 1 | 0)(push4(acc)(new TIdent(slc(start)(j) + "="))(start)(skipWs(j) + 1 | 0));
+            }
+            ;
+            $tco_done4 = true;
+            return go(j)(push4(acc)(new TIdent(slc(start)(j)))(start)(j));
+          }
+          ;
+          while (!$tco_done4) {
+            $tco_result = $tco_loop($copy_j);
+          }
+          ;
+          return $tco_result;
+        };
+        return scan(start);
+      };
+    };
+    var op2 = function(s) {
+      return function(i) {
+        return function(acc) {
+          return go(i + 2 | 0)(push4(acc)(new TOp(s))(i)(i + 2 | 0));
+        };
+      };
+    };
+    var op1 = function(s) {
+      return function(i) {
+        return function(acc) {
+          return go(i + 1 | 0)(push4(acc)(new TOp(s))(i)(i + 1 | 0));
+        };
+      };
+    };
+    var go = function($copy_i) {
+      return function($copy_acc) {
+        var $tco_var_i = $copy_i;
+        var $tco_done5 = false;
+        var $tco_result;
+        function $tco_loop(i, acc) {
+          if (i >= len) {
+            $tco_done5 = true;
+            return new Right(acc);
+          }
+          ;
+          if (otherwise) {
+            var v = at(i);
+            if (v instanceof Nothing) {
+              $tco_done5 = true;
+              return new Right(acc);
+            }
+            ;
+            if (v instanceof Just) {
+              if (isWs2(v.value0)) {
+                $tco_var_i = i + 1 | 0;
+                $copy_acc = acc;
+                return;
+              }
+              ;
+              if (v.value0 === "(") {
+                $tco_var_i = i + 1 | 0;
+                $copy_acc = push4(acc)(TLParen.value)(i)(i + 1 | 0);
+                return;
+              }
+              ;
+              if (v.value0 === ")") {
+                $tco_var_i = i + 1 | 0;
+                $copy_acc = push4(acc)(TRParen.value)(i)(i + 1 | 0);
+                return;
+              }
+              ;
+              if (v.value0 === "[") {
+                $tco_var_i = i + 1 | 0;
+                $copy_acc = push4(acc)(TLBracket.value)(i)(i + 1 | 0);
+                return;
+              }
+              ;
+              if (v.value0 === "]") {
+                $tco_var_i = i + 1 | 0;
+                $copy_acc = push4(acc)(TRBracket.value)(i)(i + 1 | 0);
+                return;
+              }
+              ;
+              if (v.value0 === "{") {
+                $tco_var_i = i + 1 | 0;
+                $copy_acc = push4(acc)(TLBrace.value)(i)(i + 1 | 0);
+                return;
+              }
+              ;
+              if (v.value0 === "}") {
+                $tco_var_i = i + 1 | 0;
+                $copy_acc = push4(acc)(TRBrace.value)(i)(i + 1 | 0);
+                return;
+              }
+              ;
+              if (v.value0 === ",") {
+                $tco_var_i = i + 1 | 0;
+                $copy_acc = push4(acc)(TComma.value)(i)(i + 1 | 0);
+                return;
+              }
+              ;
+              if (v.value0 === '"' || v.value0 === "'") {
+                $tco_done5 = true;
+                return readString(i)(v.value0)(acc);
+              }
+              ;
+              if (v.value0 === "&") {
+                var $49 = eq16(at(i + 1 | 0))(new Just("&"));
+                if ($49) {
+                  $tco_done5 = true;
+                  return op2("&&")(i)(acc);
+                }
+                ;
+                $tco_done5 = true;
+                return bad(i);
+              }
+              ;
+              if (v.value0 === "|") {
+                var $50 = eq16(at(i + 1 | 0))(new Just("|"));
+                if ($50) {
+                  $tco_done5 = true;
+                  return op2("||")(i)(acc);
+                }
+                ;
+                $tco_done5 = true;
+                return op1("|")(i)(acc);
+              }
+              ;
+              if (v.value0 === "!") {
+                var $51 = eq16(at(i + 1 | 0))(new Just("="));
+                if ($51) {
+                  $tco_done5 = true;
+                  return op2("!=")(i)(acc);
+                }
+                ;
+                $tco_done5 = true;
+                return op1("!")(i)(acc);
+              }
+              ;
+              if (v.value0 === "<") {
+                var $52 = eq16(at(i + 1 | 0))(new Just("="));
+                if ($52) {
+                  $tco_done5 = true;
+                  return op2("<=")(i)(acc);
+                }
+                ;
+                $tco_done5 = true;
+                return op1("<")(i)(acc);
+              }
+              ;
+              if (v.value0 === ">") {
+                var $53 = eq16(at(i + 1 | 0))(new Just("="));
+                if ($53) {
+                  $tco_done5 = true;
+                  return op2(">=")(i)(acc);
+                }
+                ;
+                $tco_done5 = true;
+                return op1(">")(i)(acc);
+              }
+              ;
+              if (v.value0 === "=") {
+                var $54 = eq16(at(i + 1 | 0))(new Just("="));
+                if ($54) {
+                  $tco_done5 = true;
+                  return op2("==")(i)(acc);
+                }
+                ;
+                $tco_done5 = true;
+                return bad(i);
+              }
+              ;
+              if (rangeAt(i)) {
+                $tco_done5 = true;
+                return op2("..")(i)(acc);
+              }
+              ;
+              if (v.value0 === "-" && maybe(false)(isDigit2)(at(i + 1 | 0))) {
+                $tco_done5 = true;
+                return readNumber(i)(acc);
+              }
+              ;
+              if (isOp(v.value0) && v.value0 === "?") {
+                var $55 = eq16(at(i + 1 | 0))(new Just("?"));
+                if ($55) {
+                  $tco_done5 = true;
+                  return op2("??")(i)(acc);
+                }
+                ;
+                var $56 = eq16(at(i + 1 | 0))(new Just(":"));
+                if ($56) {
+                  $tco_done5 = true;
+                  return op2("?:")(i)(acc);
+                }
+                ;
+                $tco_done5 = true;
+                return op1("?")(i)(acc);
+              }
+              ;
+              if (isOp(v.value0)) {
+                $tco_done5 = true;
+                return op1(singleton3(v.value0))(i)(acc);
+              }
+              ;
+              if (isDigit2(v.value0)) {
+                $tco_done5 = true;
+                return readNumber(i)(acc);
+              }
+              ;
+              if (identChar(v.value0)) {
+                $tco_done5 = true;
+                return readIdent(i)(acc);
+              }
+              ;
+              if (otherwise) {
+                $tco_done5 = true;
+                return bad(i);
+              }
+              ;
+            }
+            ;
+            throw new Error("Failed pattern match at MaxBars.Token (line 62, column 19 - line 101, column 31): " + [v.constructor.name]);
+          }
+          ;
+          throw new Error("Failed pattern match at MaxBars.Token (line 59, column 3 - line 59, column 68): " + [i.constructor.name, acc.constructor.name]);
+        }
+        ;
+        while (!$tco_done5) {
+          $tco_result = $tco_loop($tco_var_i, $copy_acc);
+        }
+        ;
+        return $tco_result;
+      };
+    };
+    return go(0)([]);
+  };
+};
+
 // output/MaxBars.Lexer/index.js
-var eq16 = /* @__PURE__ */ eq(/* @__PURE__ */ eqArray(eqChar));
-var notEq6 = /* @__PURE__ */ notEq(/* @__PURE__ */ eqMaybe(eqInt));
+var eq17 = /* @__PURE__ */ eq(/* @__PURE__ */ eqArray(eqChar));
+var notEq7 = /* @__PURE__ */ notEq(/* @__PURE__ */ eqMaybe(eqInt));
 var fromFoldable15 = /* @__PURE__ */ fromFoldable(foldableList);
 var eq34 = /* @__PURE__ */ eq(/* @__PURE__ */ eqMaybe(eqChar));
 var map30 = /* @__PURE__ */ map(functorEither);
-var elem17 = /* @__PURE__ */ elem2(eqString);
+var elem18 = /* @__PURE__ */ elem2(eqString);
 var RContent2 = /* @__PURE__ */ (function() {
   function RContent3(value0, value1) {
     this.value0 = value0;
@@ -20151,16 +20675,11 @@ var nlIndex2 = function(first) {
     })(toCharArray(s));
   };
 };
-var maxLexOptions = {
-  operatorChars: infixOperatorChars,
-  rangeOperator: true,
-  collectionLiterals: true
-};
 var matchAt3 = function(cs) {
   return function(i) {
     return function(pat) {
       var pcs = toCharArray(pat);
-      return eq16(slice(i)(i + length(pcs) | 0)(cs))(pcs);
+      return eq17(slice(i)(i + length(pcs) | 0)(cs))(pcs);
     };
   };
 };
@@ -20175,8 +20694,8 @@ var isSpace4 = function(c) {
 };
 var sepHead2 = function(s) {
   var cs = dropWhile(isSpace4)(toCharArray(s));
-  return fromCharArray(takeWhile(function($359) {
-    return !isSpace4($359);
+  return fromCharArray(takeWhile(function($357) {
+    return !isSpace4($357);
   })(cs));
 };
 var trimEndWs2 = function(s) {
@@ -20186,11 +20705,11 @@ var trimStartWs2 = function(s) {
   return fromCharArray(dropWhile(isSpace4)(toCharArray(s)));
 };
 var hasNL2 = function(s) {
-  return notEq6(nlIndex2(true)(s))(Nothing.value);
+  return notEq7(nlIndex2(true)(s))(Nothing.value);
 };
 var firstWord3 = function(s) {
-  return fromCharArray(takeWhile(function($360) {
-    return !isSpace4($360);
+  return fromCharArray(takeWhile(function($358) {
+    return !isSpace4($358);
   })(dropWhile(isSpace4)(toCharArray(s))));
 };
 var findFrom3 = function(cs) {
@@ -20216,7 +20735,7 @@ var findFrom3 = function(cs) {
             return;
           }
           ;
-          throw new Error("Failed pattern match at MaxBars.Lexer (line 108, column 3 - line 111, column 29): " + [i.constructor.name]);
+          throw new Error("Failed pattern match at MaxBars.Lexer (line 109, column 3 - line 112, column 29): " + [i.constructor.name]);
         }
         ;
         while (!$tco_done) {
@@ -20230,551 +20749,514 @@ var findFrom3 = function(cs) {
   };
 };
 var tokenizeTemplate2 = function(cfg) {
-  return function(lexOpts) {
-    return function(src) {
-      var trimMark = (function() {
-        if (cfg.statementTags) {
-          return "-";
+  return function(src) {
+    var trimMark = (function() {
+      if (cfg.statementTags) {
+        return "-";
+      }
+      ;
+      return "~";
+    })();
+    var splitTrims = function(raw) {
+      var trimL = take2(1)(raw) === trimMark;
+      var r1 = (function() {
+        if (trimL) {
+          return drop2(1)(raw);
         }
         ;
-        return "~";
+        return raw;
       })();
-      var splitTrims = function(raw) {
-        var trimL = take2(1)(raw) === trimMark;
-        var r1 = (function() {
-          if (trimL) {
-            return drop2(1)(raw);
-          }
-          ;
-          return raw;
-        })();
-        var trimR = takeRight(1)(r1) === trimMark;
-        var core = (function() {
-          if (trimR) {
-            return dropRight(1)(r1);
-          }
-          ;
-          return r1;
-        })();
-        return {
-          trimL,
-          trimR,
-          core
-        };
+      var trimR = takeRight(1)(r1) === trimMark;
+      var core = (function() {
+        if (trimR) {
+          return dropRight(1)(r1);
+        }
+        ;
+        return r1;
+      })();
+      return {
+        trimL,
+        trimR,
+        core
       };
-      var rawName = function(s) {
-        return fromCharArray(takeWhile(function($361) {
-          return !isSpace4($361);
-        })(dropWhile(isSpace4)(toCharArray(s))));
+    };
+    var rawName = function(s) {
+      return fromCharArray(takeWhile(function($359) {
+        return !isSpace4($359);
+      })(dropWhile(isSpace4)(toCharArray(s))));
+    };
+    var interiorAt = function(base) {
+      return function(s) {
+        return tokenizeInterior2(base)(s);
       };
-      var interiorAt = function(base) {
-        return function(s) {
-          return tokenizeInterior(lexOpts)(base)(s);
-        };
-      };
-      var flush = function(span2) {
-        return function(s0) {
-          return function(acc) {
-            return function(pend) {
-              return function(trimR) {
-                var s1 = (function() {
-                  if (pend) {
-                    return trimStartWs2(s0);
-                  }
-                  ;
-                  return s0;
-                })();
-                var s2 = (function() {
-                  if (trimR) {
-                    return trimEndWs2(s1);
-                  }
-                  ;
-                  return s1;
-                })();
-                var $181 = s2 === "";
-                if ($181) {
-                  return acc;
+    };
+    var flush = function(span2) {
+      return function(s0) {
+        return function(acc) {
+          return function(pend) {
+            return function(trimR) {
+              var s1 = (function() {
+                if (pend) {
+                  return trimStartWs2(s0);
                 }
                 ;
-                return new Cons(new RContent2(span2, s2), acc);
-              };
+                return s0;
+              })();
+              var s2 = (function() {
+                if (trimR) {
+                  return trimEndWs2(s1);
+                }
+                ;
+                return s1;
+              })();
+              var $181 = s2 === "";
+              if ($181) {
+                return acc;
+              }
+              ;
+              return new Cons(new RContent2(span2, s2), acc);
             };
           };
         };
       };
-      var finalize = function($362) {
-        return fromFoldable15(reverse2($362));
-      };
-      var cs = toCharArray(src);
-      var leadTrimAt = function(i) {
-        return matchAt3(cs)(i + 2 | 0)(trimMark);
-      };
-      var len = length(cs);
-      var findClose = function(from2) {
-        return function(close) {
-          var skipString = function($copy_j) {
-            return function($copy_q) {
-              var $tco_var_j = $copy_j;
-              var $tco_done = false;
-              var $tco_result;
-              function $tco_loop(j, q) {
-                if (j >= len) {
-                  $tco_done = true;
-                  return j;
-                }
-                ;
-                if (eq34(index(cs)(j))(new Just("\\"))) {
-                  $tco_var_j = j + 2 | 0;
-                  $copy_q = q;
-                  return;
-                }
-                ;
-                if (eq34(index(cs)(j))(new Just(q))) {
-                  $tco_done = true;
-                  return j + 1 | 0;
-                }
-                ;
-                if (otherwise) {
-                  $tco_var_j = j + 1 | 0;
-                  $copy_q = q;
-                  return;
-                }
-                ;
-                throw new Error("Failed pattern match at MaxBars.Lexer (line 361, column 5 - line 365, column 41): " + [j.constructor.name, q.constructor.name]);
+    };
+    var finalize = function($360) {
+      return fromFoldable15(reverse2($360));
+    };
+    var cs = toCharArray(src);
+    var leadTrimAt = function(i) {
+      return matchAt3(cs)(i + 2 | 0)(trimMark);
+    };
+    var len = length(cs);
+    var findClose = function(from2) {
+      return function(close) {
+        var skipString = function($copy_j) {
+          return function($copy_q) {
+            var $tco_var_j = $copy_j;
+            var $tco_done = false;
+            var $tco_result;
+            function $tco_loop(j, q) {
+              if (j >= len) {
+                $tco_done = true;
+                return j;
               }
               ;
-              while (!$tco_done) {
-                $tco_result = $tco_loop($tco_var_j, $copy_q);
+              if (eq34(index(cs)(j))(new Just("\\"))) {
+                $tco_var_j = j + 2 | 0;
+                $copy_q = q;
+                return;
               }
               ;
-              return $tco_result;
-            };
+              if (eq34(index(cs)(j))(new Just(q))) {
+                $tco_done = true;
+                return j + 1 | 0;
+              }
+              ;
+              if (otherwise) {
+                $tco_var_j = j + 1 | 0;
+                $copy_q = q;
+                return;
+              }
+              ;
+              throw new Error("Failed pattern match at MaxBars.Lexer (line 350, column 5 - line 354, column 41): " + [j.constructor.name, q.constructor.name]);
+            }
+            ;
+            while (!$tco_done) {
+              $tco_result = $tco_loop($tco_var_j, $copy_q);
+            }
+            ;
+            return $tco_result;
           };
-          var scan = function($copy_i) {
-            return function($copy_depth) {
-              var $tco_var_i = $copy_i;
-              var $tco_done1 = false;
-              var $tco_result;
-              function $tco_loop(i, depth) {
-                if (i >= len) {
-                  $tco_done1 = true;
-                  return Nothing.value;
-                }
-                ;
-                if (depth === 0 && matchAt3(cs)(i)(close)) {
-                  $tco_done1 = true;
-                  return new Just(i);
-                }
-                ;
-                if (otherwise) {
-                  var v = index(cs)(i);
-                  if (v instanceof Just && v.value0 === '"') {
-                    $tco_var_i = skipString(i + 1 | 0)('"');
-                    $copy_depth = depth;
-                    return;
-                  }
-                  ;
-                  if (v instanceof Just && v.value0 === "'") {
-                    $tco_var_i = skipString(i + 1 | 0)("'");
-                    $copy_depth = depth;
-                    return;
-                  }
-                  ;
-                  if (v instanceof Just && v.value0 === "{") {
-                    $tco_var_i = i + 1 | 0;
-                    $copy_depth = depth + 1 | 0;
-                    return;
-                  }
-                  ;
-                  if (v instanceof Just && v.value0 === "}") {
-                    $tco_var_i = i + 1 | 0;
-                    $copy_depth = (function() {
-                      var $190 = depth > 0;
-                      if ($190) {
-                        return depth - 1 | 0;
-                      }
-                      ;
-                      return 0;
-                    })();
-                    return;
-                  }
-                  ;
-                  $tco_var_i = i + 1 | 0;
+        };
+        var scan = function($copy_i) {
+          return function($copy_depth) {
+            var $tco_var_i = $copy_i;
+            var $tco_done1 = false;
+            var $tco_result;
+            function $tco_loop(i, depth) {
+              if (i >= len) {
+                $tco_done1 = true;
+                return Nothing.value;
+              }
+              ;
+              if (depth === 0 && matchAt3(cs)(i)(close)) {
+                $tco_done1 = true;
+                return new Just(i);
+              }
+              ;
+              if (otherwise) {
+                var v = index(cs)(i);
+                if (v instanceof Just && v.value0 === '"') {
+                  $tco_var_i = skipString(i + 1 | 0)('"');
                   $copy_depth = depth;
                   return;
                 }
                 ;
-                throw new Error("Failed pattern match at MaxBars.Lexer (line 352, column 5 - line 360, column 34): " + [i.constructor.name, depth.constructor.name]);
+                if (v instanceof Just && v.value0 === "'") {
+                  $tco_var_i = skipString(i + 1 | 0)("'");
+                  $copy_depth = depth;
+                  return;
+                }
+                ;
+                if (v instanceof Just && v.value0 === "{") {
+                  $tco_var_i = i + 1 | 0;
+                  $copy_depth = depth + 1 | 0;
+                  return;
+                }
+                ;
+                if (v instanceof Just && v.value0 === "}") {
+                  $tco_var_i = i + 1 | 0;
+                  $copy_depth = (function() {
+                    var $190 = depth > 0;
+                    if ($190) {
+                      return depth - 1 | 0;
+                    }
+                    ;
+                    return 0;
+                  })();
+                  return;
+                }
+                ;
+                $tco_var_i = i + 1 | 0;
+                $copy_depth = depth;
+                return;
               }
               ;
-              while (!$tco_done1) {
-                $tco_result = $tco_loop($tco_var_i, $copy_depth);
-              }
-              ;
-              return $tco_result;
-            };
+              throw new Error("Failed pattern match at MaxBars.Lexer (line 341, column 5 - line 349, column 34): " + [i.constructor.name, depth.constructor.name]);
+            }
+            ;
+            while (!$tco_done1) {
+              $tco_result = $tco_loop($tco_var_i, $copy_depth);
+            }
+            ;
+            return $tco_result;
           };
-          return scan(from2)(0);
         };
+        return scan(from2)(0);
       };
-      var openerLiteralAt = function(i) {
-        if (matchAt3(cs)(i)("{{{{#")) {
-          return new Just("{{{{#");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{{{")) {
-          return new Just("{{{{");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{~!--")) {
-          return new Just("{{~!--");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{!--")) {
-          return new Just("{{!--");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{{^")) {
-          return new Just("{{{^");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{{/")) {
-          return new Just("{{{/");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{{")) {
-          return new Just("{{{");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{~!")) {
-          return new Just("{{~!");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{!")) {
-          return new Just("{{!");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{~#")) {
-          return new Just("{{~#");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{#")) {
-          return new Just("{{#");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{~^")) {
-          return new Just("{{~^");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{^")) {
-          return new Just("{{^");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{~<")) {
-          return new Just("{{~<");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{<")) {
-          return new Just("{{<");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{~$")) {
-          return new Just("{{~$");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{$")) {
-          return new Just("{{$");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{~/")) {
-          return new Just("{{~/");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{/")) {
-          return new Just("{{/");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{~&")) {
-          return new Just("{{~&");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{&")) {
-          return new Just("{{&");
-        }
-        ;
-        if (otherwise) {
-          return Nothing.value;
-        }
-        ;
-        throw new Error("Failed pattern match at MaxBars.Lexer (line 506, column 3 - line 506, column 41): " + [i.constructor.name]);
-      };
-      var isSeparatorAt = function(i) {
-        return matchAt3(cs)(i)("{{") && (!matchAt3(cs)(i)("{{{") && (function() {
-          var v = openerLiteralAt(i);
-          if (v instanceof Just) {
-            return false;
-          }
-          ;
-          if (v instanceof Nothing) {
-            return true;
-          }
-          ;
-          throw new Error("Failed pattern match at MaxBars.Lexer (line 535, column 70 - line 537, column 20): " + [v.constructor.name]);
-        })());
-      };
-      var escapedOpenerAt = function(i) {
+    };
+    var openerLiteralAt = function(i) {
+      if (matchAt3(cs)(i)("{{{{#")) {
+        return new Just("{{{{#");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{{{")) {
+        return new Just("{{{{");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{~!--")) {
+        return new Just("{{~!--");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{!--")) {
+        return new Just("{{!--");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{{^")) {
+        return new Just("{{{^");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{{/")) {
+        return new Just("{{{/");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{{")) {
+        return new Just("{{{");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{~!")) {
+        return new Just("{{~!");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{!")) {
+        return new Just("{{!");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{~#")) {
+        return new Just("{{~#");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{#")) {
+        return new Just("{{#");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{~^")) {
+        return new Just("{{~^");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{^")) {
+        return new Just("{{^");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{~<")) {
+        return new Just("{{~<");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{<")) {
+        return new Just("{{<");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{~$")) {
+        return new Just("{{~$");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{$")) {
+        return new Just("{{$");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{~/")) {
+        return new Just("{{~/");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{/")) {
+        return new Just("{{/");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{~&")) {
+        return new Just("{{~&");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{&")) {
+        return new Just("{{&");
+      }
+      ;
+      if (otherwise) {
+        return Nothing.value;
+      }
+      ;
+      throw new Error("Failed pattern match at MaxBars.Lexer (line 495, column 3 - line 495, column 41): " + [i.constructor.name]);
+    };
+    var isSeparatorAt = function(i) {
+      return matchAt3(cs)(i)("{{") && (!matchAt3(cs)(i)("{{{") && (function() {
         var v = openerLiteralAt(i);
         if (v instanceof Just) {
-          return new Just(v.value0);
+          return false;
         }
         ;
         if (v instanceof Nothing) {
-          var $197 = isSeparatorAt(i);
-          if ($197) {
-            return new Just("{{");
-          }
-          ;
-          return Nothing.value;
-        }
-        ;
-        throw new Error("Failed pattern match at MaxBars.Lexer (line 546, column 23 - line 548, column 62): " + [v.constructor.name]);
-      };
-      var isOpenerAt = function(i) {
-        var v = openerLiteralAt(i);
-        if (v instanceof Just) {
           return true;
         }
         ;
-        if (v instanceof Nothing) {
-          return isSeparatorAt(i);
+        throw new Error("Failed pattern match at MaxBars.Lexer (line 524, column 70 - line 526, column 20): " + [v.constructor.name]);
+      })());
+    };
+    var escapedOpenerAt = function(i) {
+      var v = openerLiteralAt(i);
+      if (v instanceof Just) {
+        return new Just(v.value0);
+      }
+      ;
+      if (v instanceof Nothing) {
+        var $197 = isSeparatorAt(i);
+        if ($197) {
+          return new Just("{{");
         }
         ;
-        throw new Error("Failed pattern match at MaxBars.Lexer (line 540, column 18 - line 542, column 31): " + [v.constructor.name]);
-      };
-      var pushSeg = function(segStart) {
-        return function(frags) {
-          return function(end) {
-            return function(lit) {
-              return snoc(snoc(frags)(slice4(cs)(segStart)(end)))(lit);
-            };
+        return Nothing.value;
+      }
+      ;
+      throw new Error("Failed pattern match at MaxBars.Lexer (line 535, column 23 - line 537, column 62): " + [v.constructor.name]);
+    };
+    var isOpenerAt = function(i) {
+      var v = openerLiteralAt(i);
+      if (v instanceof Just) {
+        return true;
+      }
+      ;
+      if (v instanceof Nothing) {
+        return isSeparatorAt(i);
+      }
+      ;
+      throw new Error("Failed pattern match at MaxBars.Lexer (line 529, column 18 - line 531, column 31): " + [v.constructor.name]);
+    };
+    var pushSeg = function(segStart) {
+      return function(frags) {
+        return function(end) {
+          return function(lit) {
+            return snoc(snoc(frags)(slice4(cs)(segStart)(end)))(lit);
           };
         };
       };
-      var readInlineComment = function(i) {
-        var start = i + 2 | 0;
-        var v = findFrom3(cs)(start)("#}");
+    };
+    var readInlineComment = function(i) {
+      var start = i + 2 | 0;
+      var v = findFrom3(cs)(start)("#}");
+      if (v instanceof Nothing) {
+        return new Left(new UnterminatedComment(i));
+      }
+      ;
+      if (v instanceof Just) {
+        return new Right({
+          mtok: new Just(new RComment2({
+            start: i,
+            end: v.value0 + 2 | 0
+          }, start, slice4(cs)(start)(v.value0))),
+          next: v.value0 + 2 | 0,
+          trimL: false,
+          trimR: false
+        });
+      }
+      ;
+      throw new Error("Failed pattern match at MaxBars.Lexer (line 615, column 7 - line 623, column 14): " + [v.constructor.name]);
+    };
+    var readRaw = function(i) {
+      return function(sigil) {
+        var start = i + sigil | 0;
+        var v = findFrom3(cs)(start)("}}}}");
         if (v instanceof Nothing) {
-          return new Left(new UnterminatedComment(i));
+          return new Left(new UnterminatedRaw(i));
         }
         ;
         if (v instanceof Just) {
-          return new Right({
-            mtok: new Just(new RComment2({
-              start: i,
-              end: v.value0 + 2 | 0
-            }, start, slice4(cs)(start)(v.value0))),
-            next: v.value0 + 2 | 0,
-            trimL: false,
-            trimR: false
-          });
+          var head4 = slice4(cs)(start)(v.value0);
+          var closePat = "{{{{/" + (rawName(head4) + "}}}}");
+          var bodyStart2 = v.value0 + 4 | 0;
+          var v1 = findFrom3(cs)(bodyStart2)(closePat);
+          if (v1 instanceof Nothing) {
+            return new Left(new UnterminatedRaw(i));
+          }
+          ;
+          if (v1 instanceof Just) {
+            var end = v1.value0 + length2(closePat) | 0;
+            return new Right({
+              mtok: new Just(new RRaw3({
+                start: i,
+                end
+              }, sigil === 5, start, head4, interiorAt(start)(head4), slice4(cs)(bodyStart2)(v1.value0))),
+              next: end,
+              trimL: false,
+              trimR: false
+            });
+          }
+          ;
+          throw new Error("Failed pattern match at MaxBars.Lexer (line 827, column 13 - line 841, column 22): " + [v1.constructor.name]);
         }
         ;
-        throw new Error("Failed pattern match at MaxBars.Lexer (line 626, column 7 - line 634, column 14): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at MaxBars.Lexer (line 816, column 7 - line 841, column 22): " + [v.constructor.name]);
       };
-      var readRaw = function(i) {
-        return function(sigil) {
-          var start = i + sigil | 0;
-          var v = findFrom3(cs)(start)("}}}}");
+    };
+    var contentTo = function(segStart) {
+      return function(frags) {
+        return function(end) {
+          return joinWith("")(snoc(frags)(slice4(cs)(segStart)(end)));
+        };
+      };
+    };
+    var consTok = function(mtok) {
+      return function(acc1) {
+        return maybe(acc1)(function(t) {
+          return new Cons(t, acc1);
+        })(mtok);
+      };
+    };
+    var closeFrom = function(from2) {
+      return function(close) {
+        return findClose(from2)(close);
+      };
+    };
+    var findEndrawFrom = /* @__PURE__ */ (function() {
+      var scan = function($copy_j) {
+        var $tco_done2 = false;
+        var $tco_result;
+        function $tco_loop(j) {
+          if (j >= len) {
+            $tco_done2 = true;
+            return Nothing.value;
+          }
+          ;
+          if (matchAt3(cs)(j)("{%")) {
+            var v = closeFrom(j + 2 | 0)("%}");
+            if (v instanceof Just) {
+              if (firstWord3(splitTrims(slice4(cs)(j + 2 | 0)(v.value0)).core) === "endraw") {
+                $tco_done2 = true;
+                return new Just({
+                  tagStart: j,
+                  tagEnd: v.value0 + 2 | 0
+                });
+              }
+              ;
+              if (otherwise) {
+                $copy_j = v.value0 + 2 | 0;
+                return;
+              }
+              ;
+            }
+            ;
+            if (v instanceof Nothing) {
+              $copy_j = j + 1 | 0;
+              return;
+            }
+            ;
+            throw new Error("Failed pattern match at MaxBars.Lexer (line 801, column 29 - line 806, column 34): " + [v.constructor.name]);
+          }
+          ;
+          if (otherwise) {
+            $copy_j = j + 1 | 0;
+            return;
+          }
+          ;
+          throw new Error("Failed pattern match at MaxBars.Lexer (line 799, column 5 - line 807, column 33): " + [j.constructor.name]);
+        }
+        ;
+        while (!$tco_done2) {
+          $tco_result = $tco_loop($copy_j);
+        }
+        ;
+        return $tco_result;
+      };
+      return scan;
+    })();
+    var readRawBody = function(i) {
+      return function(headStart) {
+        return function(bodyStart2) {
+          var v = findEndrawFrom(bodyStart2);
           if (v instanceof Nothing) {
             return new Left(new UnterminatedRaw(i));
           }
           ;
           if (v instanceof Just) {
-            var head4 = slice4(cs)(start)(v.value0);
-            var closePat = "{{{{/" + (rawName(head4) + "}}}}");
-            var bodyStart2 = v.value0 + 4 | 0;
-            var v1 = findFrom3(cs)(bodyStart2)(closePat);
-            if (v1 instanceof Nothing) {
-              return new Left(new UnterminatedRaw(i));
-            }
-            ;
-            if (v1 instanceof Just) {
-              var end = v1.value0 + length2(closePat) | 0;
-              return new Right({
-                mtok: new Just(new RRaw3({
-                  start: i,
-                  end
-                }, sigil === 5, start, head4, interiorAt(start)(head4), slice4(cs)(bodyStart2)(v1.value0))),
-                next: end,
-                trimL: false,
-                trimR: false
-              });
-            }
-            ;
-            throw new Error("Failed pattern match at MaxBars.Lexer (line 838, column 13 - line 852, column 22): " + [v1.constructor.name]);
-          }
-          ;
-          throw new Error("Failed pattern match at MaxBars.Lexer (line 827, column 7 - line 852, column 22): " + [v.constructor.name]);
-        };
-      };
-      var contentTo = function(segStart) {
-        return function(frags) {
-          return function(end) {
-            return joinWith("")(snoc(frags)(slice4(cs)(segStart)(end)));
-          };
-        };
-      };
-      var consTok = function(mtok) {
-        return function(acc1) {
-          return maybe(acc1)(function(t) {
-            return new Cons(t, acc1);
-          })(mtok);
-        };
-      };
-      var closeFrom = function(from2) {
-        return function(close) {
-          if (lexOpts.collectionLiterals) {
-            return findClose(from2)(close);
-          }
-          ;
-          if (otherwise) {
-            return findFrom3(cs)(from2)(close);
-          }
-          ;
-          throw new Error("Failed pattern match at MaxBars.Lexer (line 340, column 3 - line 340, column 42): " + [from2.constructor.name, close.constructor.name]);
-        };
-      };
-      var findEndrawFrom = /* @__PURE__ */ (function() {
-        var scan = function($copy_j) {
-          var $tco_done2 = false;
-          var $tco_result;
-          function $tco_loop(j) {
-            if (j >= len) {
-              $tco_done2 = true;
-              return Nothing.value;
-            }
-            ;
-            if (matchAt3(cs)(j)("{%")) {
-              var v = closeFrom(j + 2 | 0)("%}");
-              if (v instanceof Just) {
-                if (firstWord3(splitTrims(slice4(cs)(j + 2 | 0)(v.value0)).core) === "endraw") {
-                  $tco_done2 = true;
-                  return new Just({
-                    tagStart: j,
-                    tagEnd: v.value0 + 2 | 0
-                  });
-                }
-                ;
-                if (otherwise) {
-                  $copy_j = v.value0 + 2 | 0;
-                  return;
-                }
-                ;
-              }
-              ;
-              if (v instanceof Nothing) {
-                $copy_j = j + 1 | 0;
-                return;
-              }
-              ;
-              throw new Error("Failed pattern match at MaxBars.Lexer (line 812, column 29 - line 817, column 34): " + [v.constructor.name]);
-            }
-            ;
-            if (otherwise) {
-              $copy_j = j + 1 | 0;
-              return;
-            }
-            ;
-            throw new Error("Failed pattern match at MaxBars.Lexer (line 810, column 5 - line 818, column 33): " + [j.constructor.name]);
-          }
-          ;
-          while (!$tco_done2) {
-            $tco_result = $tco_loop($copy_j);
-          }
-          ;
-          return $tco_result;
-        };
-        return scan;
-      })();
-      var readRawBody = function(i) {
-        return function(headStart) {
-          return function(bodyStart2) {
-            var v = findEndrawFrom(bodyStart2);
-            if (v instanceof Nothing) {
-              return new Left(new UnterminatedRaw(i));
-            }
-            ;
-            if (v instanceof Just) {
-              return new Right({
-                mtok: new Just(new RRaw3({
-                  start: i,
-                  end: v.value0.tagEnd
-                }, true, headStart, "raw", interiorAt(headStart)("raw"), slice4(cs)(bodyStart2)(v.value0.tagStart))),
-                next: v.value0.tagEnd,
-                trimL: leadTrimAt(i),
-                trimR: false
-              });
-            }
-            ;
-            throw new Error("Failed pattern match at MaxBars.Lexer (line 791, column 39 - line 802, column 8): " + [v.constructor.name]);
-          };
-        };
-      };
-      var readAmp = function(i) {
-        return function(opener) {
-          var start = i + length2(opener) | 0;
-          var v = closeFrom(start)("}}");
-          if (v instanceof Nothing) {
-            return new Left(new UnterminatedTag(i));
-          }
-          ;
-          if (v instanceof Just) {
-            var t = splitTrims(slice4(cs)(start)(v.value0));
             return new Right({
-              mtok: new Just(new RAmp2({
+              mtok: new Just(new RRaw3({
                 start: i,
-                end: v.value0 + 2 | 0
-              }, start, t.core, interiorAt(start)(t.core))),
-              next: v.value0 + 2 | 0,
-              trimL: leadTrimAt(i) || t.trimL,
-              trimR: t.trimR
+                end: v.value0.tagEnd
+              }, true, headStart, "raw", interiorAt(headStart)("raw"), slice4(cs)(bodyStart2)(v.value0.tagStart))),
+              next: v.value0.tagEnd,
+              trimL: leadTrimAt(i),
+              trimR: false
             });
           }
           ;
-          throw new Error("Failed pattern match at MaxBars.Lexer (line 686, column 7 - line 697, column 16): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at MaxBars.Lexer (line 780, column 39 - line 791, column 8): " + [v.constructor.name]);
         };
       };
-      var readBlockOpen = function(i) {
-        return function(opener) {
-          return function(sigil) {
-            return function(close) {
-              var start = i + length2(opener) | 0;
-              var cl = length2(close);
-              var v = closeFrom(start)(close);
-              if (v instanceof Nothing) {
-                return new Left(new UnterminatedTag(i));
-              }
-              ;
-              if (v instanceof Just) {
-                var t = splitTrims(slice4(cs)(start)(v.value0));
-                return new Right({
-                  mtok: new Just(new ROpen2({
-                    start: i,
-                    end: v.value0 + cl | 0
-                  }, sigil, start, t.core, interiorAt(start)(t.core))),
-                  next: v.value0 + cl | 0,
-                  trimL: leadTrimAt(i) || t.trimL,
-                  trimR: t.trimR
-                });
-              }
-              ;
-              throw new Error("Failed pattern match at MaxBars.Lexer (line 645, column 7 - line 657, column 16): " + [v.constructor.name]);
-            };
-          };
-        };
+    };
+    var readAmp = function(i) {
+      return function(opener) {
+        var start = i + length2(opener) | 0;
+        var v = closeFrom(start)("}}");
+        if (v instanceof Nothing) {
+          return new Left(new UnterminatedTag(i));
+        }
+        ;
+        if (v instanceof Just) {
+          var t = splitTrims(slice4(cs)(start)(v.value0));
+          return new Right({
+            mtok: new Just(new RAmp2({
+              start: i,
+              end: v.value0 + 2 | 0
+            }, start, t.core, interiorAt(start)(t.core))),
+            next: v.value0 + 2 | 0,
+            trimL: leadTrimAt(i) || t.trimL,
+            trimR: t.trimR
+          });
+        }
+        ;
+        throw new Error("Failed pattern match at MaxBars.Lexer (line 675, column 7 - line 686, column 16): " + [v.constructor.name]);
       };
-      var readClose = function(i) {
-        return function(opener) {
+    };
+    var readBlockOpen = function(i) {
+      return function(opener) {
+        return function(sigil) {
           return function(close) {
             var start = i + length2(opener) | 0;
             var cl = length2(close);
@@ -20786,241 +21268,268 @@ var tokenizeTemplate2 = function(cfg) {
             if (v instanceof Just) {
               var t = splitTrims(slice4(cs)(start)(v.value0));
               return new Right({
-                mtok: new Just(new RClose2({
+                mtok: new Just(new ROpen2({
                   start: i,
                   end: v.value0 + cl | 0
-                }, start, t.core, interiorAt(start)(t.core))),
+                }, sigil, start, t.core, interiorAt(start)(t.core))),
                 next: v.value0 + cl | 0,
                 trimL: leadTrimAt(i) || t.trimL,
                 trimR: t.trimR
               });
             }
             ;
-            throw new Error("Failed pattern match at MaxBars.Lexer (line 667, column 7 - line 678, column 16): " + [v.constructor.name]);
+            throw new Error("Failed pattern match at MaxBars.Lexer (line 634, column 7 - line 646, column 16): " + [v.constructor.name]);
           };
         };
       };
-      var readSeparator = function(i) {
-        var start = (function() {
-          var $219 = leadTrimAt(i);
-          if ($219) {
-            return i + 3 | 0;
+    };
+    var readClose = function(i) {
+      return function(opener) {
+        return function(close) {
+          var start = i + length2(opener) | 0;
+          var cl = length2(close);
+          var v = closeFrom(start)(close);
+          if (v instanceof Nothing) {
+            return new Left(new UnterminatedTag(i));
           }
           ;
-          return i + 2 | 0;
-        })();
-        var v = closeFrom(start)("}}");
-        if (v instanceof Nothing) {
-          return new Left(new UnterminatedTag(i));
+          if (v instanceof Just) {
+            var t = splitTrims(slice4(cs)(start)(v.value0));
+            return new Right({
+              mtok: new Just(new RClose2({
+                start: i,
+                end: v.value0 + cl | 0
+              }, start, t.core, interiorAt(start)(t.core))),
+              next: v.value0 + cl | 0,
+              trimL: leadTrimAt(i) || t.trimL,
+              trimR: t.trimR
+            });
+          }
+          ;
+          throw new Error("Failed pattern match at MaxBars.Lexer (line 656, column 7 - line 667, column 16): " + [v.constructor.name]);
+        };
+      };
+    };
+    var readSeparator = function(i) {
+      var start = (function() {
+        var $217 = leadTrimAt(i);
+        if ($217) {
+          return i + 3 | 0;
         }
         ;
-        if (v instanceof Just) {
-          var t = splitTrims(slice4(cs)(start)(v.value0));
+        return i + 2 | 0;
+      })();
+      var v = closeFrom(start)("}}");
+      if (v instanceof Nothing) {
+        return new Left(new UnterminatedTag(i));
+      }
+      ;
+      if (v instanceof Just) {
+        var t = splitTrims(slice4(cs)(start)(v.value0));
+        return new Right({
+          mtok: new Just(new RSep3({
+            start: i,
+            end: v.value0 + 2 | 0
+          }, start, t.core, interiorAt(start)(t.core))),
+          next: v.value0 + 2 | 0,
+          trimL: leadTrimAt(i) || t.trimL,
+          trimR: t.trimR
+        });
+      }
+      ;
+      throw new Error("Failed pattern match at MaxBars.Lexer (line 696, column 7 - line 707, column 16): " + [v.constructor.name]);
+    };
+    var readTag = function(i) {
+      if (matchAt3(cs)(i)("{{{{#")) {
+        return readRaw(i)(5);
+      }
+      ;
+      if (matchAt3(cs)(i)("{{{{")) {
+        return readRaw(i)(4);
+      }
+      ;
+      if (matchAt3(cs)(i)("{{{")) {
+        return new Left(new LexError("`{{{ \u2026 }}}` is not a tag here \u2014 unescaped output is `{{ x | safe }}`, a verbatim region is `{% raw %}`", i));
+      }
+      ;
+      if (matchAt3(cs)(i)("{{~#*")) {
+        return readBlockOpen(i)("{{~#*")(Decorator.value)("}}");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{#*")) {
+        return readBlockOpen(i)("{{#*")(Decorator.value)("}}");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{~#>")) {
+        return readBlockOpen(i)("{{~#>")(PartialBlock.value)("}}");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{#>")) {
+        return readBlockOpen(i)("{{#>")(PartialBlock.value)("}}");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{~#")) {
+        return readBlockOpen(i)("{{~#")(Section.value)("}}");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{#")) {
+        return readBlockOpen(i)("{{#")(Section.value)("}}");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{~^")) {
+        return readBlockOpen(i)("{{~^")(Inverse.value)("}}");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{^")) {
+        return readBlockOpen(i)("{{^")(Inverse.value)("}}");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{~<")) {
+        return readBlockOpen(i)("{{~<")(Parent.value)("}}");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{<")) {
+        return readBlockOpen(i)("{{<")(Parent.value)("}}");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{~$")) {
+        return readBlockOpen(i)("{{~$")(BlockDef.value)("}}");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{$")) {
+        return readBlockOpen(i)("{{$")(BlockDef.value)("}}");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{~/")) {
+        return readClose(i)("{{~/")("}}");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{/")) {
+        return readClose(i)("{{/")("}}");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{~&")) {
+        return readAmp(i)("{{~&");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{&")) {
+        return readAmp(i)("{{&");
+      }
+      ;
+      if (matchAt3(cs)(i)("{{")) {
+        return readSeparator(i);
+      }
+      ;
+      if (otherwise) {
+        return new Left(new LexError("internal: no opener", i));
+      }
+      ;
+      throw new Error("Failed pattern match at MaxBars.Lexer (line 539, column 3 - line 539, column 48): " + [i.constructor.name]);
+    };
+    var readStatementTag = function(i) {
+      var start = (function() {
+        var $221 = leadTrimAt(i);
+        if ($221) {
+          return i + 3 | 0;
+        }
+        ;
+        return i + 2 | 0;
+      })();
+      var v = closeFrom(start)("%}");
+      if (v instanceof Nothing) {
+        return new Left(new UnterminatedTag(i));
+      }
+      ;
+      if (v instanceof Just) {
+        var t = splitTrims(slice4(cs)(start)(v.value0));
+        var span2 = {
+          start: i,
+          end: v.value0 + 2 | 0
+        };
+        var mk = function(tok) {
           return new Right({
-            mtok: new Just(new RSep3({
-              start: i,
-              end: v.value0 + 2 | 0
-            }, start, t.core, interiorAt(start)(t.core))),
+            mtok: new Just(tok),
             next: v.value0 + 2 | 0,
             trimL: leadTrimAt(i) || t.trimL,
             trimR: t.trimR
           });
+        };
+        var headWord3 = firstWord3(t.core);
+        var $223 = headWord3 === "";
+        if ($223) {
+          return new Left(new LexError("empty statement tag '{% %}'", i));
         }
         ;
-        throw new Error("Failed pattern match at MaxBars.Lexer (line 707, column 7 - line 718, column 16): " + [v.constructor.name]);
-      };
-      var readTag = function(i) {
-        if (matchAt3(cs)(i)("{{{{#")) {
-          return readRaw(i)(5);
+        var $224 = trim(t.core) === "raw";
+        if ($224) {
+          return readRawBody(i)(start)(v.value0 + 2 | 0);
         }
         ;
-        if (matchAt3(cs)(i)("{{{{")) {
-          return readRaw(i)(4);
+        var $225 = isStmtClose2(headWord3);
+        if ($225) {
+          var name2 = drop2(3)(headWord3);
+          return mk(new RClose2(span2, start, name2, interiorAt(start)(name2)));
         }
         ;
-        if (matchAt3(cs)(i)("{{{")) {
-          return new Left(new LexError("`{{{ \u2026 }}}` is not a tag here \u2014 unescaped output is `{{ x | safe }}`, a verbatim region is `{% raw %}`", i));
+        var $226 = isStmtSep2(headWord3) || (headWord3 === "set" || (trim(t.core) === "yield" || trim(t.core) === "super"));
+        if ($226) {
+          return mk(new RSep3(span2, start, t.core, interiorAt(start)(t.core)));
         }
         ;
-        if (matchAt3(cs)(i)("{{~#*")) {
-          return readBlockOpen(i)("{{~#*")(Decorator.value)("}}");
+        var $227 = headWord3 === "extends";
+        if ($227) {
+          return mk(new RSep3(span2, start, t.core, interiorAt(start)(t.core)));
         }
         ;
-        if (matchAt3(cs)(i)("{{#*")) {
-          return readBlockOpen(i)("{{#*")(Decorator.value)("}}");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{~#>")) {
-          return readBlockOpen(i)("{{~#>")(PartialBlock.value)("}}");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{#>")) {
-          return readBlockOpen(i)("{{#>")(PartialBlock.value)("}}");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{~#")) {
-          return readBlockOpen(i)("{{~#")(Section.value)("}}");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{#")) {
-          return readBlockOpen(i)("{{#")(Section.value)("}}");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{~^")) {
-          return readBlockOpen(i)("{{~^")(Inverse.value)("}}");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{^")) {
-          return readBlockOpen(i)("{{^")(Inverse.value)("}}");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{~<")) {
-          return readBlockOpen(i)("{{~<")(Parent.value)("}}");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{<")) {
-          return readBlockOpen(i)("{{<")(Parent.value)("}}");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{~$")) {
-          return readBlockOpen(i)("{{~$")(BlockDef.value)("}}");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{$")) {
-          return readBlockOpen(i)("{{$")(BlockDef.value)("}}");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{~/")) {
-          return readClose(i)("{{~/")("}}");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{/")) {
-          return readClose(i)("{{/")("}}");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{~&")) {
-          return readAmp(i)("{{~&");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{&")) {
-          return readAmp(i)("{{&");
-        }
-        ;
-        if (matchAt3(cs)(i)("{{")) {
-          return readSeparator(i);
-        }
-        ;
-        if (otherwise) {
-          return new Left(new LexError("internal: no opener", i));
-        }
-        ;
-        throw new Error("Failed pattern match at MaxBars.Lexer (line 550, column 3 - line 550, column 48): " + [i.constructor.name]);
-      };
-      var readStatementTag = function(i) {
-        var start = (function() {
-          var $223 = leadTrimAt(i);
-          if ($223) {
-            return i + 3 | 0;
-          }
-          ;
-          return i + 2 | 0;
-        })();
-        var v = closeFrom(start)("%}");
-        if (v instanceof Nothing) {
-          return new Left(new UnterminatedTag(i));
-        }
-        ;
-        if (v instanceof Just) {
-          var t = splitTrims(slice4(cs)(start)(v.value0));
-          var span2 = {
-            start: i,
-            end: v.value0 + 2 | 0
-          };
-          var mk = function(tok) {
-            return new Right({
-              mtok: new Just(tok),
-              next: v.value0 + 2 | 0,
-              trimL: leadTrimAt(i) || t.trimL,
-              trimR: t.trimR
-            });
-          };
-          var headWord3 = firstWord3(t.core);
-          var $225 = headWord3 === "";
-          if ($225) {
-            return new Left(new LexError("empty statement tag '{% %}'", i));
-          }
-          ;
-          var $226 = trim(t.core) === "raw";
-          if ($226) {
-            return readRawBody(i)(start)(v.value0 + 2 | 0);
-          }
-          ;
-          var $227 = isStmtClose2(headWord3);
-          if ($227) {
-            var name2 = drop2(3)(headWord3);
-            return mk(new RClose2(span2, start, name2, interiorAt(start)(name2)));
-          }
-          ;
-          var $228 = isStmtSep2(headWord3) || (headWord3 === "set" || (trim(t.core) === "yield" || trim(t.core) === "super"));
-          if ($228) {
-            return mk(new RSep3(span2, start, t.core, interiorAt(start)(t.core)));
-          }
-          ;
-          var $229 = headWord3 === "extends";
-          if ($229) {
-            return mk(new RSep3(span2, start, t.core, interiorAt(start)(t.core)));
-          }
-          ;
-          var $230 = headWord3 === "include";
-          if ($230) {
-            var skipSp = function($copy_j) {
-              var $tco_done3 = false;
-              var $tco_result;
-              function $tco_loop(j) {
-                var $231 = j < v.value0 && maybe(false)(isSpace4)(index(cs)(j));
-                if ($231) {
-                  $copy_j = j + 1 | 0;
-                  return;
-                }
-                ;
-                $tco_done3 = true;
-                return j;
+        var $228 = headWord3 === "include";
+        if ($228) {
+          var skipSp = function($copy_j) {
+            var $tco_done3 = false;
+            var $tco_result;
+            function $tco_loop(j) {
+              var $229 = j < v.value0 && maybe(false)(isSpace4)(index(cs)(j));
+              if ($229) {
+                $copy_j = j + 1 | 0;
+                return;
               }
               ;
-              while (!$tco_done3) {
-                $tco_result = $tco_loop($copy_j);
-              }
-              ;
-              return $tco_result;
-            };
-            var argsOff = skipSp(skipSp(start) + length2(headWord3) | 0);
-            var pcore = "> " + slice4(cs)(argsOff)(v.value0);
-            return mk(new RSep3(span2, start, pcore, interiorAt(argsOff - 2 | 0)(pcore)));
-          }
-          ;
-          return mk(new ROpen2(span2, Section.value, start, t.core, interiorAt(start)(t.core)));
+              $tco_done3 = true;
+              return j;
+            }
+            ;
+            while (!$tco_done3) {
+              $tco_result = $tco_loop($copy_j);
+            }
+            ;
+            return $tco_result;
+          };
+          var argsOff = skipSp(skipSp(start) + length2(headWord3) | 0);
+          var pcore = "> " + slice4(cs)(argsOff)(v.value0);
+          return mk(new RSep3(span2, start, pcore, interiorAt(argsOff - 2 | 0)(pcore)));
         }
         ;
-        throw new Error("Failed pattern match at MaxBars.Lexer (line 730, column 7 - line 784, column 73): " + [v.constructor.name]);
-      };
-      var recoverFrom = function(i) {
-        return function(e) {
-          return function(segStart) {
-            return function(frags) {
-              return function(acc) {
-                return function(pend) {
-                  return function(open) {
-                    return function(close) {
-                      var resync = fromMaybe(len)(findFrom3(cs)(i + length2(open) | 0)(open));
-                      var acc2 = new Cons(new RError2({
-                        start: i,
-                        end: resync
-                      }, e), flush({
-                        start: segStart,
-                        end: i
-                      })(contentTo(segStart)(frags)(i))(acc)(pend)(false));
-                      return go(resync)(open)(close)(resync)([])(acc2)(false);
-                    };
+        return mk(new ROpen2(span2, Section.value, start, t.core, interiorAt(start)(t.core)));
+      }
+      ;
+      throw new Error("Failed pattern match at MaxBars.Lexer (line 719, column 7 - line 773, column 73): " + [v.constructor.name]);
+    };
+    var recoverFrom = function(i) {
+      return function(e) {
+        return function(segStart) {
+          return function(frags) {
+            return function(acc) {
+              return function(pend) {
+                return function(open) {
+                  return function(close) {
+                    var resync = fromMaybe(len)(findFrom3(cs)(i + length2(open) | 0)(open));
+                    var acc2 = new Cons(new RError2({
+                      start: i,
+                      end: resync
+                    }, e), flush({
+                      start: segStart,
+                      end: i
+                    })(contentTo(segStart)(frags)(i))(acc)(pend)(false));
+                    return go(resync)(open)(close)(resync)([])(acc2)(false);
                   };
                 };
               };
@@ -21028,23 +21537,34 @@ var tokenizeTemplate2 = function(cfg) {
           };
         };
       };
-      var go = function($copy_i) {
-        return function($copy_open) {
-          return function($copy_close) {
-            return function($copy_segStart) {
-              return function($copy_frags) {
-                return function($copy_acc) {
-                  return function($copy_pend) {
-                    var $tco_var_i = $copy_i;
-                    var $tco_var_open = $copy_open;
-                    var $tco_var_close = $copy_close;
-                    var $tco_var_segStart = $copy_segStart;
-                    var $tco_var_frags = $copy_frags;
-                    var $tco_var_acc = $copy_acc;
-                    var $tco_done4 = false;
-                    var $tco_result;
-                    function $tco_loop(i, open, close, segStart, frags, acc, pend) {
-                      if (i >= len) {
+    };
+    var go = function($copy_i) {
+      return function($copy_open) {
+        return function($copy_close) {
+          return function($copy_segStart) {
+            return function($copy_frags) {
+              return function($copy_acc) {
+                return function($copy_pend) {
+                  var $tco_var_i = $copy_i;
+                  var $tco_var_open = $copy_open;
+                  var $tco_var_close = $copy_close;
+                  var $tco_var_segStart = $copy_segStart;
+                  var $tco_var_frags = $copy_frags;
+                  var $tco_var_acc = $copy_acc;
+                  var $tco_done4 = false;
+                  var $tco_result;
+                  function $tco_loop(i, open, close, segStart, frags, acc, pend) {
+                    if (i >= len) {
+                      $tco_done4 = true;
+                      return new Right(flush({
+                        start: segStart,
+                        end: i
+                      })(contentTo(segStart)(frags)(i))(acc)(pend)(false));
+                    }
+                    ;
+                    if (otherwise) {
+                      var v = index(cs)(i);
+                      if (v instanceof Nothing) {
                         $tco_done4 = true;
                         return new Right(flush({
                           start: segStart,
@@ -21052,165 +21572,154 @@ var tokenizeTemplate2 = function(cfg) {
                         })(contentTo(segStart)(frags)(i))(acc)(pend)(false));
                       }
                       ;
-                      if (otherwise) {
-                        var v = index(cs)(i);
-                        if (v instanceof Nothing) {
-                          $tco_done4 = true;
-                          return new Right(flush({
-                            start: segStart,
-                            end: i
-                          })(contentTo(segStart)(frags)(i))(acc)(pend)(false));
-                        }
-                        ;
-                        if (v instanceof Just) {
-                          if (matchAt3(cs)(i)("{%")) {
-                            var v1 = readStatementTag(i);
-                            if (v1 instanceof Left) {
-                              $tco_done4 = true;
-                              return recoverFrom(i)(v1.value0)(segStart)(frags)(acc)(pend)(open)(close);
-                            }
-                            ;
-                            if (v1 instanceof Right) {
-                              var acc2 = consTok(v1.value0.mtok)(flush({
-                                start: segStart,
-                                end: i
-                              })(contentTo(segStart)(frags)(i))(acc)(pend)(v1.value0.trimL));
-                              $tco_var_i = v1.value0.next;
-                              $tco_var_open = open;
-                              $tco_var_close = close;
-                              $tco_var_segStart = v1.value0.next;
-                              $tco_var_frags = [];
-                              $tco_var_acc = acc2;
-                              $copy_pend = v1.value0.trimR;
-                              return;
-                            }
-                            ;
-                            throw new Error("Failed pattern match at MaxBars.Lexer (line 400, column 34 - line 409, column 68): " + [v1.constructor.name]);
+                      if (v instanceof Just) {
+                        if (matchAt3(cs)(i)("{%")) {
+                          var v1 = readStatementTag(i);
+                          if (v1 instanceof Left) {
+                            $tco_done4 = true;
+                            return recoverFrom(i)(v1.value0)(segStart)(frags)(acc)(pend)(open)(close);
                           }
                           ;
-                          if (matchAt3(cs)(i)("{#")) {
-                            var v1 = readInlineComment(i);
-                            if (v1 instanceof Left) {
-                              $tco_done4 = true;
-                              return recoverFrom(i)(v1.value0)(segStart)(frags)(acc)(pend)(open)(close);
-                            }
-                            ;
-                            if (v1 instanceof Right) {
-                              var acc2 = consTok(v1.value0.mtok)(flush({
-                                start: segStart,
-                                end: i
-                              })(contentTo(segStart)(frags)(i))(acc)(pend)(v1.value0.trimL));
-                              $tco_var_i = v1.value0.next;
-                              $tco_var_open = open;
-                              $tco_var_close = close;
-                              $tco_var_segStart = v1.value0.next;
-                              $tco_var_frags = [];
-                              $tco_var_acc = acc2;
-                              $copy_pend = v1.value0.trimR;
-                              return;
-                            }
-                            ;
-                            throw new Error("Failed pattern match at MaxBars.Lexer (line 414, column 34 - line 423, column 68): " + [v1.constructor.name]);
-                          }
-                          ;
-                          if (v.value0 === "\\") {
-                            var $247 = matchAt3(cs)(i + 1 | 0)("\\");
-                            if ($247) {
-                              $tco_var_i = i + 2 | 0;
-                              $tco_var_open = open;
-                              $tco_var_close = close;
-                              $tco_var_segStart = i + 2 | 0;
-                              $tco_var_frags = pushSeg(segStart)(frags)(i)("\\");
-                              $tco_var_acc = acc;
-                              $copy_pend = pend;
-                              return;
-                            }
-                            ;
-                            var v1 = escapedOpenerAt(i + 1 | 0);
-                            if (v1 instanceof Just) {
-                              var next = (i + 1 | 0) + length2(v1.value0) | 0;
-                              $tco_var_i = next;
-                              $tco_var_open = open;
-                              $tco_var_close = close;
-                              $tco_var_segStart = next;
-                              $tco_var_frags = pushSeg(segStart)(frags)(i)(v1.value0);
-                              $tco_var_acc = acc;
-                              $copy_pend = pend;
-                              return;
-                            }
-                            ;
-                            if (v1 instanceof Nothing) {
-                              $tco_var_i = i + 1 | 0;
-                              $tco_var_open = open;
-                              $tco_var_close = close;
-                              $tco_var_segStart = i + 1 | 0;
-                              $tco_var_frags = pushSeg(segStart)(frags)(i)("\\");
-                              $tco_var_acc = acc;
-                              $copy_pend = pend;
-                              return;
-                            }
-                            ;
-                            throw new Error("Failed pattern match at MaxBars.Lexer (line 432, column 20 - line 438, column 98): " + [v1.constructor.name]);
-                          }
-                          ;
-                          if (v.value0 === "{" && isOpenerAt(i)) {
-                            var v1 = readTag(i);
-                            if (v1 instanceof Left) {
-                              $tco_done4 = true;
-                              return recoverFrom(i)(v1.value0)(segStart)(frags)(acc)(pend)(open)(close);
-                            }
-                            ;
-                            if (v1 instanceof Right) {
-                              var acc2 = consTok(v1.value0.mtok)(flush({
-                                start: segStart,
-                                end: i
-                              })(contentTo(segStart)(frags)(i))(acc)(pend)(v1.value0.trimL));
-                              $tco_var_i = v1.value0.next;
-                              $tco_var_open = open;
-                              $tco_var_close = close;
-                              $tco_var_segStart = v1.value0.next;
-                              $tco_var_frags = [];
-                              $tco_var_acc = acc2;
-                              $copy_pend = v1.value0.trimR;
-                              return;
-                            }
-                            ;
-                            throw new Error("Failed pattern match at MaxBars.Lexer (line 439, column 41 - line 448, column 68): " + [v1.constructor.name]);
-                          }
-                          ;
-                          if (otherwise) {
-                            $tco_var_i = i + 1 | 0;
+                          if (v1 instanceof Right) {
+                            var acc2 = consTok(v1.value0.mtok)(flush({
+                              start: segStart,
+                              end: i
+                            })(contentTo(segStart)(frags)(i))(acc)(pend)(v1.value0.trimL));
+                            $tco_var_i = v1.value0.next;
                             $tco_var_open = open;
                             $tco_var_close = close;
-                            $tco_var_segStart = segStart;
-                            $tco_var_frags = frags;
+                            $tco_var_segStart = v1.value0.next;
+                            $tco_var_frags = [];
+                            $tco_var_acc = acc2;
+                            $copy_pend = v1.value0.trimR;
+                            return;
+                          }
+                          ;
+                          throw new Error("Failed pattern match at MaxBars.Lexer (line 389, column 34 - line 398, column 68): " + [v1.constructor.name]);
+                        }
+                        ;
+                        if (matchAt3(cs)(i)("{#")) {
+                          var v1 = readInlineComment(i);
+                          if (v1 instanceof Left) {
+                            $tco_done4 = true;
+                            return recoverFrom(i)(v1.value0)(segStart)(frags)(acc)(pend)(open)(close);
+                          }
+                          ;
+                          if (v1 instanceof Right) {
+                            var acc2 = consTok(v1.value0.mtok)(flush({
+                              start: segStart,
+                              end: i
+                            })(contentTo(segStart)(frags)(i))(acc)(pend)(v1.value0.trimL));
+                            $tco_var_i = v1.value0.next;
+                            $tco_var_open = open;
+                            $tco_var_close = close;
+                            $tco_var_segStart = v1.value0.next;
+                            $tco_var_frags = [];
+                            $tco_var_acc = acc2;
+                            $copy_pend = v1.value0.trimR;
+                            return;
+                          }
+                          ;
+                          throw new Error("Failed pattern match at MaxBars.Lexer (line 403, column 34 - line 412, column 68): " + [v1.constructor.name]);
+                        }
+                        ;
+                        if (v.value0 === "\\") {
+                          var $245 = matchAt3(cs)(i + 1 | 0)("\\");
+                          if ($245) {
+                            $tco_var_i = i + 2 | 0;
+                            $tco_var_open = open;
+                            $tco_var_close = close;
+                            $tco_var_segStart = i + 2 | 0;
+                            $tco_var_frags = pushSeg(segStart)(frags)(i)("\\");
                             $tco_var_acc = acc;
                             $copy_pend = pend;
                             return;
                           }
                           ;
+                          var v1 = escapedOpenerAt(i + 1 | 0);
+                          if (v1 instanceof Just) {
+                            var next = (i + 1 | 0) + length2(v1.value0) | 0;
+                            $tco_var_i = next;
+                            $tco_var_open = open;
+                            $tco_var_close = close;
+                            $tco_var_segStart = next;
+                            $tco_var_frags = pushSeg(segStart)(frags)(i)(v1.value0);
+                            $tco_var_acc = acc;
+                            $copy_pend = pend;
+                            return;
+                          }
+                          ;
+                          if (v1 instanceof Nothing) {
+                            $tco_var_i = i + 1 | 0;
+                            $tco_var_open = open;
+                            $tco_var_close = close;
+                            $tco_var_segStart = i + 1 | 0;
+                            $tco_var_frags = pushSeg(segStart)(frags)(i)("\\");
+                            $tco_var_acc = acc;
+                            $copy_pend = pend;
+                            return;
+                          }
+                          ;
+                          throw new Error("Failed pattern match at MaxBars.Lexer (line 421, column 20 - line 427, column 98): " + [v1.constructor.name]);
                         }
                         ;
-                        throw new Error("Failed pattern match at MaxBars.Lexer (line 393, column 19 - line 449, column 71): " + [v.constructor.name]);
+                        if (v.value0 === "{" && isOpenerAt(i)) {
+                          var v1 = readTag(i);
+                          if (v1 instanceof Left) {
+                            $tco_done4 = true;
+                            return recoverFrom(i)(v1.value0)(segStart)(frags)(acc)(pend)(open)(close);
+                          }
+                          ;
+                          if (v1 instanceof Right) {
+                            var acc2 = consTok(v1.value0.mtok)(flush({
+                              start: segStart,
+                              end: i
+                            })(contentTo(segStart)(frags)(i))(acc)(pend)(v1.value0.trimL));
+                            $tco_var_i = v1.value0.next;
+                            $tco_var_open = open;
+                            $tco_var_close = close;
+                            $tco_var_segStart = v1.value0.next;
+                            $tco_var_frags = [];
+                            $tco_var_acc = acc2;
+                            $copy_pend = v1.value0.trimR;
+                            return;
+                          }
+                          ;
+                          throw new Error("Failed pattern match at MaxBars.Lexer (line 428, column 41 - line 437, column 68): " + [v1.constructor.name]);
+                        }
+                        ;
+                        if (otherwise) {
+                          $tco_var_i = i + 1 | 0;
+                          $tco_var_open = open;
+                          $tco_var_close = close;
+                          $tco_var_segStart = segStart;
+                          $tco_var_frags = frags;
+                          $tco_var_acc = acc;
+                          $copy_pend = pend;
+                          return;
+                        }
+                        ;
                       }
                       ;
-                      throw new Error("Failed pattern match at MaxBars.Lexer (line 381, column 3 - line 389, column 39): " + [i.constructor.name, open.constructor.name, close.constructor.name, segStart.constructor.name, frags.constructor.name, acc.constructor.name, pend.constructor.name]);
+                      throw new Error("Failed pattern match at MaxBars.Lexer (line 382, column 19 - line 438, column 71): " + [v.constructor.name]);
                     }
                     ;
-                    while (!$tco_done4) {
-                      $tco_result = $tco_loop($tco_var_i, $tco_var_open, $tco_var_close, $tco_var_segStart, $tco_var_frags, $tco_var_acc, $copy_pend);
-                    }
-                    ;
-                    return $tco_result;
-                  };
+                    throw new Error("Failed pattern match at MaxBars.Lexer (line 370, column 3 - line 378, column 39): " + [i.constructor.name, open.constructor.name, close.constructor.name, segStart.constructor.name, frags.constructor.name, acc.constructor.name, pend.constructor.name]);
+                  }
+                  ;
+                  while (!$tco_done4) {
+                    $tco_result = $tco_loop($tco_var_i, $tco_var_open, $tco_var_close, $tco_var_segStart, $tco_var_frags, $tco_var_acc, $copy_pend);
+                  }
+                  ;
+                  return $tco_result;
                 };
               };
             };
           };
         };
       };
-      return map30(finalize)(go(0)(cfg.open)(cfg.close)(0)([])(Nil.value)(false));
     };
+    return map30(finalize)(go(0)(cfg.open)(cfg.close)(0)([])(Nil.value)(false));
   };
 };
 var dropTrailingIndent2 = function(s) {
@@ -21223,7 +21732,7 @@ var dropTrailingIndent2 = function(s) {
     return "";
   }
   ;
-  throw new Error("Failed pattern match at MaxBars.Lexer (line 265, column 24 - line 267, column 16): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at MaxBars.Lexer (line 266, column 24 - line 268, column 16): " + [v.constructor.name]);
 };
 var dropLeadingLine2 = function(s) {
   var v = nlIndex2(true)(s);
@@ -21235,7 +21744,7 @@ var dropLeadingLine2 = function(s) {
     return "";
   }
   ;
-  throw new Error("Failed pattern match at MaxBars.Lexer (line 258, column 21 - line 260, column 16): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at MaxBars.Lexer (line 259, column 21 - line 261, column 16): " + [v.constructor.name]);
 };
 var defaultLexConfig2 = {
   open: "{{",
@@ -21249,7 +21758,7 @@ var maxLexConfig = /* @__PURE__ */ (function() {
     statementTags: true
   };
 })();
-var tokenize = /* @__PURE__ */ tokenizeTemplate2(maxLexConfig)(maxLexOptions);
+var tokenize = /* @__PURE__ */ tokenizeTemplate2(maxLexConfig);
 var blockLevel2 = function(v) {
   if (v instanceof ROpen2) {
     return true;
@@ -21275,12 +21784,12 @@ var beforeFirstNL2 = function(s) {
     return s;
   }
   ;
-  throw new Error("Failed pattern match at MaxBars.Lexer (line 251, column 19 - line 253, column 15): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at MaxBars.Lexer (line 252, column 19 - line 254, column 15): " + [v.constructor.name]);
 };
 var allWs2 = /* @__PURE__ */ (function() {
-  var $363 = all2(isSpace4);
-  return function($364) {
-    return $363(toCharArray($364));
+  var $361 = all2(isSpace4);
+  return function($362) {
+    return $361(toCharArray($362));
   };
 })();
 var afterLastNL2 = function(s) {
@@ -21293,7 +21802,7 @@ var afterLastNL2 = function(s) {
     return s;
   }
   ;
-  throw new Error("Failed pattern match at MaxBars.Lexer (line 246, column 17 - line 248, column 15): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at MaxBars.Lexer (line 247, column 17 - line 249, column 15): " + [v.constructor.name]);
 };
 var trimStandalone2 = function(seps) {
   return function(toks) {
@@ -21331,7 +21840,7 @@ var trimStandalone2 = function(seps) {
             return false;
           }
           ;
-          throw new Error("Failed pattern match at MaxBars.Lexer (line 206, column 17 - line 212, column 22): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at MaxBars.Lexer (line 207, column 17 - line 213, column 22): " + [v.constructor.name]);
         }
         ;
         while (!$tco_done) {
@@ -21376,7 +21885,7 @@ var trimStandalone2 = function(seps) {
             return false;
           }
           ;
-          throw new Error("Failed pattern match at MaxBars.Lexer (line 194, column 16 - line 200, column 22): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at MaxBars.Lexer (line 195, column 16 - line 201, column 22): " + [v.constructor.name]);
         }
         ;
         while (!$tco_done1) {
@@ -21390,7 +21899,7 @@ var trimStandalone2 = function(seps) {
     var eligible2 = function(t) {
       return blockLevel2(t) || (function() {
         if (t instanceof RSep3) {
-          return elem17(sepHead2(t.value2))(seps);
+          return elem18(sepHead2(t.value2))(seps);
         }
         ;
         return false;
@@ -21408,16 +21917,16 @@ var trimStandalone2 = function(seps) {
       return function(v) {
         if (v instanceof RContent2) {
           var s1 = (function() {
-            var $355 = standaloneAt(j - 1 | 0);
-            if ($355) {
+            var $353 = standaloneAt(j - 1 | 0);
+            if ($353) {
               return dropLeadingLine2(v.value1);
             }
             ;
             return v.value1;
           })();
           var s2 = (function() {
-            var $356 = standaloneAt(j + 1 | 0);
-            if ($356) {
+            var $354 = standaloneAt(j + 1 | 0);
+            if ($354) {
               return dropTrailingIndent2(s1);
             }
             ;
@@ -21435,7 +21944,7 @@ var trimStandalone2 = function(seps) {
 
 // output/MaxBars.Parser/index.js
 var map31 = /* @__PURE__ */ map(functorMaybe);
-var elem18 = /* @__PURE__ */ elem2(eqString);
+var elem19 = /* @__PURE__ */ elem2(eqString);
 var eq6 = /* @__PURE__ */ eq(eqToken);
 var eq24 = /* @__PURE__ */ eq(/* @__PURE__ */ eqMaybe(eqChar));
 var fromFoldable16 = /* @__PURE__ */ fromFoldable(foldableList);
@@ -21468,7 +21977,7 @@ var sepHeadIsClause = function(seps) {
         return v2.tok;
       })(head(v.value0));
       if (v1 instanceof Just && v1.value0 instanceof TIdent) {
-        return elem18(v1.value0.value0)(seps);
+        return elem19(v1.value0.value0)(seps);
       }
       ;
       return false;
@@ -22247,9 +22756,9 @@ var compileMaxJsWith = function(partials) {
 var compileMaxJs = /* @__PURE__ */ compileSurfaceWith(false)(maxLoopVars)(maxSurfaceParse)("rt.truthyNonEmpty");
 
 // output/MaxBars.Highlight/index.js
-var eq17 = /* @__PURE__ */ eq(/* @__PURE__ */ eqMaybe(eqChar));
+var eq18 = /* @__PURE__ */ eq(/* @__PURE__ */ eqMaybe(eqChar));
 var append7 = /* @__PURE__ */ append(semigroupArray);
-var elem19 = /* @__PURE__ */ elem2(eqString);
+var elem20 = /* @__PURE__ */ elem2(eqString);
 var maxClauseSeps2 = ["else", "elif", "when"];
 var isSpace6 = function(c) {
   return c === " " || (c === "	" || (c === "\n" || c === "\r"));
@@ -22261,7 +22770,7 @@ var trimmedChars2 = /* @__PURE__ */ (function() {
   };
 })();
 var isPartialHead2 = function(s) {
-  return eq17(head(trimmedChars2(s)))(new Just(">"));
+  return eq18(head(trimmedChars2(s)))(new Just(">"));
 };
 var headWord2 = function(s) {
   return fromCharArray(takeWhile(function($57) {
@@ -22368,7 +22877,7 @@ var tokenizeSpans2 = function(src) {
         return tag(v2.value0)("partial");
       }
       ;
-      if (elem19(headWord2(v2.value2))(maxClauseSeps2)) {
+      if (elem20(headWord2(v2.value2))(maxClauseSeps2)) {
         return append7(tag(v2.value0)("keyword"))(carveInterior(v2.value3));
       }
       ;
@@ -23174,7 +23683,7 @@ var minEngine = function(dictMonadThrow) {
 };
 
 // output/MinBars.Standalone/index.js
-var notEq7 = /* @__PURE__ */ notEq(/* @__PURE__ */ eqMaybe(eqInt));
+var notEq8 = /* @__PURE__ */ notEq(/* @__PURE__ */ eqMaybe(eqInt));
 var nlIndex3 = function(first) {
   return function(s) {
     var f = (function() {
@@ -23205,7 +23714,7 @@ var isHWs = function(c) {
   return c === " " || c === "	";
 };
 var hasNL3 = function(s) {
-  return notEq7(nlIndex3(true)(s))(Nothing.value);
+  return notEq8(nlIndex3(true)(s))(Nothing.value);
 };
 var eligible = function(v) {
   if (v instanceof ROpen) {
@@ -23628,7 +24137,7 @@ var runTemplate5 = /* @__PURE__ */ runTemplate(monadEither);
 var minEngine2 = /* @__PURE__ */ minEngine(monadThrowEither);
 var traverse10 = /* @__PURE__ */ traverse(traversableArray)(applicativeEither);
 var fromFoldable17 = /* @__PURE__ */ fromFoldable2(ordString)(foldableArray);
-var elem20 = /* @__PURE__ */ elem(foldableList)(eqString);
+var elem21 = /* @__PURE__ */ elem(foldableList)(eqString);
 var lookup13 = /* @__PURE__ */ lookup2(ordString);
 var union10 = /* @__PURE__ */ union(ordString);
 var map33 = /* @__PURE__ */ map(functorEither);
@@ -23781,7 +24290,7 @@ var inline = function(partials) {
           var recurse = inline(partials)(overrides)(chain)(depth);
           var one2 = function(v) {
             if (v instanceof Output && (v.value1 instanceof App2 && (v.value1.value0 === "partial" && (v.value1.value1.length === 2 && (v["value1"]["value1"][0] instanceof Lit && (v["value1"]["value1"][0].value0 instanceof VString && (v["value1"]["value1"][1] instanceof Lit && v["value1"]["value1"][1].value0 instanceof VString))))))) {
-              if (elem20(v["value1"]["value1"][0].value0.value0)(chain)) {
+              if (elem21(v["value1"]["value1"][0].value0.value0)(chain)) {
                 return new Left(new DisallowedShape("recursive partial '" + (v["value1"]["value1"][0].value0.value0 + "' (MinBars compile)"), 0));
               }
               ;
@@ -25467,7 +25976,7 @@ var fromFoldable110 = /* @__PURE__ */ fromFoldable2(ordString)(foldableArray);
 var constOperation2 = /* @__PURE__ */ constOperation(applicativeEither);
 var union12 = /* @__PURE__ */ union(ordString);
 var show19 = /* @__PURE__ */ show(showError);
-var elem21 = /* @__PURE__ */ elem2(eqString);
+var elem22 = /* @__PURE__ */ elem2(eqString);
 var toTranslator = function(jt) {
   return function(name2) {
     return function(args) {
@@ -26101,7 +26610,7 @@ var rexpr = function(v) {
   }
   ;
   if (v instanceof App2 && v.value1.length === 0) {
-    var $117 = elem21(v.value0)(dataVars);
+    var $117 = elem22(v.value0)(dataVars);
     if ($117) {
       return obj([tt2(v.value0)]);
     }
