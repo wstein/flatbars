@@ -282,6 +282,33 @@ impl Program {
         })
     }
 
+    /// Compile `main` plus a set of **cross-file partials** (docs/21) — the VM twin of the AOT
+    /// macro's `partials = [name = "file"]` and of [`trussbars_interp::Template::parse_with_partials`].
+    /// Each `(name, source)` is merged into the partial registry, so `{% include "name" %}` /
+    /// `{% partial "name" %}` / `{% yield %}` resolve across files and an imported partial may serve
+    /// as an `{% extends "name" %}` base (the inheritance flatten is deferred until the registry is
+    /// built). A name bound twice (an in-source `{% inline %}` and an import, or twice) is an error.
+    ///
+    /// # Errors
+    /// The parse/flatten reason; an error inside a partial is tagged `(in partial 'name')`.
+    ///
+    /// (Cross-file partials read source files, so this is a `std`-only constructor — the `no_std`
+    /// VM compiles single templates via [`Program::compile`].)
+    #[cfg(feature = "std")]
+    pub fn compile_with_partials(
+        main: &str,
+        partials: &[(String, String)],
+    ) -> Result<Program, String> {
+        let (nodes, registry) = trussbars_template::parse_with_partials(main, partials)?;
+        let mut ops = Vec::new();
+        compile_nodes(&nodes, &mut ops);
+        Ok(Program {
+            ops,
+            partials: Rc::new(registry),
+            cap: Cell::new(64),
+        })
+    }
+
     /// Compile from an already-parsed node tree (no `{% inline %}` hoisting — for callers,
     /// e.g. the benchmarks, whose templates define no inline partials).
     ///
@@ -1037,5 +1064,29 @@ mod tests {
                 "{tpl}"
             );
         }
+    }
+
+    /// Cross-file partials (docs/21) on the VM, byte-identical to the interpreter — an imported
+    /// partial used both as an `{% include %}` and as an `{% extends %}` base.
+    #[test]
+    fn vm_cross_file_partials_match_interpreter() {
+        use trussbars_interp::Template;
+        let partials = &[
+            (
+                "layout".to_string(),
+                "<title>{% block title %}{{site}}{% endblock %}</title>{% block content %}{% include \"badge\" %}{% endblock %}".to_string(),
+            ),
+            ("badge".to_string(), "[{{site}}]".to_string()),
+        ];
+        let main =
+            r#"{% extends "layout" %}{% block content %}<p>{{post}}</p>{% super %}{% endblock %}"#;
+        let d = obj(&[("site", s("Site")), ("post", s("Body"))]);
+
+        let prog = Program::compile_with_partials(main, partials).unwrap();
+        let interp = Template::parse_with_partials(main, partials).unwrap();
+        let got = prog.render(&d).unwrap();
+        assert_eq!(got, interp.render(&d).unwrap(), "VM ≠ interpreter");
+        // child override + {% super %} splicing the base default (which itself {% include %}s).
+        assert_eq!(got, "<title>Site</title><p>Body</p>[Site]");
     }
 }

@@ -40,7 +40,7 @@ pub mod span;
 
 pub use ast::{Case, Cond, Expr, For, Node, TruthMode, TruthPolicy, Value, With};
 #[cfg(feature = "std")]
-pub use emit::{emit, emit_named, emit_with_partials};
+pub use emit::{PartialRegistry, emit, emit_named, emit_with_partials, parse_with_partials};
 pub use lex::{Lexeme, Sigil, lex};
 pub use parse::parse;
 pub use parse_expr::{ParseError, Scope, parse_expr};

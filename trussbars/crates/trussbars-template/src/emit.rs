@@ -255,6 +255,76 @@ impl Env {
     }
 }
 
+// ── cross-file partials for the dynamic backends (docs/21) ────────────────────
+
+/// A dynamic-backend partial registry: `name → body nodes`. The interpreter's `Template` and the
+/// VM's `Program` render `{% include %}` / `{% partial %}` / `{% yield %}` against one of these.
+pub type PartialRegistry = BTreeMap<String, Vec<Node>>;
+
+/// Parse a `main` template plus a set of named cross-file partial sources into a flattened node
+/// tree and the merged partial registry (`name → body`) the **dynamic backends** (interpreter and
+/// VM) render against. The node-level twin of [`emit_with_partials`]: the same deferred ADR-040
+/// inheritance flatten — so an imported `partials = [name = "file"]` may serve as an
+/// `{% extends "name" %}` base — but it returns a plain `BTreeMap` registry rather than emitting
+/// Rust (the dynamic backends carry no per-partial source spans, so partial errors are tagged by
+/// name, not located `line:col`). With an empty `file_partials` this is just `hoist(parse(main))`.
+///
+/// A name bound twice (an in-source `{% inline %}` and an import, or twice in the map) is an error.
+///
+/// # Errors
+/// The parse/flatten reason; an error inside a partial is tagged `(in partial 'name')`.
+pub fn parse_with_partials(
+    main: &str,
+    file_partials: &[(String, String)],
+) -> Result<(Vec<Node>, PartialRegistry), String> {
+    // Parse main raw (no flatten yet) so the imported partials — the `{% extends %}` base
+    // registry, `{% block %}` slots intact — are known before main resolves (mirror of
+    // `emit_with_partials`).
+    let main_raw = parse_raw(main).map_err(|e| e.message)?;
+
+    let mut extra_bases: BTreeMap<String, Vec<Node>> = BTreeMap::new();
+    let mut file_flat: Vec<(&str, Vec<Node>)> = Vec::with_capacity(file_partials.len());
+    for (name, psrc) in file_partials {
+        let raw = parse_raw(psrc).map_err(|e| format!("{} (in partial '{name}')", e.message))?;
+        let flat = crate::inherit::resolve_inheritance(raw.clone())
+            .map(crate::sig::augment_signatures)
+            .map_err(|e| format!("{} (in partial '{name}')", e.message))?;
+        extra_bases.insert(name.clone(), raw);
+        file_flat.push((name.as_str(), flat));
+    }
+
+    let nodes = crate::inherit::resolve_inheritance_with(main_raw, &extra_bases)
+        .map(crate::sig::augment_signatures)
+        .map_err(|e| e.message)?;
+    let (mut registry, top) = hoist(nodes); // main's own `{% inline %}` defs
+
+    for (name, flat) in file_flat {
+        let (nested, ptop) = hoist(flat);
+        // A file partial may itself define `{% inline %}`s (its nested partials).
+        for (iname, ibody) in nested {
+            insert_node_partial(&mut registry, iname, ibody)?;
+        }
+        insert_node_partial(&mut registry, name.to_string(), ptop)?;
+    }
+    Ok((top, registry))
+}
+
+/// Insert into the dynamic-backend registry, rejecting a duplicate name (the twin of
+/// [`insert_partial`] for plain node bodies).
+fn insert_node_partial(
+    registry: &mut PartialRegistry,
+    name: String,
+    body: Vec<Node>,
+) -> Result<(), String> {
+    if registry.contains_key(&name) {
+        return Err(format!(
+            "duplicate partial '{name}' — defined more than once (an in-source `{{% inline %}}` and a `partials = […]` file, or twice in the map)"
+        ));
+    }
+    registry.insert(name, body);
+    Ok(())
+}
+
 // ── inline-partial hoisting ───────────────────────────────────────────────────
 
 /// Lift every `{% inline "n" %}…{% endinline %}` definition (anywhere in the tree) into

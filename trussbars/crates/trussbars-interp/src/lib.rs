@@ -473,6 +473,32 @@ impl Template {
         })
     }
 
+    /// Parse `main` plus a set of **cross-file partials** (docs/21) — the dynamic-backend twin of
+    /// the AOT macro's `partials = [name = "file"]`. Each `(name, source)` is parsed and merged
+    /// into the partial registry, so `{% include "name" %}` / `{% partial "name" %}` / `{% yield %}`
+    /// resolve across files and an imported partial may serve as an `{% extends "name" %}` base
+    /// (the inheritance flatten is deferred until the registry is built). A name bound twice (an
+    /// in-source `{% inline %}` and an import, or twice in the map) is an error.
+    ///
+    /// # Errors
+    /// The parse/flatten reason; an error inside a partial is tagged `(in partial 'name')`.
+    ///
+    /// (Cross-file partials read source files, so this is a `std`-only constructor — the
+    /// `no_std` interpreter renders single templates via [`Template::parse`].)
+    #[cfg(feature = "std")]
+    pub fn parse_with_partials(
+        main: &str,
+        partials: &[(String, String)],
+    ) -> Result<Template, String> {
+        let (nodes, registry) = trussbars_template::parse_with_partials(main, partials)?;
+        Ok(Template {
+            nodes,
+            partials: Rc::new(registry),
+            cap_hint: Cell::new(64),
+            mode: TruthMode::NonEmpty,
+        })
+    }
+
     /// Set the truthiness policy for every render of this template — the dynamic
     /// backend's parallel to AOT's `truss!(…, truthiness = Mode)`, carried as a
     /// load-time setting (docs/11 §8, docs/16). `NonEmpty` is the default; `Liquid` and
@@ -1514,6 +1540,65 @@ mod tests {
         );
         let blk = r#"{% inline "card" %}<div>{% yield %}</div>{% endinline %}{% partial "card" %}{{name}}{% endpartial %}"#;
         assert_eq!(render(blk, d).unwrap(), "<div>Ann &amp; Bo</div>");
+    }
+
+    // ── cross-file partials (docs/21) — the dynamic-backend twin of the AOT macro ──
+
+    #[test]
+    fn cross_file_partial_include() {
+        // A `(name, source)` import resolves `{% include "name" %}` against the caller's context.
+        let t = Template::parse_with_partials(
+            r#"{% include "header" %}"#,
+            &[("header".to_string(), "<h1>{{title}}</h1>".to_string())],
+        )
+        .unwrap();
+        assert_eq!(
+            t.render(&obj(&[("title", s("Hi"))])).unwrap(),
+            "<h1>Hi</h1>"
+        );
+    }
+
+    #[test]
+    fn cross_file_extends_base() {
+        // An imported partial serves as an `{% extends %}` base: the child fills `content`, the
+        // un-overridden `title` keeps the base default.
+        let t = Template::parse_with_partials(
+            r#"{% extends "layout" %}{% block content %}<p>{{post}}</p>{% endblock %}"#,
+            &[(
+                "layout".to_string(),
+                "<title>{% block title %}{{site}}{% endblock %}</title>{% block content %}default{% endblock %}".to_string(),
+            )],
+        )
+        .unwrap();
+        let d = obj(&[("site", s("Site")), ("post", s("Body"))]);
+        assert_eq!(t.render(&d).unwrap(), "<title>Site</title><p>Body</p>");
+    }
+
+    #[test]
+    fn cross_file_extends_super_splices_base_block() {
+        let t = Template::parse_with_partials(
+            r#"{% extends "layout" %}{% block body %}<main>{% super %}</main>{% endblock %}"#,
+            &[(
+                "layout".to_string(),
+                "{% block body %}{{base}}{% endblock %}".to_string(),
+            )],
+        )
+        .unwrap();
+        assert_eq!(
+            t.render(&obj(&[("base", s("X"))])).unwrap(),
+            "<main>X</main>"
+        );
+    }
+
+    #[test]
+    fn cross_file_duplicate_partial_is_rejected() {
+        let err = Template::parse_with_partials(
+            r#"{% inline "h" %}x{% endinline %}{% include "h" %}"#,
+            &[("h".to_string(), "<p>file</p>".to_string())],
+        )
+        .err()
+        .unwrap();
+        assert!(err.contains("duplicate partial 'h'"), "{err}");
     }
 
     #[test]

@@ -112,10 +112,22 @@ flatten in the AOT path: `parse()` gained a raw variant (`parse_raw`, no inherit
 `crate::inherit::resolve_inheritance_with` takes an external base registry, so
 `emit_with_partials` now parses the main template raw, builds the base registry from the
 imported partials (`{% block %}` slots intact), and *then* flattens against it. The
-interpreter and VM (single-template, no cross-file partials) keep parsing through `parse()`
-unchanged — conformance stays 87/87 across all four axes. Concretely, the Hyde port now shares
+conformance stays 87/87 across all four axes. Concretely, the Hyde port now shares
 **one** `templates/hyde_base.truss`: `render_index` renders it directly and `render_page`
 imports it as the `hyde` partial and `{% extends %}` it (no duplicated base).
+
+A follow-up closed the matching **capability gap** on the dynamic backends: cross-file partials
+used to be AOT-only (the `truss!` macro's `partials = [name = "file"]`) — the interpreter and VM
+could only parse a *single* template string, so an imported partial wasn't even expressible
+there. They now have the same reach: `trussbars_template::parse_with_partials` builds the merged
+node-level registry (the deferred-flatten twin of `emit_with_partials`), and
+`trussbars_interp::Template::parse_with_partials` / `trussbars_vm::Program::compile_with_partials`
+expose it — so `{% include %}` / `{% partial %}` / `{% yield %}` and an `{% extends %}` base
+resolve across files at runtime too (byte-identical VM≡interpreter, asserted in the VM tests).
+These are `std`-only constructors (they read source files); the `no_std` backends keep rendering
+single templates. This is the enabling piece for the VM hot-reload / user-editable-template
+northstar — a live site renders many files dynamically, which only the compile-time path could do
+before.
 
 ## Non-goals (for the proof)
 
