@@ -22,9 +22,11 @@ import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
 import FlatBars.Lexer as FL
+import FlatBars.Parser (parseWith)
 import FlatBars.Value (Value(..))
 import MaxBars (compileMaxJs, inferMax, inferMaxData, maxOptions, maxbarsWarnings, renderMax)
 import MaxBars.Lexer as ML
+import MaxBars.Parser as MP
 import MaxBars.Rust (compileMaxRust)
 import Test.Assert (assert')
 
@@ -909,5 +911,30 @@ main = do
   lexEquiv "raw-block" "{{{{#hl}}}}verbatim {{x}}{{{{/hl}}}}"
   lexEquiv "standalone" "  {% if a %}\n  x\n  {% endif %}\n"
   lexEquiv "extends-block" "{% extends \"base\" %}{% block title %}T{% endblock %}{% super %}"
+
+  -- ADR-041 Phase 2: the owned `MaxBars.Parser` must be byte-identical to the shared
+  -- parser driven with `maxOptions` — same `Template` AND same errors (the inlined
+  -- config + the unconditional rejections must match the gated reference). Pins the
+  -- parser fork to the reference until the Phase 4 freeze. Valid MaxBars and the
+  -- rejected Handlebars/Mustache shapes both appear, so the rejection paths are
+  -- gated too.
+  let
+    parseEquiv name src = assert' ("parse-equiv " <> name)
+      (show (MP.parse src) == show (parseWith maxOptions src))
+  parseEquiv "output" "Hi {{ name }}!"
+  parseEquiv "block-infix" "{{#each xs}}{{ this > 0 }}{{/each}}"
+  parseEquiv "statement-if-elif" "{% if x >= 18 %}A{% elif x < 5 %}B{% else %}C{% endif %}"
+  parseEquiv "for-range" "{% for i in 1..n %}{{ i }}{% endfor %}"
+  parseEquiv "collection" "{% for [1, 2, 3] %}{{ this }}{% endfor %}"
+  parseEquiv "triple" "{{{ raw }}}"
+  parseEquiv "raw-block" "{{{{#hl}}}}verbatim {{x}}{{{{/hl}}}}"
+  parseEquiv "standalone" "  {% if a %}\n  x\n  {% endif %}\n"
+  parseEquiv "directive" "{{! @trim: none }}\n{% if a %}x{% endif %}\n"
+  parseEquiv "literal-output" "{{42}} {{\"x\"}}"
+  parseEquiv "reject-amp" "{{&a}}"
+  parseEquiv "reject-inverse" "{{^a}}x{% enda %}"
+  parseEquiv "reject-rawblock-hbs" "{{{{r}}}}body{{{{/r}}}}"
+  parseEquiv "reject-stray-close" "{{/x}}"
+  parseEquiv "recover-missing-close" "{% if a %}x"
 
   log "all MaxBars tests passed"
