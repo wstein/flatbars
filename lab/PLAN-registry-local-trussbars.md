@@ -151,7 +151,7 @@ directly. Freeze the `Engine` shape here (write it down as
 `lab/app/engines/contract.md`). No new engine yet — this proves the seam with the
 engine we have, so the second engine is a drop-in (Pris's sequencing argument).
 
-### Phase 3 — FileProvider seam (two providers: http, fs-access)
+### Phase 3 — FileProvider seam (two providers: http, fs-access)  ✅ DONE (2026-06-11)
 
 Replace direct `fetch`/`fetchJson` in `app/examples.mjs` with
 `provider.readText/readJson/list`. Ship `http` (default, behaviour-identical) and
@@ -161,15 +161,21 @@ with **zero server** and proves the transport abstraction with two real provider
 (Rune's condition: extract the interface from two working impls, don't speculate
 it).
 
-### Phase 4 — trussbars-wasm provider (citizen #2)
+### Phase 4 — trussbars-wasm provider (citizen #2)  ✅ DONE (2026-06-11)
 
-New crate `trussbars-wasm` (`wasm-bindgen`, `crate-type=["cdylib"]`) wrapping the
-existing Trussbars engine. Build to `lab/vendor/trussbars-engine.wasm` +
-JS glue. Register a `trussbars` `EngineProvider` whose `create()` implements the
-frozen `Engine` seam. v1 feature vector omits `source-map`/`context-inspect`
-(panels gate off honestly). The conformance-gated Trussbars mode is the render
-target (its modes are output-equivalent by CI invariant, so the Lab diffs against
-one).
+New crate `trussbars-wasm` (`wasm-bindgen`, `crate-type=["cdylib","rlib"]`) wrapping
+the `trussbars-interp` engine. Built to `lab/vendor/trussbars-engine.{js,_bg.wasm}` by
+`scripts/gen-trussbars-wasm.mjs` (`npm run gen:trussbars-wasm` — cargo wasm32 →
+wasm-bindgen → content-stamp the glue's `_bg.wasm` URL; the glue hash then propagates
+through `hash-lab.mjs`). `lab/app/engines/trussbars.mjs` registers a `trussbars`
+`EngineProvider` whose async `create()` lazily instantiates the wasm and returns the
+frozen `Engine` seam. **v1 feature vector is empty (render-only)** — every analysis
+member is an inert, gated-off stub, so the capability gate hides Transformers / Data
+Access / Truthiness / Lint / Context Inspector / Compiled JS with no UI change. Render
+is byte-identical to the native binary (same JSON→Value ingestion + ECMA-f64 formatter).
+Tested against the REAL wasm (`trussbars.test.mjs` instantiates from the committed
+bytes; Rust unit tests cover the pure core). Not yet user-selectable — the provider
+PICKER is Phase 7 (the differential view); boot still defaults to oracle.
 
 **Runs in-page on both transports (decided).** Same wasm engine in the browser
 hosted *and* local — one Trussbars render path, no native-vs-wasm equivalence

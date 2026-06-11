@@ -1,0 +1,22 @@
+[package]
+name = "trussbars-wasm"
+description = "The Trussbars engine compiled to WebAssembly (wasm-bindgen) — the shipping render path for the FlatBars Lab's `trussbars` engine citizen. In-page wasm on both transports (PLAN Phase 4): the same conformance-gated interpreter the native binary runs, exposed to the browser."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+keywords = ["template", "maxbars", "wasm", "trussbars"]
+categories = ["template-engine", "wasm"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# The std interpreter (serde_json data ingestion + the ECMA-f64 `perf` formatter, so
+# wasm output is byte-identical to the native binary and the oracle).
+trussbars-interp = { path = "../trussbars-interp" }
+wasm-bindgen = "0.2"
+serde_json = "1"
+
+[lints]
+workspace = true

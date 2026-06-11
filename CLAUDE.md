@@ -270,6 +270,16 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   **`npm run gen:lab-hashes`** to re-stamp the hashes; `check:lab-hashes` (in `npm
   test`) fails if any `?v=` is stale. This replaced the old hand-bumped `?v=N` +
   `lab/cachebust.lock.json` scheme — there is no version number to forget anymore.
+  A **second engine citizen** rides the same artifact discipline: `trussbars-wasm`
+  (the Rust `trussbars-interp` engine compiled to wasm, crate
+  `trussbars/crates/trussbars-wasm`) is built to `lab/vendor/trussbars-engine.{js,_bg.wasm}`
+  by **`npm run gen:trussbars-wasm`** (cargo wasm32 → wasm-bindgen → content-stamp the
+  glue's `_bg.wasm` URL). The Lab registers it through the engine-provider registry
+  (`lab/app/engines/registry.mjs`, ADR-0020 seam frozen in `app/engines/contract.md`)
+  as the `trussbars` *shipping* provider beside the PureScript *oracle* reference; its
+  v1 feature vector is empty (render-only), so the capability gate hides every analysis
+  panel it doesn't back. It is lazy (oracle first-paints; the wasm instantiates on the
+  first `create()`) and not yet user-selectable — the provider picker is a follow-up.
 - **`cli`** (`flatbars-cli`) — render templates, and the `examples verify`
   conformance gate.
 - **`linter`** — cross-dialect lowering (MaxBars → RawBars source).

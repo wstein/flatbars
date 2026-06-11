@@ -21,6 +21,7 @@
 // hides the panels it doesn't back (honest by construction).
 
 import { createRenderer } from "../../renderer.mjs?v=448b21fb";
+import { trussbarsProvider } from "./trussbars.mjs?v=96ddfdea";
 
 // The oracle provider — the PureScript flatbars-js engine, the spec/reference
 // engine. create(dialect, opts) is the existing ADR-0020 factory, unchanged.
@@ -31,7 +32,13 @@ export const oracleProvider = {
   create: (dialect, opts) => createRenderer(dialect, opts),
 };
 
-const PROVIDERS = new Map([[oracleProvider.id, oracleProvider]]);
+// Registered citizens: the oracle (reference, default) + trussbars (shipping, the
+// Rust engine in wasm — Phase 4). trussbars' wasm is lazy: its module loads at import
+// but the wasm only instantiates on the first `create()` (oracle first-paints).
+const PROVIDERS = new Map([
+  [oracleProvider.id, oracleProvider],
+  [trussbarsProvider.id, trussbarsProvider],
+]);
 
 // Register an engine provider (Phase 4: the trussbars-wasm citizen registers here).
 export function registerProvider(provider) {

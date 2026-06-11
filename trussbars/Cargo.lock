@@ -644,6 +644,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "trussbars-wasm"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "trussbars-interp",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "trybuild"
 version = "1.0.116"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -23,6 +23,13 @@ test("the oracle provider is registered + advertises its identity", () => {
   assert.ok(listProviders().includes(oracleProvider));
 });
 
+test("the trussbars (shipping) provider is registered alongside the oracle", () => {
+  const t = getProvider("trussbars");
+  assert.equal(t.id, "trussbars");
+  assert.equal(t.kind, "shipping");
+  assert.ok(listProviders().some((p) => p.id === "trussbars"));
+});
+
 test("getProvider throws on an unknown id", () => {
   assert.throws(() => getProvider("nope"), /unknown engine provider: nope/);
 });

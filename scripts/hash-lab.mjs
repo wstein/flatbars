@@ -22,10 +22,12 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const ENTRY = resolve(root, "lab/index.html");
 const write = process.argv.includes("--write");
 
-// A local module ref: a quoted "./…​.mjs" or "./…​.mjs?v=<hex>" (covers `from "…"`,
-// bare string refs like createHelperSandbox("…"), and <script src="…">). External
-// (esm.sh / non-relative) refs don't start with `.` and are ignored.
-const REF_RE = /(["'])(\.\.?\/[^"'?]+\.mjs)(\?v=[0-9a-f]+)?\1/g;
+// A local module ref: a quoted "./…​.mjs" / "./…​.js" or "…?v=<hex>" (covers `from
+// "…"`, bare string refs like createHelperSandbox("…"), <script src="…">, and the
+// wasm-bindgen glue `.js`). External (esm.sh / non-relative) refs don't start with
+// `.` and are ignored. The wasm-bindgen glue's own `_bg.wasm` URL is content-stamped
+// by gen-trussbars-wasm.mjs (the glue hash then propagates it here).
+const REF_RE = /(["'])(\.\.?\/[^"'?]+\.m?js)(\?v=[0-9a-f]+)?\1/g;
 
 // Load the local module graph reachable from the entry.
 const graph = new Map(); // abs -> { text, deps: Set<abs> } | null (external/missing)
