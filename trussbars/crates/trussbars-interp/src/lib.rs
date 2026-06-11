@@ -37,7 +37,7 @@ use alloc::collections::BTreeMap;
 use alloc::rc::Rc;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use core::cell::Cell;
+use core::cell::{Cell, RefCell};
 
 use trussbars_core::{ToText, escape_html};
 use trussbars_template::{Case, Cond, Expr, For, Node, Value as Lit, With, parse};
@@ -172,21 +172,28 @@ pub fn write_escaped(v: &Value, out: &mut String) {
 
 /// A loop frame: the `{{loop.*}}` metadata for the current iteration, with an `Rc`
 /// link to the enclosing loop's frame (for `loop.parent.*` / `loop.root.*`).
-#[derive(Debug, Clone)]
+///
+/// The two per-iteration fields (`index0`, `key`) are **interior-mutable** so one frame
+/// is allocated per loop *entry* and advanced in place each cell — not re-allocated per
+/// iteration. This is sound because at any instant every *active* loop's frame holds its
+/// current iteration (an enclosing loop is paused while its body — incl. a nested loop —
+/// runs), so `loop.*` and `loop.parent.*` read the right values; nothing captures a frame
+/// past its iteration (labels live in the per-loop child scope).
+#[derive(Debug)]
 struct LoopFrame {
-    index0: usize,
+    index0: Cell<usize>,
     length: usize,
     /// The 1-based loop-nesting level (`loop.depth`, ADR-021 amendment): the
     /// enclosing frame's `depth + 1`, `1` at the outermost loop. Stored (not
     /// walked) so it matches the AOT backend's `Loop::at` derivation in O(1).
     depth: usize,
-    key: Option<String>,
+    key: RefCell<Option<String>>,
     parent: Option<Rc<LoopFrame>>,
 }
 
 impl LoopFrame {
     fn field(&self, name: &str) -> Result<Value, String> {
-        let i = self.index0;
+        let i = self.index0.get();
         let n = self.length;
         Ok(match name {
             "index0" => Value::Num(i as f64),
@@ -199,7 +206,8 @@ impl LoopFrame {
             "depth" => Value::Num(self.depth as f64),
             "key" => self
                 .key
-                .clone()
+                .borrow()
+                .as_ref()
                 .map_or(Value::Null, |k| Value::Str(Rc::from(k.as_str()))),
             other => return Err(format!("unsupported: loop field '{other}'")),
         })
@@ -672,39 +680,54 @@ fn eval_with(env: &Env, w: &With, out: &mut String) -> Result<(), String> {
 
 fn eval_for(env: &Env, e: &For, out: &mut String) -> Result<(), String> {
     let subj = eval_expr(env, &e.subject)?;
-    // (key, element) pairs — arrays have no key, objects carry their field name.
-    // Element clones are refcount bumps (Rc-backed Value), not deep copies.
-    let items: Vec<(Option<String>, Value)> = match &subj {
-        Value::Array(a) => a.iter().map(|v| (None, v.clone())).collect(),
-        Value::Object(o) => o
-            .iter()
-            .map(|(k, v)| (Some(k.clone()), v.clone()))
-            .collect(),
-        _ => Vec::new(), // non-collection → empty (lenient)
+    let length = match &subj {
+        Value::Array(a) => a.len(),
+        Value::Object(o) => o.len(),
+        _ => 0, // non-collection → empty (lenient)
     };
-    if items.is_empty() {
+    if length == 0 {
         return eval_nodes(env, &e.otherwise, out);
     }
-    let length = items.len();
-    for (i, (key, element)) in items.into_iter().enumerate() {
-        let frame = Rc::new(LoopFrame {
-            index0: i,
-            length,
-            depth: env.loop_frame.as_ref().map_or(0, |p| p.depth) + 1,
-            key,
-            parent: env.loop_frame.clone(),
-        });
-        let mut child = env.rerooted(element.clone());
+
+    // One frame + one parent-chain node + one child scope per loop ENTRY — advanced in
+    // place each cell rather than re-allocated per iteration (the per-cell cost that put
+    // the tree-walk well behind the bytecode VM). The frame's iteration fields are
+    // interior-mutable; the pushed parent `this` is constant for the whole loop.
+    let frame = Rc::new(LoopFrame {
+        index0: Cell::new(0),
+        length,
+        depth: env.loop_frame.as_ref().map_or(0, |p| p.depth) + 1,
+        key: RefCell::new(None),
+        parent: env.loop_frame.clone(),
+    });
+    let mut child = env.clone();
+    child.parents = Some(Rc::new(ParentNode {
+        value: env.this.clone(),
+        next: env.parents.clone(),
+    }));
+    child.loop_frame = Some(Rc::clone(&frame));
+    if let Some(label) = &e.label {
+        child.labels.insert(label.clone(), Rc::clone(&frame));
+    }
+
+    // Drive by reference — no up-front `Vec` materialization, no per-cell collection
+    // copy. The boxed iterator is one allocation per loop entry; each element clone is an
+    // `Rc` refcount bump.
+    let items: Box<dyn Iterator<Item = (Option<&str>, &Value)>> = match &subj {
+        Value::Array(a) => Box::new(a.iter().map(|v| (None, v))),
+        Value::Object(o) => Box::new(o.iter().map(|(k, v)| (Some(k.as_str()), v))),
+        _ => unreachable!("non-collection handled above"),
+    };
+    for (i, (key, element)) in items.enumerate() {
+        frame.index0.set(i);
+        *frame.key.borrow_mut() = key.map(str::to_string);
         if let Some(item) = &e.item {
-            child.params.insert(item.clone(), element);
+            child.params.insert(item.clone(), element.clone());
         }
         if let Some(index) = &e.index {
             child.params.insert(index.clone(), Value::Num(i as f64));
         }
-        if let Some(label) = &e.label {
-            child.labels.insert(label.clone(), Rc::clone(&frame));
-        }
-        child.loop_frame = Some(frame);
+        child.this = element.clone();
         eval_nodes(&child, &e.body, out)?;
     }
     Ok(())
