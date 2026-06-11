@@ -40,7 +40,8 @@ instead of re-closing over it.
 | CodeMirror (1986) + Output editor (2288): EditorView wiring, decoration fields, update listeners | `app/editors.mjs` | reads ~14 state vars + ~10 inline callbacks | ⛔ (the nerve center — extract last, after its callback deps move) |
 | Virtual file explorer (2378) | `app/explorer.mjs` | reads/writes tabs | ⛔ |
 | Tabs (2658) + open-editor helpers (2769) | `app/tabs.mjs` | reads/writes tabs | ⛔ |
-| Compile + render `run()` (3080) | `app/render.mjs` | central; reads all | ⛔ |
+| Compile + render: `previewDoc` + `applyEscape` | `app/render-helpers.mjs` | none (pure; capability passed in) | ✅ (unit-tested) |
+| Compile + render `run()` (3080) + the ~25 `last*` caches | `app/render.mjs` | central; reads/writes everything | ⛔ (the nerve center — needs the ctx/DI restructure, see below) |
 | Download / export (3222) | `app/export.mjs` | reads workspace | ⛔ |
 | Status bar (3821) | `app/statusbar.mjs` | reads state | ⛔ |
 | Output view (3865) + source-map interactions (3934) | `app/output.mjs` | reads state | ⛔ |
@@ -69,3 +70,28 @@ instead of re-closing over it.
 
 When step 7 lands, `index.html` carries no inline app logic and Phase 1
 (content-hashed build) can hash the `app/*` graph as one unit.
+
+## The entangled core needs a `ctx` (dependency-injection) restructure
+
+The pure-leaf extractions (engine-config, dom, boot-error, ui-chrome, cm-languages,
+render-helpers) are nearly exhausted. What remains — `run()`, `setOutput`, the ~25
+`last*` analysis caches, `renderDock`/`renderTabs`/`renderDataInspect`, the
+EditorView update listeners — is a single mutually-recursive cluster: `run()` calls
+the renderers, which read the caches, which `run()` writes; the editor listeners
+call `scheduleRun`/`renderTabs`. You cannot lift one function out without its
+siblings.
+
+The safe way to break it (next design step, NOT a blind sweep):
+
+1. Land `app/state.mjs` adoption + a `ctx` object that also holds the live handles
+   the cluster shares: the CM views, `lastOutput`/`lastSegments`/the `last*` caches,
+   and the cross-references (`scheduleRun`, `renderDock`, …).
+2. Move functions into `app/render.mjs` / `app/dock/*.mjs` as `(ctx) => …` closures,
+   one at a time, index.html holding and passing `ctx`. Each move is behaviour-
+   preserving and smoke-verifiable (the smoke covers the boot→render→provenance→
+   data-access path strongly).
+3. When the cluster is fully in modules, `ctx` becomes the module-internal store and
+   the `let`s leave index.html for good.
+
+This is a deliberate restructure, not a leaf extraction — worth its own design note
+before implementation.

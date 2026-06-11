@@ -1712,6 +1712,7 @@
       import { showBootError, bootFail } from "./app/boot-error.mjs?v=1";
       import { toast, openShareMenu, closeShareMenu } from "./app/ui-chrome.mjs?v=1";
       import { createCmLanguages } from "./app/cm-languages.mjs?v=1";
+      import { previewDoc, applyEscape } from "./app/render-helpers.mjs?v=1";
       import { EditorState, Annotation, StateField, StateEffect, Compartment } from "https://esm.sh/@codemirror/state@6.5.2/es2022/state.mjs";
       import {
         Decoration,
@@ -2987,41 +2988,10 @@
       }
 
       // ── Compile + render ──────────────────────────────────────────────
-      // Rewrite every `emit` instruction's escape mode in place. This walks the
-      // stem-bc/v1 wire directly, so it is meaningful only for an engine that
-      // declares `escape-modes` (ADR-0020): a program from an engine without
-      // per-emit escape modes is not a stem-bc wire and must not be rewritten —
-      // applyEscape is then a no-op and the render-config escape control has no
-      // effect (Phase 2: neutralize the wire couplings).
-      function applyEscape(program, mode) {
-        if (!mode || !engineHas("escape-modes")) return program;
-        const rewrite = (instructions) =>
-          instructions.map((inst) => {
-            const next = { ...inst };
-            if (next.t === "emit") next.escape = mode;
-            for (const key of ["then", "else", "body"]) {
-              if (Array.isArray(next[key])) next[key] = rewrite(next[key]);
-            }
-            return next;
-          });
-        return { ...program, instructions: rewrite(program.instructions) };
-      }
-
-      // When scripting is off, a strict CSP (no scripts) is the inner boundary on
-      // top of the same-origin sandbox. When the author opts into scripts, the
-      // CSP is dropped — the isolated `allow-scripts` (null-origin) sandbox is the
-      // boundary instead — so the rendered <script> actually runs.
-      function previewDoc(body, allowScripts = false) {
-        const cspMeta = allowScripts
-          ? ""
-          : '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src * data:; style-src \'unsafe-inline\'; font-src *;">';
-        return (
-          '<!doctype html><html><head><meta charset="utf-8">' +
-          cspMeta +
-          "<style>html,body{margin:0}body{font:13px/1.5 system-ui,sans-serif;padding:14px;color:#18181b;background:#fff}</style>" +
-          `</head><body>${body}</body></html>`
-        );
-      }
+      // applyEscape (stem-bc emit-escape rewrite) and previewDoc (the preview
+      // iframe's sandbox document + CSP boundary) now live in
+      // ./app/render-helpers.mjs. applyEscape takes the `escape-modes` capability
+      // as an argument (it was the only engine coupling).
 
       let lastOutput = "";
       let lastSegments = [];
@@ -3649,7 +3619,7 @@
           return;
         }
         try {
-          const program = applyEscape(compiled.program, escapeMode);
+          const program = applyEscape(compiled.program, escapeMode, engineHas("escape-modes"));
           // Custom-helper render (ADR-018/019): the registerHelper source runs in
           // the Worker sandbox, out of band. Use the cached result when it
           // matches the current inputs; otherwise show "rendering…" and let the
