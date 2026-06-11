@@ -73,6 +73,27 @@ famous logo outranks demonstrating the new capabilities.
 3. Wire the harness into `trussbars/benchmarks/` as a **build-time A/B vs Tera**, reproducing
    the 17–29× headline on a real theme rather than the synthetic workloads.
 
+## Host helpers — the Tera-filter mapping (spike)
+
+The theme's Tera filters/functions realize as **typed host helpers** (plain Rust fns,
+declared once via `helpers = [..]` / `#[truss_helpers(..)]`) plus harness precompute —
+the logic-less split: *logic in the host, the template only calls.* Proven end-to-end in
+`trussbars/crates/trussbars-macros/tests/zola_helpers.rs` (compiles + renders, stubbed
+bodies):
+
+| Tera construct | Trussbars realization |
+| --- | --- |
+| `get_url(path)`, `date(format=…)` | value host helpers — `fn get_url(path: &str) -> String`, `fn date(value: &str, fmt: &str) -> String`; `{{ get_url "@/p.md" }}`, `{{ page.date \| date "%b %d, %Y" }}` compile to direct calls. Named args become positional/piped. |
+| `markdown` (page body) | **harness precompute** — front-matter + Markdown → `Safe` HTML in the typed context, output `{{ body \| safe }}`. No template helper. |
+| `markdown` (inline filter) | a value helper returning `trussbars_core::Safe` → spliced raw (the injection boundary stays explicit; only a `Safe` return bypasses `esc`). |
+| shortcode **template** | `{% inline "youtube" (id, w=560) %}…{% endinline %}` — an ADR-042 typed signature (required `id`, defaulted `w`); a block shortcode is the `fn(body: impl Fn() -> String)` block-helper shape. |
+| shortcode **invocation/splice** | **harness** (markdown preprocessing): detect the call, render the Trussbars shortcode template with parsed args, splice. Not a template helper. |
+
+Two caveats to budget for: the AOT needs **typed host-helper declarations** (roadmap item 4 —
+the `.truss` host-binding affordance, which building the harness drives), and site-wide
+functions (`get_taxonomy`/`get_section`/pagination) need the host to *supply the index data*.
+Pick a layout-heavy, logic-light theme to keep both small.
+
 ## Non-goals (for the proof)
 
 - Full Zola/Tera feature parity (every filter, `get_url`, shortcodes) — port what the theme
