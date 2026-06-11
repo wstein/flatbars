@@ -2786,7 +2786,7 @@
         const res = parseConfigYaml(text);
         if (!res.ok) {
           configError = res.error;
-          dockProblems = [{ severity: "error", file: "config.yaml", line: 1, col: 1, message: res.error }];
+          ctx.caches.dockProblems = [{ severity: "error", file: "config.yaml", line: 1, col: 1, message: res.error }];
           setError("config error: " + res.error);
           renderDock(); renderTabs();
           return;
@@ -2993,7 +2993,7 @@
       function refreshCoverageGutter() {
         if (!templateView) return;
         const file = activeTab()?.name === undefined ? "main" : (activeTabIdx === 0 ? "main" : activeTab().name);
-        const rows = lastCoverage.filter((r) => r.file === file);
+        const rows = ctx.caches.lastCoverage.filter((r) => r.file === file);
         const source = templateView.state.doc.toString();
         templateView.dispatch({ effects: setCoverageEffect.of(buildCoverageDeco(source, rows)) });
       }
@@ -3016,8 +3016,8 @@
           lastSegViews: [],  // [{from,to,file,kind,start,end}] — segment char ranges in the output editor
         },
       };
-      let lastUsedTransformers = []; // ADR-0013 report: transformer names called by the compiled program
-      let dockProblems = []; // diagnostics for the Problems tab, refreshed each run()
+      ctx.caches.lastUsedTransformers = []; // ADR-0013 report: transformer names called by the compiled program
+      ctx.caches.dockProblems = []; // diagnostics for the Problems tab, refreshed each run()
       let hadProblems = false; // tracks the 0->>0 transition so the dock auto-opens once
       // Dock tab id; the persisted activeTab (see panelState below) is folded
       // in inside restorePanels(), which runs after panelState exists.
@@ -3030,19 +3030,19 @@
       // Any built-in missing from TRANSFORMER_RISK falls back to "host" tier at
       // render time.
 
-      let lastTimings = null;       // #6: { parseMs, compileMs, renderMs, totalMs, outBytes }
-      let lastAst = null;           // shared cache: { main: nodes, partials: { name: nodes } }
-      let lastDataAccess = [];      // #1: [{ path, status, file, start, end, value? }]
-      let lastWhitespace = [];      // #2: [{ file, start, end, kind, line, col }]
-      let lastDeps = null;          // #3: dependency graph
-      let lastCalls = [];           // #4: [{ name, file, start, end }]
-      let lastEscapeRuns = null;    // #5: { html, plain, raw, total }
-      let lastCoverage = [];        // #7: [{ kind, file, start, end, line, col, executed, count }]
-      let lastAnalyse = { ok: true, findings: [] }; // ADR-022: truthiness portability (Truthiness panel)
-      let lastAnalyseSuppressed = 0; // ADR-030: count of potential/miss findings the pathSchema removed
-      let lastLint = { ok: true, findings: [] }; // ADR-019: canonicalization lint findings (Lint panel)
-      let lastRequiredAssigns = []; // engine reflection: assign names the program reads
-      let lastMissingAssigns = [];  // intersection: requiredAssigns NOT in current data
+      ctx.caches.lastTimings = null;       // #6: { parseMs, compileMs, renderMs, totalMs, outBytes }
+      ctx.caches.lastAst = null;           // shared cache: { main: nodes, partials: { name: nodes } }
+      ctx.caches.lastDataAccess = [];      // #1: [{ path, status, file, start, end, value? }]
+      ctx.caches.lastWhitespace = [];      // #2: [{ file, start, end, kind, line, col }]
+      ctx.caches.lastDeps = null;          // #3: dependency graph
+      ctx.caches.lastCalls = [];           // #4: [{ name, file, start, end }]
+      ctx.caches.lastEscapeRuns = null;    // #5: { html, plain, raw, total }
+      ctx.caches.lastCoverage = [];        // #7: [{ kind, file, start, end, line, col, executed, count }]
+      ctx.caches.lastAnalyse = { ok: true, findings: [] }; // ADR-022: truthiness portability (Truthiness panel)
+      ctx.caches.lastAnalyseSuppressed = 0; // ADR-030: count of potential/miss findings the pathSchema removed
+      ctx.caches.lastLint = { ok: true, findings: [] }; // ADR-019: canonicalization lint findings (Lint panel)
+      ctx.caches.lastRequiredAssigns = []; // engine reflection: assign names the program reads
+      ctx.caches.lastMissingAssigns = [];  // intersection: requiredAssigns NOT in current data
 
       // outputHasContent (./app/render-helpers.mjs) destructures { lastData,
       // lastProgram, lastOutput } from a cache snapshot — ctx.caches has exactly
@@ -3302,13 +3302,13 @@
         renderPending = false;
         setRecomputing(false); // I-1 · debounce window ended; clear before sync work
         ctx.caches.lastData = null; // reset; reassigned once data is parsed + transformed below
-        dockProblems = []; // success leaves this empty; error paths populate it below
+        ctx.caches.dockProblems = []; // success leaves this empty; error paths populate it below
         // Reset per-run analyses so a stale value never leaks into the dock.
-        lastTimings = null; lastAst = null; lastDataAccess = []; lastWhitespace = [];
-        lastDeps = null; lastCalls = []; lastEscapeRuns = null; lastCoverage = [];
-        lastAnalyse = { ok: true, findings: [] };
-        lastLint = { ok: true, findings: [] };
-        lastRequiredAssigns = []; lastMissingAssigns = [];
+        ctx.caches.lastTimings = null; ctx.caches.lastAst = null; ctx.caches.lastDataAccess = []; ctx.caches.lastWhitespace = [];
+        ctx.caches.lastDeps = null; ctx.caches.lastCalls = []; ctx.caches.lastEscapeRuns = null; ctx.caches.lastCoverage = [];
+        ctx.caches.lastAnalyse = { ok: true, findings: [] };
+        ctx.caches.lastLint = { ok: true, findings: [] };
+        ctx.caches.lastRequiredAssigns = []; ctx.caches.lastMissingAssigns = [];
         const dataSource = yamlSrc; // the YAML tab's source (editor may show the transform)
         const mainSource = tabs[0].source;
         const tCompileStart = performance.now();
@@ -3319,7 +3319,7 @@
 
         if (compiled.errors) {
           ctx.caches.lastProgram = null;
-          lastUsedTransformers = [];
+          ctx.caches.lastUsedTransformers = [];
           // The compiler reports every recoverable parse error in one pass, in
           // source order. Each names the file ("main" or a partial) it occurred
           // in; map its byte span into that file's source for line/column, and
@@ -3344,14 +3344,14 @@
           const more = problems.length > 1 ? ` (+${problems.length - 1} more)` : "";
           const first = problems[0];
           setError(`compile error: ${first.file} · ${first.message} (Ln ${first.line}, Col ${first.col})${more}`);
-          dockProblems = problems;
+          ctx.caches.dockProblems = problems;
           renderDock();
           setOutput(""); saveHash(); return;
         }
 
         ctx.caches.lastProgram = compiled.program;
-        lastUsedTransformers = renderer.usedTransformers(compiled.program);
-        lastRequiredAssigns = renderer.requiredAssigns(compiled.program);
+        ctx.caches.lastUsedTransformers = renderer.usedTransformers(compiled.program);
+        ctx.caches.lastRequiredAssigns = renderer.requiredAssigns(compiled.program);
         clearDiagnostics();
 
         // Static analyses — every panel that doesn't need rendered output runs
@@ -3365,13 +3365,13 @@
           const a = renderer.parseAst(src);
           astsByFile[name] = a.ast ? a.ast.nodes : [];
         }
-        lastAst = astsByFile;
-        lastCalls = analyseCalls(astsByFile);
-        lastEscapeRuns = analyseEscapeRuns(astsByFile);
-        lastDeps = buildDependencyGraph(astsByFile);
-        lastWhitespace = [];
+        ctx.caches.lastAst = astsByFile;
+        ctx.caches.lastCalls = analyseCalls(astsByFile);
+        ctx.caches.lastEscapeRuns = analyseEscapeRuns(astsByFile);
+        ctx.caches.lastDeps = buildDependencyGraph(astsByFile);
+        ctx.caches.lastWhitespace = [];
         for (const [file, src] of [["main", mainSource]].concat(Object.entries(partialsMap()))) {
-          for (const w of analyseWhitespace(src, file)) lastWhitespace.push(w);
+          for (const w of analyseWhitespace(src, file)) ctx.caches.lastWhitespace.push(w);
         }
         const tParseEnd = performance.now();
 
@@ -3381,7 +3381,7 @@
           if (typeof data === "undefined") data = null;
         } catch (err) {
           setError("invalid YAML: " + err.message);
-          dockProblems = [{ severity: "error", file: "data.yaml", line: (err.mark?.line ?? 0) + 1, col: (err.mark?.column ?? 0) + 1, message: "YAML · " + err.message }];
+          ctx.caches.dockProblems = [{ severity: "error", file: "data.yaml", line: (err.mark?.line ?? 0) + 1, col: (err.mark?.column ?? 0) + 1, message: "YAML · " + err.message }];
           setOutput(""); saveHash(); return;
         }
 
@@ -3398,7 +3398,7 @@
             parsedOverlays.push({ name: ov.name, value });
           } catch (err) {
             setError("invalid YAML: " + ov.name + " · " + err.message);
-            dockProblems = [{
+            ctx.caches.dockProblems = [{
               severity: "error", file: ov.name,
               line: (err.mark?.line ?? 0) + 1, col: (err.mark?.column ?? 0) + 1,
               message: "YAML · " + err.message,
@@ -3409,7 +3409,7 @@
         const overlayResult = mergeDataOverlays(data, parsedOverlays);
         data = overlayResult.merged;
         for (const c of overlayResult.clashes) {
-          dockProblems.push({
+          ctx.caches.dockProblems.push({
             severity: "missing", // re-use the warn-colour Problems styling
             file: "data.yaml", line: 1, col: 1,
             message: `overlay clash at \`${c.path || "(root)"}\` — ${c.was} replaced by ${c.now}`,
@@ -3425,7 +3425,7 @@
             ctx.caches.lastData = null;
             const message = "transform · " + (err.message || err.code || "invalid JSONata");
             setError("transform error: " + (err.message || err.code || "invalid JSONata"));
-            dockProblems = [{ severity: "error", file: "transform", line: 1, col: 1, message }];
+            ctx.caches.dockProblems = [{ severity: "error", file: "transform", line: 1, col: 1, message }];
             setOutput(""); saveHash(); return;
           }
         }
@@ -3442,29 +3442,29 @@
 
         // Data-aware analyses, now that the view-model is finalized. Coverage
         // uses the engine's default truthiness for dead-branch classification.
-        lastDataAccess = analyseDataAccess(astsByFile, data);
-        lastCoverage = analyseCoverage(astsByFile, data);
+        ctx.caches.lastDataAccess = analyseDataAccess(astsByFile, data);
+        ctx.caches.lastCoverage = analyseCoverage(astsByFile, data);
         // ADR-022: trace the render and collect the truthiness portability
         // findings for the Truthiness dock panel (FlatBars engine only). ADR-030:
         // when config.yaml declares safe paths, route through analyzeWith so the
         // panel suppresses those paths' potential + miss findings.
-        lastAnalyseSuppressed = 0;
+        ctx.caches.lastAnalyseSuppressed = 0;
         if (typeof renderer.analyze !== "function") {
-          lastAnalyse = { ok: true, findings: [] };
+          ctx.caches.lastAnalyse = { ok: true, findings: [] };
         } else if (labPathSchema.length && typeof renderer.analyzeWith === "function") {
           // ADR-030: the schema'd pass is what the panel shows; an unschema'd pass
           // counts how many potential/miss findings the schema removed (advisory
           // findings only — observed findings are never suppressed).
-          lastAnalyse = renderer.analyzeWith((p) => !labPathSchema.includes(p), { source: mainSource }, data);
+          ctx.caches.lastAnalyse = renderer.analyzeWith((p) => !labPathSchema.includes(p), { source: mainSource }, data);
           const unsch = renderer.analyze({ source: mainSource }, data);
           const advisory = (r) => (r.findings || []).filter((f) => f.kind === "potential" || f.kind === "miss").length;
-          if (lastAnalyse.ok && unsch.ok) lastAnalyseSuppressed = Math.max(0, advisory(unsch) - advisory(lastAnalyse));
+          if (ctx.caches.lastAnalyse.ok && unsch.ok) ctx.caches.lastAnalyseSuppressed = Math.max(0, advisory(unsch) - advisory(ctx.caches.lastAnalyse));
         } else {
-          lastAnalyse = renderer.analyze({ source: mainSource }, data);
+          ctx.caches.lastAnalyse = renderer.analyze({ source: mainSource }, data);
         }
         // ADR-019: deprecated-alias + non-canonical scoped-variable findings for
         // the active dialect (the Lint dock panel; FlatBars engines only).
-        lastLint = typeof renderer.lint === "function"
+        ctx.caches.lastLint = typeof renderer.lint === "function"
           ? renderer.lint(mainSource)
           : { ok: true, findings: [] };
         refreshCoverageGutter();
@@ -3472,20 +3472,20 @@
         // tight, false-positive-free "missing assigns" signal (Data Access).
         const dataKeys = (data && typeof data === "object" && !Array.isArray(data))
           ? new Set(Object.keys(data)) : new Set();
-        lastMissingAssigns = lastRequiredAssigns.filter((n) => !dataKeys.has(n));
+        ctx.caches.lastMissingAssigns = ctx.caches.lastRequiredAssigns.filter((n) => !dataKeys.has(n));
         // Promote each missing assign to a Problems row at warn severity, so
         // the dock's auto-open behaviour fires for a missing key just like it
         // does for compile errors. The first source span that references the
         // assign is the jump target; locating it by re-using the data-access
         // walk (which already classifies bare identifiers).
-        for (const name of lastMissingAssigns) {
-          const firstHit = lastDataAccess.find((r) => r.path === name || r.path.startsWith(name + "."));
+        for (const name of ctx.caches.lastMissingAssigns) {
+          const firstHit = ctx.caches.lastDataAccess.find((r) => r.path === name || r.path.startsWith(name + "."));
           const file = firstHit?.file || "main";
           const src = fileSource(file);
           const pos = firstHit && typeof firstHit.start === "number"
             ? charToLineColumn(src, spanRange(src, firstHit.start, firstHit.end)[0])
             : { line: 1, column: 1 };
-          dockProblems.push({
+          ctx.caches.dockProblems.push({
             severity: "missing",
             file, line: pos.line, col: pos.column,
             message: `missing assign '${name}' — referenced by the template but not present in data`,
@@ -3500,17 +3500,17 @@
         // refusal: amber "cap" Problems row, no output. Analyses above still
         // ran, so the dock can show what was used and why it was blocked.
         const denied = allowList !== null
-          ? [...new Set(lastUsedTransformers.filter((n) => !allowList.includes(n)))]
+          ? [...new Set(ctx.caches.lastUsedTransformers.filter((n) => !allowList.includes(n)))]
           : [];
         if (denied.length) {
           const plural = denied.length > 1 ? "s" : "";
           setError(`not in allow-list: transformer${plural} '${denied.join("', '")}'`);
-          dockProblems.push({
+          ctx.caches.dockProblems.push({
             severity: "cap", file: "main", line: 1, col: 1,
             message: `transformer${plural} '${denied.join("', '")}' not in the render-config allow-list — add to \`transformers.allow\` to render`,
           });
           setOutput(""); renderDock(); saveHash();
-          lastTimings = null;
+          ctx.caches.lastTimings = null;
           return;
         }
         try {
@@ -3532,11 +3532,11 @@
             const key = helperKey(mainSource, partialsMap(), data, helperSrc, catSrc, labLocale, ENGINE);
             if (helperCache.key !== key) {
               requestHelperRender(key, { dialect: ENGINE, template: mainSource, data, partials: partialsMap(), helperSrc, catalogSrc: catSrc, locale: labLocale });
-              setOutput("rendering…"); setError(""); renderDock(); saveHash(); lastTimings = null;
+              setOutput("rendering…"); setError(""); renderDock(); saveHash(); ctx.caches.lastTimings = null;
               return;
             }
             if (helperCache.error) {
-              setError(helperCache.error); setOutput(""); renderDock(); saveHash(); lastTimings = null;
+              setError(helperCache.error); setOutput(""); renderDock(); saveHash(); ctx.caches.lastTimings = null;
               return;
             }
             output = helperCache.output; segments = [];
@@ -3556,11 +3556,11 @@
           const at = /^(\d+):(\d+):\s*/.exec(message);
           if (at) { line = +at[1]; col = +at[2]; message = message.slice(at[0].length); }
           setError("render error: " + message);
-          dockProblems = [{ severity: isPolicy ? "cap" : "render", file: "main", line, col, message }];
+          ctx.caches.dockProblems = [{ severity: isPolicy ? "cap" : "render", file: "main", line, col, message }];
           setOutput("");
         }
         const tRenderEnd = performance.now();
-        lastTimings = {
+        ctx.caches.lastTimings = {
           parseMs: tParseEnd - tParseStart,
           compileMs: tCompileEnd - tCompileStart,
           renderMs: tRenderEnd - tRenderStart,
@@ -4968,25 +4968,25 @@
       // the dock body. Adding a panel is one entry here — no DOM wiring.
       const dockTabs = [
         { id: "problems", label: "Problems",
-          count: () => dockProblems.length,
-          badge: () => dockProblems.length === 0 ? "success" :
-            (dockProblems.some((p) => p.severity === "error" || p.severity === "render") ? "danger" : "warn"),
-          render: (body) => renderProblems(body, dockProblems, { openOrCreatePartial, openProblem }) },
+          count: () => ctx.caches.dockProblems.length,
+          badge: () => ctx.caches.dockProblems.length === 0 ? "success" :
+            (ctx.caches.dockProblems.some((p) => p.severity === "error" || p.severity === "render") ? "danger" : "warn"),
+          render: (body) => renderProblems(body, ctx.caches.dockProblems, { openOrCreatePartial, openProblem }) },
         { id: "transformers", label: "Transformers", requires: ["catalog"],
-          count: () => lastUsedTransformers.length,
-          badge: () => lastUsedTransformers.length ? "" : "success",
+          count: () => ctx.caches.lastUsedTransformers.length,
+          badge: () => ctx.caches.lastUsedTransformers.length ? "" : "success",
           render: renderTransformers },
         { id: "data-access", label: "Data Access", requires: ["required-assigns"],
-          count: () => lastDataAccess.filter((r) => r.status !== "hit").length,
+          count: () => ctx.caches.lastDataAccess.filter((r) => r.status !== "hit").length,
           badge: () => {
-            const misses = lastDataAccess.filter((r) => r.status === "miss").length;
-            const mism = lastDataAccess.filter((r) => r.status !== "hit" && r.status !== "miss").length;
+            const misses = ctx.caches.lastDataAccess.filter((r) => r.status === "miss").length;
+            const mism = ctx.caches.lastDataAccess.filter((r) => r.status !== "hit" && r.status !== "miss").length;
             if (mism) return "danger";
             if (misses) return "warn";
-            return lastDataAccess.length ? "success" : "";
+            return ctx.caches.lastDataAccess.length ? "success" : "";
           },
           render: (body) => renderDataAccess(body,
-            { rows: lastDataAccess, requiredAssigns: lastRequiredAssigns, missingAssigns: lastMissingAssigns },
+            { rows: ctx.caches.lastDataAccess, requiredAssigns: ctx.caches.lastRequiredAssigns, missingAssigns: ctx.caches.lastMissingAssigns },
             {
               rowPosition: (r) => {
                 const src = fileSource(r.file);
@@ -4997,61 +4997,61 @@
               openProblem, saveAsVector,
             }) },
         { id: "trim", label: "Whitespace", requires: ["standalone"],
-          count: () => lastWhitespace.length,
+          count: () => ctx.caches.lastWhitespace.length,
           badge: () => "",
-          render: (body) => renderWhitespace(body, lastWhitespace, { openProblem, standaloneOn: standalone }) },
+          render: (body) => renderWhitespace(body, ctx.caches.lastWhitespace, { openProblem, standaloneOn: standalone }) },
         { id: "partials", label: "Partials", requires: ["partial-graph"],
           count: () => {
-            if (!lastDeps) return 0;
+            if (!ctx.caches.lastDeps) return 0;
             // Count partials (everything except main) — main is the entry,
             // not a partial. Empty count is what the user expects when a
             // template uses no `{{> name}}`.
-            return lastDeps.nodes.filter((n) => !n.isMain).length;
+            return ctx.caches.lastDeps.nodes.filter((n) => !n.isMain).length;
           },
           badge: () => {
-            if (!lastDeps) return "";
-            if (lastDeps.nodes.some((n) => n.missing)) return "warn";
-            const partials = lastDeps.nodes.filter((n) => !n.isMain);
+            if (!ctx.caches.lastDeps) return "";
+            if (ctx.caches.lastDeps.nodes.some((n) => n.missing)) return "warn";
+            const partials = ctx.caches.lastDeps.nodes.filter((n) => !n.isMain);
             if (partials.length === 0) return ""; // no partials in use — neutral
-            return lastDeps.cycles.length ? "" : "success";
+            return ctx.caches.lastDeps.cycles.length ? "" : "success";
           },
           render: renderPartials },
         { id: "capabilities", label: "Capabilities",
           count: () => {
-            const evalCount = lastUsedTransformers.filter((n) => n === "eval").length;
-            const xform = lastUsedTransformers.filter((n) => TRANSFORMER_RISK[n] === "transform").length;
+            const evalCount = ctx.caches.lastUsedTransformers.filter((n) => n === "eval").length;
+            const xform = ctx.caches.lastUsedTransformers.filter((n) => TRANSFORMER_RISK[n] === "transform").length;
             return evalCount + xform;
           },
           badge: () => {
-            if (lastUsedTransformers.includes("eval")) return "danger";
+            if (ctx.caches.lastUsedTransformers.includes("eval")) return "danger";
             if (allowScripts) return "warn";
-            if (lastUsedTransformers.some((n) => TRANSFORMER_RISK[n] === "transform")) return "warn";
+            if (ctx.caches.lastUsedTransformers.some((n) => TRANSFORMER_RISK[n] === "transform")) return "warn";
             return "success";
           },
           render: (body) => renderCapabilities(body, {
-            escapeRuns: lastEscapeRuns,
-            usedTransformers: lastUsedTransformers,
+            escapeRuns: ctx.caches.lastEscapeRuns,
+            usedTransformers: ctx.caches.lastUsedTransformers,
             stemAllowList: engineHas("stem-allow-list"),
             engineMeta,
             escapeMode, standalone, allowList,
           }) },
         { id: "perf", label: "Performance",
-          count: () => lastTimings ? Math.round(lastTimings.totalMs) : 0,
+          count: () => ctx.caches.lastTimings ? Math.round(ctx.caches.lastTimings.totalMs) : 0,
           badge: () => {
-            if (!lastTimings) return "";
-            if (lastTimings.totalMs > 100) return "warn";
-            if (lastTimings.totalMs > 500) return "danger";
+            if (!ctx.caches.lastTimings) return "";
+            if (ctx.caches.lastTimings.totalMs > 100) return "warn";
+            if (ctx.caches.lastTimings.totalMs > 500) return "danger";
             return "success";
           },
-          render: (body) => renderPerformance(body, lastTimings) },
+          render: (body) => renderPerformance(body, ctx.caches.lastTimings) },
         { id: "coverage", label: "Coverage",
-          count: () => lastCoverage.filter((r) => !r.executed).length,
+          count: () => ctx.caches.lastCoverage.filter((r) => !r.executed).length,
           badge: () => {
-            if (!lastCoverage.length) return "";
-            const dead = lastCoverage.filter((r) => !r.executed).length;
+            if (!ctx.caches.lastCoverage.length) return "";
+            const dead = ctx.caches.lastCoverage.filter((r) => !r.executed).length;
             return dead ? "warn" : "success";
           },
-          render: (body) => renderCoverage(body, lastCoverage, {
+          render: (body) => renderCoverage(body, ctx.caches.lastCoverage, {
             rowPosition: (r) => {
               const src = fileSource(r.file);
               return typeof r.start === "number"
@@ -5063,23 +5063,23 @@
         // ADR-022: conditions whose branch would differ on another engine
         // (Mustache/StringTemplate4/…), with a portable fix each.
         { id: "truthiness", label: "Truthiness", requires: ["analyse"],
-          count: () => lastAnalyse.findings.length,
+          count: () => ctx.caches.lastAnalyse.findings.length,
           badge: () => {
-            if (!lastAnalyse.ok) return "";
-            return lastAnalyse.findings.length ? "warn" : "success";
+            if (!ctx.caches.lastAnalyse.ok) return "";
+            return ctx.caches.lastAnalyse.findings.length ? "warn" : "success";
           },
           render: (body) => renderTruthiness(body,
-            { analyse: lastAnalyse, suppressed: lastAnalyseSuppressed, pathSchema: labPathSchema },
+            { analyse: ctx.caches.lastAnalyse, suppressed: ctx.caches.lastAnalyseSuppressed, pathSchema: labPathSchema },
             { openProblem }) },
         // ADR-019: deprecated aliases + non-canonical scoped variables, each with
         // the canonical spelling the editor quick-fix / `flatbars lint` steers to.
         { id: "lint", label: "Lint", requires: ["lint"],
-          count: () => lastLint.findings.length,
+          count: () => ctx.caches.lastLint.findings.length,
           badge: () => {
-            if (!lastLint.ok) return "";
-            return lastLint.findings.length ? "warn" : "success";
+            if (!ctx.caches.lastLint.ok) return "";
+            return ctx.caches.lastLint.findings.length ? "warn" : "success";
           },
-          render: (body) => renderLint(body, lastLint, { openProblem }) },
+          render: (body) => renderLint(body, ctx.caches.lastLint, { openProblem }) },
         // The read-only inspectors (moved here from the Sources pane). They are
         // not analyses with a count — `noBadge` suppresses the badge — and follow
         // the active file / last render (re-rendered by renderDock after each run).
@@ -5152,7 +5152,7 @@
         paintDockTabs();
 
         // Auto-open on the 0→>0 transition so problems surface without a click.
-        const probCount = dockProblems.length;
+        const probCount = ctx.caches.dockProblems.length;
         if (probCount > 0 && !hadProblems && byId("dock").hidden) {
           byId("dock").hidden = false;
           byId("dock-toggle").classList.add("active");
@@ -5180,8 +5180,8 @@
       // helpers into the module's pure-renderer signature.
       function renderTransformers(body) {
         renderTransformersPanel(body, {
-          usedTransformers: lastUsedTransformers,
-          calls: lastCalls,
+          usedTransformers: ctx.caches.lastUsedTransformers,
+          calls: ctx.caches.lastCalls,
           engineBuiltins,
           makeEl,
           fileSource,
@@ -5197,7 +5197,7 @@
       // Every data lookup the template makes (paths and bare identifiers),
       // classified hit/miss/oob/type-mismatch/scoped. Jump-linked to source.
       // Panel #1: Data Access now lives in ./app/dock/data-access.mjs — it takes
-      // its three caches (lastDataAccess / lastRequiredAssigns / lastMissingAssigns)
+      // its three caches (ctx.caches.lastDataAccess / ctx.caches.lastRequiredAssigns / ctx.caches.lastMissingAssigns)
       // plus injected rowPosition, openProblem, and saveAsVector (the descriptor
       // above passes them). dxSnippet moved into that module.
 
@@ -5218,7 +5218,7 @@
           data: ctx.caches.lastData == null ? {} : ctx.caches.lastData,
           escape: escapeMode,
           expected: ctx.caches.lastOutput,
-          transformers: lastUsedTransformers,
+          transformers: ctx.caches.lastUsedTransformers,
         };
         const json = JSON.stringify(vector);
         navigator.clipboard?.writeText(json).then(
@@ -5229,7 +5229,7 @@
       // dxSnippet moved into ./app/dock/data-access.mjs (its only consumer).
 
       // Panel #2: Whitespace trim trace now lives in ./app/dock/whitespace.mjs —
-      // it takes its cache (lastWhitespace) plus the openProblem callback and the
+      // it takes its cache (ctx.caches.lastWhitespace) plus the openProblem callback and the
       // global standalone-trim flag (the descriptor above passes them).
 
       // ── Panel #3: Partial graph (Dependencies, formerly the floating popup) ──
@@ -5248,7 +5248,7 @@
       // into the module's pure-renderer signature.
       function renderPartials(body) {
         renderPartialsPanel(body, {
-          partialDeps: lastDeps,
+          partialDeps: ctx.caches.lastDeps,
           makeEl,
           openOrCreatePartial,
           tabIndexByFile,
@@ -5266,24 +5266,24 @@
       // emit-escape mix and the iframe+CSP sandbox are the engine-agnostic floor.
       // Panel #5: Capabilities / escape provenance now lives in
       // ./app/dock/capabilities.mjs — a pure DOM build taking the two caches
-      // (lastEscapeRuns / lastUsedTransformers), the stem-allow-list capability,
+      // (ctx.caches.lastEscapeRuns / ctx.caches.lastUsedTransformers), the stem-allow-list capability,
       // engineMeta, and the render policy (escapeMode / standalone / allowList).
       // The descriptor above passes them.
 
       // Panel #6: Performance now lives in ./app/dock/performance.mjs — the first
-      // dock panel migrated to the ctx form (it takes its one cache, lastTimings,
+      // dock panel migrated to the ctx form (it takes its one cache, ctx.caches.lastTimings,
       // as an argument; the descriptor above passes it).
 
       // Panel #7: Coverage map now lives in ./app/dock/coverage.mjs — it takes its
-      // cache (lastCoverage) plus an injected rowPosition closure (fileSource +
+      // cache (ctx.caches.lastCoverage) plus an injected rowPosition closure (fileSource +
       // charToLineColumn/spanRange) and openProblem (the descriptor passes them).
 
       // Panel: Truthiness (ADR-022) now lives in ./app/dock/truthiness.mjs — it
-      // takes the analyse cache (lastAnalyse), the suppressed count, and the host
+      // takes the analyse cache (ctx.caches.lastAnalyse), the suppressed count, and the host
       // pathSchema, plus openProblem (the descriptor above passes them).
 
       // Lint panel (ADR-019) now lives in ./app/dock/lint.mjs — it takes the lint
-      // cache (lastLint) and openProblem (the descriptor above passes them).
+      // cache (ctx.caches.lastLint) and openProblem (the descriptor above passes them).
 
       // Context Inspector: snapshots of the render context at the last-clicked
       // output span, from the engine's `inspect_at` — one card per execution
@@ -5353,7 +5353,7 @@
       }
 
       // Problems panel now lives in ./app/dock/problems.mjs — it takes the
-      // dockProblems cache plus openOrCreatePartial + openProblem (the descriptor
+      // ctx.caches.dockProblems cache plus openOrCreatePartial + openProblem (the descriptor
       // above passes them).
 
       // Jump from a Problems row to its source location.
