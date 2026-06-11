@@ -144,6 +144,35 @@ jobs:
           path: trussbars/benchmarks/bench-render.txt
           if-no-files-found: warn
 
+  # The Zola-style SSG harness (the northstar Hyde port, docs/24) — its own workspace,
+  # so neither the `check` (crates/*) nor the `benchmarks` job covers it. Gate it here so
+  # an engine change that breaks the ported theme can't land silently.
+  ssg:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: trussbars/examples/ssg
+    steps:
+      - uses: actions/checkout@v6
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            trussbars/examples/ssg/target
+          key: trussbars-ssg-${{ runner.os }}-${{ hashFiles('trussbars/examples/ssg/Cargo.lock') }}
+      - name: Toolchain
+        run: rustup show && cargo --version
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Test (the ported Hyde theme renders end to end)
+        run: cargo test
+      - name: Build the demo site
+        run: cargo run
+
   # The dogfood examples: build each and assert its pages still match the committed
   # golden output (no PureScript toolchain needed — the generated render module is
   # committed). `blog` = authored content; `changelog` = git-log aggregation;
