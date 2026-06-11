@@ -42,6 +42,14 @@ const ctx = {
 `ctx` mutates in place exactly where the `let`s were reassigned — `lastOutput = x`
 becomes `ctx.caches.lastOutput = x`. No semantic change.
 
+## Progress
+
+- ✅ All 11 dock/inspector panels extracted to `app/dock/*.mjs` (leaf consumers).
+- ✅ `ctx` object introduced; the output caches (lastOutput/lastSegments/lastData/
+  lastProgram) migrated into `ctx.caches.*` via a word-boundary sweep (43 sites),
+  rename-only — verified by the smoke (a missed site throws a loud ReferenceError).
+  Other last* caches migrate into ctx.caches as their owning subsystem moves.
+
 ## Move order (leaf-most consumers first, run() last)
 
 Each function moves to a module as `export function f(ctx, …args)`; index.html
