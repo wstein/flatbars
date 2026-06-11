@@ -293,9 +293,15 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   `detectTransport` sees it, `lab/app/project.mjs` walks the launch directory into a
   workspace (a `main` template + cross-tree partials + a data file) and the Lab
   re-renders on save via the provider's `watch()`. The `local_project_smoke.mjs` browser
-  test proves project mode + render-on-save end to end. Still open (the workbench
-  follow-ups): writing edits back to disk, glob analyze/lint across the tree, and the
-  differential provider picker (Phase 7).
+  test proves project mode + render-on-save end to end. The **Differential** dock panel
+  (`lab/app/dock/differential.mjs`) runs the current template+data through every
+  registered provider and byte-diffs each candidate against the oracle reference
+  (directional: oracle = green reference, trussbars = candidate flagged only on a true
+  divergence; a surface it doesn't target is a neutral `na`), with a "Report divergence"
+  button that emits a corpus-shaped fixture. Still open (workbench follow-ups): writing
+  edits back to disk, glob analyze/lint across the tree, a user-facing provider picker
+  for normal sessions, and the span-level provenance diff (needs trussbars-wasm to
+  advertise `source-map`).
 - **`cli`** (`flatbars-cli`) — render templates, and the `examples verify`
   conformance gate.
 - **`linter`** — cross-dialect lowering (MaxBars → RawBars source).

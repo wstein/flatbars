@@ -255,14 +255,35 @@ store (localStorage remains the hosted fallback). Writes from the Lab back to di
 (`/__fs/write` exists, gated `--write`) are not yet wired to the editors — project
 mode reflects disk read-only for now.
 
-### Phase 7 — Differential view + provenance diff
+### Phase 7 — Differential view + provenance diff  ✅ DONE (2026-06-11)
 
-Multi-provider compare panel: run all registered providers, diff outputs
-byte-level (v1), then span-level once trussbars-wasm emits the provenance map
-(ADR-035) — divergences become *locatable* ("oracle vs Trussbars diverge at this
-span"). A "report divergence" affordance emits a corpus-shaped fixture (closing
-the loop into the 71/71 suite). Directional verdict: oracle = reference (green),
-Trussbars = candidate (flagged on mismatch).
+The Differential dock panel (`lab/app/dock/differential.mjs`) runs the current
+template+data through every registered provider and **byte-diffs each candidate against
+the oracle reference**. Directional verdict: oracle = green reference; a candidate is
+flagged only on a true `diverge` (both rendered, outputs differ). A surface the
+candidate doesn't target (trussbars on a ClassicBars `{{#if}}`) is `na` — the dialect
+boundary, not a false bug. On a divergence, the panel shows the first differing byte +
+a **"Report divergence ▸ fixture"** button that downloads a corpus-shaped JSON
+(template + data + reference/candidate outputs), closing the loop into the conformance
+suite. Compute is async + lazy (compute-on-view, keyed on source/data/dialect; the
+trussbars wasm only instantiates when the tab is opened) and the panel is gated on
+`listProviders().length > 1`. Tested: 6 renderer unit tests + a 2-engine integration
+test (oracle ≡ trussbars on MaxBars → match; ClassicBars → n/a) + a real-browser smoke
+(`lab/test/differential_smoke.mjs`) proving the in-page compare paints verdict "match".
+
+Span-level (provenance) diff stays a follow-up — it needs trussbars-wasm to advertise
+`source-map` (ADR-035), which the render-only v1 doesn't; the byte-level v1 is the
+shipped deliverable, exactly as scoped.
+
+---
+
+**The 7-phase plan is complete.** The Lab now has an engine-provider axis (oracle +
+trussbars-wasm), a FileProvider axis (http / fs-access / local), a content-hashed build,
+a local dev transport with project mode + render-on-save, and a multi-engine
+differential — every piece independently shipped and green, all falling out of the two
+frozen interfaces. Remaining workbench follow-ups (not plan phases): writing edits back
+to disk, glob analyze/lint across the tree, a user-facing provider picker for normal
+sessions, and the span-level provenance diff.
 
 ## Gate impact summary
 

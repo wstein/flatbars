@@ -932,9 +932,19 @@
       .dx-hint, .wt-hint, .cv-hint {
         font-size: 11px; color: var(--fg-faint); margin-bottom: 6px;
       }
-      .dx-empty, .wt-empty, .pg-empty, .cp-empty, .pf-empty, .cv-empty {
+      .dx-empty, .wt-empty, .pg-empty, .cp-empty, .pf-empty, .cv-empty, .dock-empty {
         padding: 14px; text-align: center; color: var(--fg-faint); font-size: 12px;
       }
+      /* Differential panel (Phase 7) — layout only; verdict colour rides the badge. */
+      .diff-head { padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
+      .diff-ref-label { font-weight: 600; }
+      .diff-row { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+      .diff-row-head { display: flex; align-items: center; gap: 6px; }
+      .diff-cand-label { font-weight: 600; }
+      .diff-detail { margin-top: 5px; font-size: 12px; }
+      .diff-at { color: var(--fg-muted); font-size: 11px; margin-bottom: 3px; }
+      .diff-snip { margin: 2px 0; padding: 3px 6px; font-family: var(--font-mono); font-size: 11px; white-space: pre-wrap; word-break: break-all; border-left: 2px solid var(--border-strong); }
+      .diff-report { margin-top: 7px; }
       .dx-pill {
         padding: 1px 6px; border-radius: 999px; font-size: 10.5px; font-family: var(--font-mono);
         background: var(--bg-2); color: var(--fg);
@@ -1656,7 +1666,8 @@
       // Cache-bust query (like playground_utils.mjs): bump on any change to the
       // engine adapters so a reload never pairs a fresh index.html / example
       // file with a stale cached adapter module.
-      import { getProvider } from "./app/engines/registry.mjs?v=93800cc7";
+      import { getProvider, listProviders } from "./app/engines/registry.mjs?v=93800cc7";
+      import { renderDifferential, verdictOf } from "./app/dock/differential.mjs?v=899a35e8";
       // Engine-derived INNER-TOKEN highlighting (ADR-014 amendment): the shared
       // painter + the lexer's own tokenizer, in place of a hand-written tag regex.
       import { flatbarsHighlight } from "./cm-flatbars.mjs?v=d4ad35e2";
@@ -1851,7 +1862,9 @@
       // adapter the vector is full, so nothing hides; a thinner adapter (e.g.
       // Handlebars) advertises fewer features and the matching panels drop out.
       const engineFeatures = engineMeta.features || [];
-      const tabVisible = (entry) => tabVisibleUnder(engineFeatures, entry && entry.requires);
+      const tabVisible = (entry) =>
+        tabVisibleUnder(engineFeatures, entry && entry.requires) &&
+        (!entry || typeof entry.visible !== "function" || entry.visible());
       // Does the loaded engine advertise a single capability? (ADR-0020 Phase 2
       // uses this to gate behaviour that assumes the stem-bc wire — e.g. the
       // per-emit escape rewrite — rather than just hiding a panel.)
@@ -4377,6 +4390,19 @@
             { ctxTarget, program: ctx.caches.lastProgram, data: ctx.caches.lastData, inspectAt: renderer.inspectAt, minbarsCompat: ctx.state.minbarsCompat }) },
         { id: "ast", label: "Syntax Tree", noBadge: true,
           count: () => 0, badge: () => "", render: renderAst },
+        // Phase 7: run the current template+data through every registered engine and
+        // byte-diff each candidate against the oracle reference. Only shown when a
+        // second engine is registered (oracle + trussbars-wasm today).
+        { id: "differential", label: "Differential", visible: () => listProviders().length > 1,
+          count: () => { const d = ctx.caches.lastDifferential; return d && d.ready ? d.candidates.filter((c) => c.verdict === "diverge").length : 0; },
+          badge: () => {
+            const d = ctx.caches.lastDifferential;
+            if (!d || !d.ready) return "";
+            const div = d.candidates.filter((c) => c.verdict === "diverge").length;
+            if (div) return "danger";
+            return d.candidates.some((c) => c.verdict === "match") ? "success" : "";
+          },
+          render: renderDifferentialPanel },
       ];
 
       function dockTabById(id) { return dockTabs.find((t) => t.id === id); }
@@ -4459,6 +4485,68 @@
         const active = visible.find((t) => t.id === dockActiveTab) || visible[0] || dockTabs[0];
         dockActiveTab = active.id;
         active.render(body);
+      }
+
+      // ── Differential (Phase 7) ────────────────────────────────────────────
+      // Compute-on-view: when the panel is shown (or its inputs changed) run the current
+      // template+data through every registered provider and byte-diff each candidate
+      // against the oracle. Async (trussbars-wasm renders off the main thread of boot),
+      // cached + keyed on (source, data, dialect); re-renders the dock when ready.
+      function differentialKey() {
+        const source = ctx.state.tabs[0]?.source ?? "";
+        return source + " " + JSON.stringify(ctx.caches.lastData ?? {}) + " " + ENGINE;
+      }
+      async function computeDifferential(key) {
+        const source = ctx.state.tabs[0]?.source ?? "";
+        const data = ctx.caches.lastData ?? {};
+        const partials = partialsMap();
+        const results = [];
+        for (const provider of listProviders()) {
+          try {
+            const engine = await provider.create(ENGINE);
+            const compiled = engine.compile(source, partials, { dialect: ENGINE });
+            if (compiled.errors && compiled.errors.length) {
+              results.push({ id: provider.id, label: provider.label, kind: provider.kind, error: compiled.errors[0].message });
+              continue;
+            }
+            const out = engine.render(compiled.program, data);
+            results.push({ id: provider.id, label: provider.label, kind: provider.kind, output: typeof out === "string" ? out : out.output });
+          } catch (err) {
+            results.push({ id: provider.id, label: provider.label, kind: provider.kind, error: (err && err.message) || String(err) });
+          }
+        }
+        const reference = results.find((r) => r.id === "oracle") || results[0];
+        const candidates = results.filter((r) => r !== reference).map((r) => ({ ...r, verdict: verdictOf(reference, r) }));
+        ctx.caches.lastDifferential = { ready: true, key, dialect: ENGINE, reference, candidates };
+        if (dockActiveTab === "differential") renderDock();
+      }
+      function renderDifferentialPanel(body) {
+        const key = differentialKey();
+        const cached = ctx.caches.lastDifferential;
+        if (!cached || cached.key !== key) {
+          if (ctx.caches.differentialComputing !== key) {
+            ctx.caches.differentialComputing = key;
+            computeDifferential(key).finally(() => { if (ctx.caches.differentialComputing === key) ctx.caches.differentialComputing = null; });
+          }
+          renderDifferential(body, { ready: false }, { makeEl, onReport: reportDivergence });
+          return;
+        }
+        renderDifferential(body, cached, { makeEl, onReport: reportDivergence });
+      }
+      // "Report divergence" — emit a corpus-shaped fixture (template + data + the
+      // reference's expected output + the candidate's actual), closing the loop into the
+      // conformance suite.
+      function reportDivergence(candidate) {
+        const d = ctx.caches.lastDifferential;
+        if (!d) return;
+        const fixture = {
+          dialect: d.dialect,
+          template: ctx.state.tabs[0]?.source ?? "",
+          data: ctx.caches.lastData ?? {},
+          reference: { engine: d.reference.id, output: d.reference.output ?? null, error: d.reference.error ?? null },
+          candidate: { engine: candidate.id, output: candidate.output ?? null, error: candidate.error ?? null },
+        };
+        downloadFile(`divergence-${candidate.id}.json`, JSON.stringify(fixture, null, 2), "application/json");
       }
 
       // Used-transformers report v2 — aggregated call sites per name, with
