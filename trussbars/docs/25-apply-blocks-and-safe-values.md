@@ -1,6 +1,7 @@
 # Trussbars — Block filters `{% apply P %}…{% endapply %}` + the dynamic `Value::Safe` model
 
-> **Status:** **PROPOSED** (surface frozen here; implementation staged below). **Audience:**
+> **Status:** **IMPLEMENTED** (all six stages; conformance-gated `oracle ≡ AOT ≡ VM`, 94/94).
+> One frozen detail was corrected in build — see §2's escaping note. **Audience:**
 > whoever extends the surface and the dynamic value model. **Companions:** `docs/18`
 > (`{% capture %}` — the sibling render-body construct this shares all machinery with; that ADR
 > froze capture's *surface*, this one adds the **dynamic-backend port** it predates), `docs/17`
@@ -46,9 +47,12 @@ docs/18 (written before interp/VM existed) did not cover.
   - `{% apply truncate 280 %}` → `truncate(BODY, 280)`
   - `{% apply upper | truncate 280 %}` → `truncate(upper(BODY), 280)`
 - The pipeline's result is **written at the `apply` site** (output-producing; unlike `capture`,
-  which binds and produces nothing). Escaping of the result follows the normal output rule: a
-  pipeline ending in a `Safe`-returning op (e.g. `safe`, `markdown`) emits verbatim; otherwise the
-  result is escaped like any `{{ … }}`.
+  which binds and produces nothing), and **emitted verbatim** (raw). **Corrected from the original
+  freeze** (which said "otherwise escaped"): the body's *interpolations were already escaped while
+  rendering it*, so the filtered fragment is safe markup — re-escaping it would double-escape. This
+  is what the oracle does (its string ops preserve `VSafe`, Jinja `Markup`-style); Rust matches by
+  emitting the `apply` Output raw. So `{% apply uppercase %}<b>{{x}}</b>` (x=`a`) → `<B>A</B>`, and a
+  `{{ user }}` inside the body stays escaped through the filter.
 - **`apply` binds nothing** and does not open a scope; the sibling tail continues unchanged.
 - A bare `|` in the head is a parse error (as in any MaxBars block head, docs/19): the head *is* the
   pipeline, so `{% apply f %}` not `{% apply body | f %}`.
@@ -148,7 +152,20 @@ exhaustive `Value::` match sites (interp + VM); most fall through identically to
 Both constructs become **oracle ≡ AOT ≡ VM** gated (the `apply`-in-oracle decision). Corpus cases
 land in `trussbars/conformance/cases.mjs` (capture: reuse/no-double-escape, safe-markup,
 forward-scope, pipeable; apply: single filter, multi-pipe, filter-with-args, raw-body composition,
-escaping of the result). Stages, each green + committed:
+escaping of the result). Stages, each green + committed — **all delivered** (94/94 across `--v2`/
+`--interp`/`--vm`). Notes on what changed in build:
+
+- The `render` op landed in `eval_expr` only — that **covers both** interp *and* VM (the VM routes
+  general output exprs through the shared evaluator), so no separate VM op was needed.
+- The Rust desugars build `(render "@cap$k")` / `(render "@app$k")` source directly; the **oracle**
+  uses an `__applybody__` placeholder (parser) that `SetSugar` substitutes (the oracle's `(partial …)`
+  value op already yields `VSafe`).
+- **Escaping correction** (§2): `apply` Output is **raw**, not "escaped otherwise" — the oracle's
+  ops preserve `VSafe`, so the result is verbatim safe markup.
+- The `__applybody__` placeholder and the capture *binding* both leak into PureScript schema
+  inference (a `§Not-yet` gap), so the AOT cases carry `ctxFromData: true` (the data shape).
+- The `filter`→`apply` reject shipped in **Rust**; a matching located reject in the **oracle**
+  (where an unknown block head currently renders empty) is the one open follow-up.
 
 1. **`Value::Safe`** in interp + VM (the ~130-site foundation; `write_escaped`/`raw_text`/truthiness
    rules; never from `from_json`).
