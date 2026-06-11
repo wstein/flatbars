@@ -1725,6 +1725,7 @@
       import { createOutputView } from "./app/output.mjs?v=2";
       import { createRun } from "./app/render.mjs?v=1";
       import { httpFileProvider } from "./app/file-provider.mjs?v=1";
+      import { createStatusBar } from "./app/statusbar.mjs?v=1";
       import { TRANSFORMER_RISK } from "./app/transformer-risk.mjs?v=1";
       import { EditorState, Annotation, StateField, StateEffect, Compartment } from "https://esm.sh/@codemirror/state@6.5.2/es2022/state.mjs";
       import {
@@ -3350,35 +3351,19 @@
         else { bar.classList.remove("has-error"); txt.textContent = "no errors"; }
       }
 
-      function escapeHtml(s) {
-        return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-      }
-
-      function updateStatusMeta() {
-        // The inspector tabs have no editor/caret — show a plain label.
-        if (activeView === "data" && isInspectTab(dataTab)) {
-          const name = dataTab === "context" ? "Context Inspector" : "Syntax Tree";
-          byId("status-meta").innerHTML = `<b>${name}</b>  ·  read-only`;
-          return;
-        }
-        const view = (activeView === "data" || activeView === "config" || activeView === "catalog") ? dataView : templateView;
-        const sel  = view.state.selection.main;
-        const line = view.state.doc.lineAt(sel.head);
-        const col  = sel.head - line.from + 1;
-        // Active source filename for the status bar. In the template pane:
-        // either an overlay name, the JSONata transform, or the current
-        // template tab. In the data pane: an overlay name or `data.yaml`.
-        const overlay = activeView === "data" ? overlayByName(dataFile) : null;
-        const fileName = activeView === "config" ? "config.yaml"
-          : activeView === "catalog" ? "catalog.yaml"
-          : activeView !== "data"
-            ? (templateMode === "transform" ? "transform" : templateMode === "helpers" ? "helpers.js" : activeTab().name)
-            : overlay ? overlay.name + ".yaml" : "data.yaml";
-        // Just the caret location — the language is implied by the active tab and
-        // the encoding is always UTF-8, so both were noise.
-        byId("status-meta").innerHTML =
-          `<b>${escapeHtml(fileName)} · Ln ${line.number}, Col ${col}</b>`;
-      }
+      // The status bar (escapeHtml + updateStatusMeta) now lives in
+      // ./app/statusbar.mjs — the factory binds the live-state getters + the two CM
+      // views; call sites stay arg-free.
+      const updateStatusMeta = createStatusBar({
+        getActiveView: () => activeView,
+        getDataTab: () => dataTab,
+        isInspectTab,
+        dataView, templateView,
+        overlayByName,
+        getDataFile: () => dataFile,
+        getTemplateMode: () => templateMode,
+        activeTab,
+      });
 
       // ── Output view ───────────────────────────────────────────────────
       // Valid output views; anything else — an old share link, or a view the
