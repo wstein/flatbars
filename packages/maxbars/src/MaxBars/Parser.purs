@@ -33,12 +33,14 @@ import Data.Either (Either(..), either)
 import Data.List (List(..), (:))
 import Data.List as List
 import Data.Maybe (Maybe(..), maybe)
-import Data.String (trim)
+import Data.Number as Number
+import Data.String (Pattern(..), contains, drop, indexOf, take, trim)
 import Data.String.CodeUnits as SCU
 import FlatBars.Error (ParseError(..), parseErrorMessage)
 import FlatBars.Span (Span)
 import FlatBars.Syntax (Directive, Expr(..), Node(..), Sigil(..), Template)
 import FlatBars.Token (Interior, PosToken, Token(..))
+import FlatBars.Value (Value(..))
 import MaxBars.Expr (parseMaxExpr, parseMaxHead)
 import MaxBars.Lexer (RawTok(..), tokenize, trimStandalone)
 
@@ -296,10 +298,76 @@ headedRecovering pe span = case _ of
   Left e -> { name: Nothing, args: [], error: Just e }
   Right toks
     | Array.null toks -> { name: Nothing, args: [], error: Just (HeadNotIdent span.start) }
+    -- a `{% inline "name" (params) %}` typed signature (ADR-042) is parsed by a
+    -- dedicated rule — its parenthesised, comma-separated parameter list is not an
+    -- ordinary head-argument expression. A plain `{% inline "name" %}` (no `(`)
+    -- returns `Nothing` and falls through to the generic head parse below.
+    | Just sig <- parseInlineHead toks -> sig
     | otherwise -> case pe (partialHead toks) of
         Right (App name args) -> { name: Just name, args, error: Nothing }
         Right _ -> { name: Nothing, args: [], error: Just (HeadNotIdent span.start) }
         Left e -> { name: salvageName (partialHead toks), args: [], error: Just e }
+
+-- | Parse a `{% inline "name" (p, q=default) %}` head. Each parameter becomes a
+-- | marker argument the surface desugar reads — `App p []` (required) or
+-- | `App p [defaultLit]` (a literal default) — so the signature rides the existing
+-- | `Block "inline" args` shape with no new AST node. Returns `Nothing` for any
+-- | head that is not `inline "name" (` (incl. the plain, signature-less inline), so
+-- | the generic head parse keeps handling those.
+parseInlineHead
+  :: Array PosToken
+  -> Maybe { name :: Maybe String, args :: Array Expr, error :: Maybe ParseError }
+parseInlineHead toks = case tokAt 0, tokAt 1, tokAt 2 of
+  Just (TIdent "inline"), Just (TStr pname), Just TLParen ->
+    Just (loop 3 [ Lit (VString pname) ])
+  _, _, _ -> Nothing
+  where
+  tokAt i = _.tok <$> Array.index toks i
+  atOf i = maybe 0 _.at (Array.index toks i)
+  loop i acc = case tokAt i of
+    Just TRParen -> { name: Just "inline", args: acc, error: Nothing }
+    Just TComma -> loop (i + 1) acc
+    -- a glued `name=value` lexes as one ident ("badge=", "span=1", "on=true" — the
+    -- `=` and any ident-char value fold in); split it like the hash-arg machinery.
+    Just (TIdent ident)
+      | contains (Pattern "=") ident ->
+          let
+            { key, rest } = splitFirstEq ident
+          in
+            -- `name=` (empty glued value) → the default is the *next* token.
+            if rest == "" then case litAt (i + 1) of
+              Just def -> loop (i + 2) (Array.snoc acc (App key [ def ]))
+              Nothing -> fail (i + 1) "inline parameter default must be a literal"
+            -- `name=value` (glued) → parse the literal out of the value text.
+            else case gluedLit rest of
+              Just def -> loop (i + 1) (Array.snoc acc (App key [ def ]))
+              Nothing -> fail i "inline parameter default must be a literal (quote a string)"
+      -- a bare `name` → a required parameter.
+      | otherwise -> loop (i + 1) (Array.snoc acc (App ident []))
+    Just _ -> fail i "unexpected token in inline signature"
+    Nothing -> fail (i - 1) "unterminated inline signature — missing `)`"
+    where
+    fail j msg = { name: Just "inline", args: acc, error: Just (LexError msg (atOf j)) }
+  -- the default of a `name=` parameter when it is the following token.
+  litAt i = case tokAt i of
+    Just (TStr s) -> Just (Lit (VString s))
+    Just (TNum n) -> Just (Lit (VNumber n))
+    Just (TIdent t) -> gluedLit t
+    _ -> Nothing
+  -- a glued default value's text → a literal (`true`/`false`/`null` or a number);
+  -- a bare word is rejected (string defaults must be quoted), matching the typed,
+  -- literal-only signature of ADR-042.
+  gluedLit t
+    | t == "true" = Just (Lit (VBool true))
+    | t == "false" = Just (Lit (VBool false))
+    | t == "null" = Just (Lit VNull)
+    | otherwise = Lit <<< VNumber <$> Number.fromString t
+
+-- | Split an ident at its first `=` into the key and the glued value text.
+splitFirstEq :: String -> { key :: String, rest :: String }
+splitFirstEq s = case indexOf (Pattern "=") s of
+  Just i -> { key: take i s, rest: drop (i + 1) s }
+  Nothing -> { key: s, rest: "" }
 
 -- | The leading identifier of an interior token stream, if any — the head name a
 -- | recovered block keeps even when its arguments don't parse.

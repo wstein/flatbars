@@ -500,6 +500,38 @@ main = do
     "{% inline \"layout\" %}<{% yield %}>{% endinline %}{% partial \"layout\" %}HI{% endpartial %}"
     (obj [])
     "<HI>"
+
+  -- typed inline signatures (ADR-042): `{% inline "name" (p, q=default) %}`. A
+  -- required parameter reads the `{% include %}` hash directly; an optional one
+  -- (`q=default`) falls back to its literal default when the argument is omitted.
+  let
+    card =
+      "{% inline \"card\" (title, badge=\"\") %}<h3>{{title}}</h3>{% if badge %}<b>{{badge}}</b>{% endif %}{% endinline %}"
+  expectM "inline-sig-default-omitted" (card <> "{% include \"card\" title=name %}")
+    (obj [ Tuple "name" (VString "Hi") ])
+    "<h3>Hi</h3>"
+  expectM "inline-sig-default-provided" (card <> "{% include \"card\" title=name badge=\"new\" %}")
+    (obj [ Tuple "name" (VString "Hi") ])
+    "<h3>Hi</h3><b>new</b>"
+  -- a glued numeric default (`span=1`) and a zero default both fall back correctly.
+  expectM "inline-sig-numeric-default"
+    "{% inline \"row\" (label, span=1) %}<td colspan={{span}}>{{label}}</td>{% endinline %}{% include \"row\" label=l %}"
+    (obj [ Tuple "l" (VString "X") ])
+    "<td colspan=1>X</td>"
+  expectM "inline-sig-zero-default"
+    "{% inline \"r\" (s=0) %}[{{s}}]{% endinline %}{% include \"r\" %}"
+    (obj [])
+    "[0]"
+  -- one definition, two call sites with different arguments.
+  expectM "inline-sig-reused"
+    "{% inline \"c\" (t, b=\"-\") %}[{{t}}/{{b}}]{% endinline %}{% include \"c\" t=\"a\" %}{% include \"c\" t=\"x\" b=\"y\" %}"
+    (obj [])
+    "[a/-][x/y]"
+  -- a bare (unquoted, non-literal) default is a located error — defaults are literals.
+  assert' "reject: inline non-literal default"
+    ( isLeft
+        (renderMax "{% inline \"r\" (s=foo) %}{{s}}{% endinline %}{% include \"r\" %}" (obj []))
+    )
   -- the retired `{{ }}` spellings are rejected with a fix-it (no silent no-op): the
   -- inline partial `{{> name}}`, the Handlebars block-partial yield `{{> @partial-block}}`,
   -- and the bare slot `{{yield}}`.

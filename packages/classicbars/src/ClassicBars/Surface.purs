@@ -75,6 +75,7 @@ import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Number as Number
 import Data.String (Pattern(..), Replacement(..), contains, replaceAll, stripPrefix)
 import Data.String.CodeUnits (drop, indexOf, singleton, take, toCharArray)
+import FlatBars.Span (Span)
 import FlatBars.Syntax (Expr(..), Ident, Node(..), Sigil(..), Template)
 import FlatBars.Value (Value(..))
 
@@ -161,6 +162,46 @@ desugarWith lv clauseNames = go []
       Nothing -> Nothing
     Nothing -> Nothing
 
+  -- ADR-042: a `{% inline "name" (p, q=default) %}` carries its parameter signature
+  -- as marker args after the partial name — `App p []` (required) / `App p [default]`
+  -- (optional). Each parameter is bound as a body-local sourced from the `{% include
+  -- %}` hash (which already merges onto the partial context): a required parameter
+  -- passes through (the hash provides it), an optional one is wrapped in a
+  -- `{% local q = (q ?? default) %}` so an *omitted* argument falls back to its
+  -- default. The names enter the body scope so a bare `{{q}}` resolves to the
+  -- binding, and the signature is stripped from the stored partial (only the name
+  -- reaches `hoistInline`). A signature-less inline takes the plain path unchanged.
+  inlineSigDesugar :: Span -> Scope -> Array Expr -> Template -> Node
+  inlineSigDesugar sp scope args body = case Array.uncons args of
+    Just { head: nameArg, tail: params } | not (Array.null params) ->
+      let
+        -- only *optional* (defaulted) params enter the body scope: each gets a
+        -- `local` binding, so a bare `{{q}}` resolves to it. A *required* param is
+        -- left out of scope so `{{title}}` lowers to a context lookup that reads the
+        -- `{% include %}` hash directly (no binding needed).
+        innerScope = scope <> Array.mapMaybe optionalName params
+        wrapped = Array.foldr wrapDefault (go innerScope (expandElseIf body)) params
+      in
+        Block sp Section "inline" [ nameArg ] wrapped
+    _ -> Block sp Section "inline" (inlineArgs lv scope args) (go scope (expandElseIf body))
+    where
+    optionalName = case _ of
+      App n [ _ ] -> Just n
+      _ -> Nothing
+    -- an optional `App n [default]` → `{% local n = (n ?? default) %}` around the
+    -- body. The coalesce value is rewritten in the *outer* `scope` (n is not bound
+    -- there), so its `n` reads the merged hash; the `local` then shadows it for the
+    -- body. A required `App n []` → no wrapper (it reads the hash directly).
+    wrapDefault param inner = case param of
+      App n [ def ] ->
+        [ Block sp Section "local"
+            [ App "@hash"
+                [ Lit (VString n), rewrite lv scope (App "coalesce" [ App n [], def ]) ]
+            ]
+            inner
+        ]
+      _ -> inner
+
   go :: Scope -> Template -> Template
   go scope = map node
     where
@@ -188,8 +229,7 @@ desugarWith lv clauseNames = go []
       -- which gates the `{{#*inline}}` decorator off so the bare form is its only
       -- inline-partial spelling). ClassicBars rejects it before desugar (it requires
       -- the `{{#*inline}}` decorator) via `strictSurfaceViolation`.
-      Block sp Section "inline" args body ->
-        Block sp Section "inline" (inlineArgs lv scope args) (go scope (expandElseIf body))
+      Block sp Section "inline" args body -> inlineSigDesugar sp scope args body
       -- the inline-partial *decorator* `{{#*inline "name"}}…{{/inline}}` (Decorator
       -- sigil; the decorator name `inline` is the head, the partial name its arg).
       -- Same definition as the bare `{{#inline}}` form, hoisted by `hoistInline`.
