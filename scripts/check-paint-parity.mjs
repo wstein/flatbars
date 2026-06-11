@@ -112,8 +112,11 @@ const CASES = [
   // keyword — both spellings, in the dialects that accept each.
   ["{{{{myraw}}}}body {{x}}{{{{/myraw}}}}", ["classicbars"]],
   ["{{{{#myraw}}}}body {{x}}{{{{/myraw}}}}", ["rawbars", "maxbars"]],
-  ["{{! comment with add toFixed }}"],
-  ["{{!-- a {{nested}}-looking comment --}}"],
+  // Handlebars comments `{{! }}` / `{{!-- --}}` — NOT MaxBars, where `{{ }}` is
+  // output-only (`bracesOutputOnly`, ADR-039): the comment is `{# … #}`, so a `{{!`
+  // there lexes as output, not a comment.
+  ["{{! comment with add toFixed }}", ["classicbars", "minbars", "rawbars"]],
+  ["{{!-- a {{nested}}-looking comment --}}", ["classicbars", "minbars", "rawbars"]],
   ["{{a + b * c}}", ["maxbars"]],
   ["{{price >= 100}}", ["maxbars"]],
   ["{{=<% %>=}}", ["minbars"]],

@@ -173,14 +173,15 @@ printNode = case _ of
   Content _ s -> emptyOut { text = s }
 
   -- `Output _ (App "escapeHtml" [e])` is the auto-escaped `{{ e }}`; any other
-  -- `Output _ e` is the raw `{{{ e }}}`.
+  -- `Output _ e` is raw output, the `safe` final pipe `{{ e | safe }}` (MaxBars has no
+  -- `{{{ }}}` sigil — ADR-039 item 8).
   Output span e -> case e of
     App "escapeHtml" [ inner ] -> escaped span inner
     _ ->
       let
         ex = exprTop span e
       in
-        ex { text = "{{{ " <> ex.text <> " }}}" }
+        ex { text = "{{ " <> ex.text <> " | safe }}" }
 
   Block span sig name args body -> printBlock span sig name args body
 

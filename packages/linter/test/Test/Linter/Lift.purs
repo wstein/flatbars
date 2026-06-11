@@ -139,7 +139,7 @@ maxCorpus :: Array (Tuple String String)
 maxCorpus =
   [ Tuple "interp" "{{ a }}"
   , Tuple "dotted" "{{ user.name }}"
-  , Tuple "raw" "{{{ a }}}"
+  , Tuple "raw" "{{ a | safe }}"
   , Tuple "infix and" "{{ done && done }}"
   , Tuple "infix gt" "{{ b > 21 }}"
   , Tuple "not" "{{ !done }}"

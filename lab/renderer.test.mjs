@@ -91,8 +91,8 @@ test("renders the maxbars dialect: infix, bare-infix block conditions, loop vars
   assert.equal(mx("{% if a && b %}Y{% else %}N{% endif %}", { a: true, b: false }), "N");
   // loop variables through the loop object (ADR-021)
   assert.equal(mx("{% for xs %}[{{loop.index1}}/{{loop.length}}]{% endfor %}", { xs: ["a", "b"] }), "[1/2][2/2]");
-  // a pipe
-  assert.equal(mx("{{{ o | json }}}", { o: { a: 1 } }), '{"a":1}');
+  // a pipe (unescaped via the `safe` final pipe — MaxBars has no `{{{ }}}` sigil)
+  assert.equal(mx("{{ o | json | safe }}", { o: { a: 1 } }), '{"a":1}');
 });
 
 test("parseAst handles maxbars infix (the AST/analysis panels)", async () => {

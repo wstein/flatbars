@@ -103,7 +103,7 @@ matrixData = VObject $ Map.fromFoldable
 rendersSame :: String -> String -> String -> Effect Unit
 rendersSame name dir body =
   let
-    src = "{{! @truthiness: " <> dir <> " }}" <> body
+    src = "{# @truthiness: " <> dir <> " #}" <> body
   in
     case lowerToRawBars src of
       Left e -> assert' (name <> ": lower failed: " <> show e) false
@@ -169,7 +169,7 @@ main = do
   roundTrips "plain text" "hello world"
   roundTrips "simple interpolation" "{{ a }}"
   roundTrips "dotted path" "{{ user.name }}"
-  roundTrips "raw output" "{{{ a }}}"
+  roundTrips "raw output" "{{ a | safe }}"
   roundTrips "infix and" "{{ a && b }}"
   roundTrips "infix comparison" "{{ a > b }}"
   roundTrips "pipe unary" "{{ o | json }}"
@@ -212,7 +212,9 @@ main = do
 
   -- source fidelity: header directives are carried verbatim into the lowering
   -- (an inert `@truthiness` is preserved like any other directive — ADR-022).
-  lowersContaining "carries directives verbatim" "{{! @truthiness: minimal }}{{ a }}"
+  -- The directive is authored in the native `{# … #}` comment (MaxBars has no `{{! }}`);
+  -- the lowered RawBars source re-emits it as a `{{! … }}` short comment (`printDirectives`).
+  lowersContaining "carries directives verbatim" "{# @truthiness: minimal #}{{ a }}"
     "{{! @truthiness: minimal }}"
 
   -- Direct shape assertions on the printer.
@@ -220,8 +222,10 @@ main = do
     "{{{ escapeHtml (and (lookup this \"a\") (lookup this \"b\")) }}}"
   lowersContaining "gt shape" "{{ a > b }}"
     "{{{ escapeHtml (gt (lookup this \"a\") (lookup this \"b\")) }}}"
-  lowersContaining "pipe shape" "{{{ o | json }}}"
-    "{{{ json (lookup this \"o\") }}}"
+  -- the `safe` final pipe is the `safe` prelude helper (returns a `VSafe`, so the
+  -- enclosing `escapeHtml` is a no-op on it — output is raw), matching the render path.
+  lowersContaining "pipe shape" "{{ o | json | safe }}"
+    "{{{ escapeHtml (safe (json (lookup this \"o\"))) }}}"
   lowersContaining "section shape" "{% unless done %}x{% endunless %}"
     "{% unless (lookup this \"done\") %}x{% endunless %}"
 

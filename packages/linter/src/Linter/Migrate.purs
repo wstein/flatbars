@@ -19,8 +19,8 @@
 -- |  * `{{^x}}` (inverted section) → `{% unless x %}`; its matching `{{/x}}` →
 -- |    `{% endunless %}`. Pairing uses an open/close **stack** so nested same-named
 -- |    sections close correctly.
--- |  * `{{&x}}` (amp-unescaped) → `{{{x}}}`. (`{{&x}}` and `{{{x}}}` already lex
--- |    to the same skeleton — this is a cosmetic source normalization.)
+-- |  * unescaped output `{{&x}}` / `{{{x}}}` → `{{ x | safe }}` — MaxBars has no `{{{ }}}`
+-- |    sigil (ADR-039 item 8), so the `safe` final pipe is the unescaped-output form.
 -- |  * inside ANY tag interior: the `@`-data names migrate to the MaxBars reserved
 -- |    variable model (ADR-021): `@index`→`loop.index0`, `@first`→`loop.first`,
 -- |    `@key`→`loop.key`, …; `@root.x`→`root.x`; and `../` runs climb —
@@ -142,12 +142,14 @@ step :: String -> Acc -> RawTok -> Acc
 step src acc = case _ of
   RContent _ s -> emit acc s
 
-  ROutput span _ _ _ -> emit acc (mapDataInTag (sliceSpan src span))
+  -- `{{{x}}}` (triple-stache, unescaped) → `{{ x | safe }}`: MaxBars has no `{{{ }}}`
+  -- sigil (ADR-039 item 8), so unescaped output is the `safe` final pipe.
+  ROutput _ _ core _ -> emit acc ("{{ " <> mapDataNames core <> " | safe }}")
 
-  -- `{{&x}}` (amp-unescaped) → `{{{x}}}` (cosmetic normalization). The interior
-  -- still gets the `@`-data mapping (e.g. `{{&@key}}` → `{{{key}}}`).
+  -- `{{&x}}` (amp-unescaped) → `{{ x | safe }}` likewise. The interior still gets the
+  -- `@`-data mapping (e.g. `{{&@key}}` → `{{ key | safe }}`).
   RAmp _ _ interior _ ->
-    emit acc ("{{{" <> mapDataNames interior <> "}}}")
+    emit acc ("{{ " <> mapDataNames interior <> " | safe }}")
 
   -- Control flow migrates to Django-style `{% … %}` statement tags (docs-19), the
   -- only control surface MaxBars accepts; `~` whitespace-control is read off the

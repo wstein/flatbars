@@ -17069,7 +17069,7 @@ var stripDotDot = function($copy_s) {
         };
       }
       ;
-      throw new Error("Failed pattern match at Linter.Migrate (line 364, column 23 - line 366, column 32): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at Linter.Migrate (line 366, column 23 - line 368, column 32): " + [v.constructor.name]);
     }
     ;
     while (!$tco_done) {
@@ -17113,7 +17113,7 @@ var quoteHead = function(kw) {
       return kw + (' "' + (take2(v.value0)(t) + ('" ' + trim(drop2(v.value0)(t)))));
     }
     ;
-    throw new Error("Failed pattern match at Linter.Migrate (line 266, column 5 - line 268, column 83): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at Linter.Migrate (line 268, column 5 - line 270, column 83): " + [v.constructor.name]);
   };
 };
 var push2 = function(acc) {
@@ -17148,7 +17148,7 @@ var partialInclude = function(interior) {
     return new Just(quoteHead("include")(r));
   }
   ;
-  throw new Error("Failed pattern match at Linter.Migrate (line 251, column 27 - line 257, column 89): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Linter.Migrate (line 253, column 27 - line 259, column 89): " + [v.constructor.name]);
 };
 var matchAt2 = function(cs) {
   return function(i) {
@@ -17187,7 +17187,7 @@ var migrateAtName = function(name2) {
         return chain + ("." + v.rest);
       }
       ;
-      throw new Error("Failed pattern match at Linter.Migrate (line 341, column 9 - line 347, column 65): " + [v12.constructor.name]);
+      throw new Error("Failed pattern match at Linter.Migrate (line 343, column 9 - line 349, column 65): " + [v12.constructor.name]);
     })());
   }
   ;
@@ -17204,7 +17204,7 @@ var migrateAtName = function(name2) {
     return Nothing.value;
   }
   ;
-  throw new Error("Failed pattern match at Linter.Migrate (line 349, column 10 - line 354, column 31): " + [v1.constructor.name]);
+  throw new Error("Failed pattern match at Linter.Migrate (line 351, column 10 - line 356, column 31): " + [v1.constructor.name]);
 };
 var isPartialBlockRef = function(interior) {
   var v = stripPrefix(">")(trim(interior));
@@ -17216,7 +17216,7 @@ var isPartialBlockRef = function(interior) {
     return false;
   }
   ;
-  throw new Error("Failed pattern match at Linter.Migrate (line 242, column 30 - line 244, column 19): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Linter.Migrate (line 244, column 30 - line 246, column 19): " + [v.constructor.name]);
 };
 var isIdentChar2 = function(c) {
   return c >= "a" && c <= "z" || (c >= "A" && c <= "Z" || (c >= "0" && c <= "9" || (c === "_" || (c === "-" || (c === "." || c === "/")))));
@@ -17233,7 +17233,7 @@ var matchData = function(cs) {
       return Nothing.value;
     }
     ;
-    throw new Error("Failed pattern match at Linter.Migrate (line 322, column 5 - line 324, column 25): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at Linter.Migrate (line 324, column 5 - line 326, column 25): " + [v.constructor.name]);
   };
 };
 var precededByBoundary = function(cs) {
@@ -17247,7 +17247,7 @@ var precededByBoundary = function(cs) {
       return !isIdentChar2(v.value0);
     }
     ;
-    throw new Error("Failed pattern match at Linter.Migrate (line 307, column 27 - line 309, column 32): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at Linter.Migrate (line 309, column 27 - line 311, column 32): " + [v.constructor.name]);
   };
 };
 var isBareName = function(s) {
@@ -17271,7 +17271,7 @@ var firstWord2 = function(s) {
     return "";
   }
   ;
-  throw new Error("Failed pattern match at Linter.Migrate (line 454, column 5 - line 456, column 20): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Linter.Migrate (line 456, column 5 - line 458, column 20): " + [v.constructor.name]);
 };
 var isClauseSep = function(interior) {
   return elem16(firstWord2(interior))(["else", "elif", "when"]);
@@ -17299,7 +17299,7 @@ var findFrom2 = function(cs) {
             return;
           }
           ;
-          throw new Error("Failed pattern match at Linter.Migrate (line 578, column 3 - line 581, column 30): " + [i.constructor.name]);
+          throw new Error("Failed pattern match at Linter.Migrate (line 580, column 3 - line 583, column 30): " + [i.constructor.name]);
         }
         ;
         while (!$tco_done) {
@@ -17350,7 +17350,7 @@ var scanSetDelimiters = function(src) {
             return;
           }
           ;
-          throw new Error("Failed pattern match at Linter.Migrate (line 543, column 9 - line 564, column 36): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at Linter.Migrate (line 545, column 9 - line 566, column 36): " + [v.constructor.name]);
         }
         ;
         if (otherwise) {
@@ -17359,7 +17359,7 @@ var scanSetDelimiters = function(src) {
           return;
         }
         ;
-        throw new Error("Failed pattern match at Linter.Migrate (line 539, column 3 - line 539, column 48): " + [i.constructor.name, acc.constructor.name]);
+        throw new Error("Failed pattern match at Linter.Migrate (line 541, column 3 - line 541, column 48): " + [i.constructor.name, acc.constructor.name]);
       }
       ;
       while (!$tco_done) {
@@ -17413,7 +17413,7 @@ var mapDataNames = function(s) {
                 return;
               }
               ;
-              throw new Error("Failed pattern match at Linter.Migrate (line 296, column 11 - line 299, column 68): " + [v1.constructor.name]);
+              throw new Error("Failed pattern match at Linter.Migrate (line 298, column 11 - line 301, column 68): " + [v1.constructor.name]);
             }
             ;
             if (otherwise) {
@@ -17425,7 +17425,7 @@ var mapDataNames = function(s) {
             ;
           }
           ;
-          throw new Error("Failed pattern match at Linter.Migrate (line 292, column 19 - line 300, column 66): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at Linter.Migrate (line 294, column 19 - line 302, column 66): " + [v.constructor.name]);
         }
         ;
         while (!$tco_done) {
@@ -17473,7 +17473,7 @@ var rewriteElseIf = function(interior) {
     return Nothing.value;
   }
   ;
-  throw new Error("Failed pattern match at Linter.Migrate (line 403, column 5 - line 405, column 25): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Linter.Migrate (line 405, column 5 - line 407, column 25): " + [v.constructor.name]);
 };
 var canonLoopHead = function(v) {
   if (v === "each") {
@@ -17511,7 +17511,7 @@ var renameInteriorHead = function(interior) {
     return lead + canonLoopHead(body);
   }
   ;
-  throw new Error("Failed pattern match at Linter.Migrate (line 444, column 5 - line 446, column 44): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Linter.Migrate (line 446, column 5 - line 448, column 44): " + [v.constructor.name]);
 };
 var ambiguousSection = function(span2) {
   return function(sigil) {
@@ -17560,11 +17560,11 @@ var step = function(src) {
       }
       ;
       if (v instanceof ROutput) {
-        return emit(acc)(mapDataInTag(sliceSpan(src)(v.value0)));
+        return emit(acc)("{{ " + (mapDataNames(v.value2) + " | safe }}"));
       }
       ;
       if (v instanceof RAmp) {
-        return emit(acc)("{{{" + (mapDataNames(v.value2) + "}}}"));
+        return emit(acc)("{{ " + (mapDataNames(v.value2) + " | safe }}"));
       }
       ;
       if (v instanceof ROpen) {
@@ -17652,7 +17652,7 @@ var step = function(src) {
         return emit(acc)(sliceSpan(src)(v.value0));
       }
       ;
-      throw new Error("Failed pattern match at Linter.Migrate (line 142, column 16 - line 220, column 49): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at Linter.Migrate (line 142, column 16 - line 222, column 49): " + [v.constructor.name]);
     };
   };
 };

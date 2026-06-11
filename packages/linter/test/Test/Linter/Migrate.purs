@@ -170,7 +170,7 @@ main = do
     "{{#each m}}{{@key}}={{this}};{{/each}}"
     keyMatrix
 
-  -- {{&x}} amp-unescaped → {{{x}}}
+  -- {{&x}} amp-unescaped → {{ x | safe }}
   rendersEquivalent "amp unescaped"
     "{{&x}}"
     ampMatrix
@@ -197,7 +197,7 @@ main = do
   migratesContaining "loop.index0 rewrite" "{{#each items}}{{@index}}{{/each}}" "loop.index0"
   migratesContaining "loop.first rewrite" "{{#each items}}{{@first}}{{/each}}" "{{loop.first}}"
   assertNotContaining "first @ dropped" "{{#each items}}{{@first}}{{/each}}" "@first"
-  migratesContaining "amp to triple" "{{&x}}" "{{{x}}}"
+  migratesContaining "amp to safe pipe" "{{&x}}" "{{ x | safe }}"
   migratesContaining "elif rewrite" "{{#if a}}x{{else if b}}y{{/if}}" "{% elif b %}"
 
   -- Partials migrate to the `{% … %}` surface (ADR-039 item 5): the block-partial slot

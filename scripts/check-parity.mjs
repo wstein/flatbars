@@ -82,25 +82,30 @@ if (!fail.length) ok(`${WITNESS.length} witness values: identical in both, falsy
 // dialect-specific loop-var spelling) belongs in the documented exceptions, not here.
 console.log("\nRender parity (RawBars ≡ MaxBars) over shared core syntax:");
 const CORPUS = [
-  { id: "escape", tpl: `{{{escapeHtml (lookup this "h")}}}`, data: { h: "<b>&\"'" } },
-  { id: "lookup-path", tpl: `{{{lookup this "a" "b"}}}`, data: { a: { b: "deep" } } },
+  // Unescaped output is a documented surface exception (ADR-039 item 8): RawBars keeps
+  // the `{{{ … }}}` sigil; MaxBars spells it `{{ … | safe }}` (the `safe` final pipe). The
+  // engine output must still match byte-for-byte.
+  { id: "escape", tpl: `{{{escapeHtml (lookup this "h")}}}`, maxTpl: `{{ escapeHtml (lookup this "h") | safe }}`, data: { h: "<b>&\"'" } },
+  { id: "lookup-path", tpl: `{{{lookup this "a" "b"}}}`, maxTpl: `{{ lookup this "a" "b" | safe }}`, data: { a: { b: "deep" } } },
   { id: "if-elif-else", tpl: `{% if (lookup this "a") %}A{% elif (lookup this "b") %}B{% else %}C{% endif %}`, data: { a: false, b: true } },
   { id: "unless", tpl: `{% unless (lookup this "x") %}none{% endunless %}`, data: { x: [] } },
   // `{{{this}}}` is shared; bare loop vars (index/key/…) are excluded — see the
   // documented variable-model exception above. The loop SURFACE diverges (RawBars
   // `{% each %}` vs MaxBars `{% for %}`, ADR-039 item 4), so `maxTpl` spells the
   // MaxBars form; the engine output must still match byte-for-byte.
-  { id: "each-array", tpl: `{% each (lookup this "xs") %}[{{{this}}}]{% endeach %}`, maxTpl: `{% for (lookup this "xs") %}[{{{this}}}]{% endfor %}`, data: { xs: ["p", "q"] } },
-  { id: "each-object", tpl: `{% each (lookup this "o") %}[{{{this}}}]{% endeach %}`, maxTpl: `{% for (lookup this "o") %}[{{{this}}}]{% endfor %}`, data: { o: { a: 1, b: 2 } } },
+  { id: "each-array", tpl: `{% each (lookup this "xs") %}[{{{this}}}]{% endeach %}`, maxTpl: `{% for (lookup this "xs") %}[{{ this | safe }}]{% endfor %}`, data: { xs: ["p", "q"] } },
+  { id: "each-object", tpl: `{% each (lookup this "o") %}[{{{this}}}]{% endeach %}`, maxTpl: `{% for (lookup this "o") %}[{{ this | safe }}]{% endfor %}`, data: { o: { a: 1, b: 2 } } },
   // `with`/`scope` is a documented surface exception (RawBars `{% with %}` vs MaxBars
   // `{% scope %}`, ADR-039) — not in the shared corpus.
   { id: "compare", tpl: `{% if (gt (lookup this "n") 3) %}big{% else %}small{% endif %}`, data: { n: 5 } },
-  { id: "arith", tpl: `{{{multiply (add (lookup this "a") 1) 2}}}`, data: { a: 4 } },
-  { id: "coalesce", tpl: `{{{coalesce (lookup this "a") (lookup this "b")}}}`, data: { a: null, b: "fallback" } },
-  { id: "string-prim", tpl: `{{{uppercase (lookup this "s")}}}`, data: { s: "hi" } },
-  { id: "array-prim", tpl: `{{{join (lookup this "xs") ", "}}}`, data: { xs: ["a", "b", "c"] } },
-  { id: "inline-yield", tpl: `{% inline "f" %}<{{{yield}}}>{% endinline %}{% partial "f" this %}{{{lookup this "n"}}}{% endpartial %}`, data: { n: "Z" } },
-  { id: "nested-each-if", tpl: `{% each (lookup this "xs") %}{% if (gt this 1) %}{{{this}}}{% endif %}{% endeach %}`, maxTpl: `{% for (lookup this "xs") %}{% if (gt this 1) %}{{{this}}}{% endif %}{% endfor %}`, data: { xs: [1, 2, 3] } },
+  { id: "arith", tpl: `{{{multiply (add (lookup this "a") 1) 2}}}`, maxTpl: `{{ multiply (add (lookup this "a") 1) 2 | safe }}`, data: { a: 4 } },
+  { id: "coalesce", tpl: `{{{coalesce (lookup this "a") (lookup this "b")}}}`, maxTpl: `{{ coalesce (lookup this "a") (lookup this "b") | safe }}`, data: { a: null, b: "fallback" } },
+  { id: "string-prim", tpl: `{{{uppercase (lookup this "s")}}}`, maxTpl: `{{ uppercase (lookup this "s") | safe }}`, data: { s: "hi" } },
+  { id: "array-prim", tpl: `{{{join (lookup this "xs") ", "}}}`, maxTpl: `{{ join (lookup this "xs") ", " | safe }}`, data: { xs: ["a", "b", "c"] } },
+  // RawBars spells the yield slot `{{{yield}}}` (raw output of the op); MaxBars spells it
+  // `{% yield %}` (the structural slot, ADR-039 item 5) — both inject the caller's body.
+  { id: "inline-yield", tpl: `{% inline "f" %}<{{{yield}}}>{% endinline %}{% partial "f" this %}{{{lookup this "n"}}}{% endpartial %}`, maxTpl: `{% inline "f" %}<{% yield %}>{% endinline %}{% partial "f" this %}{{ lookup this "n" | safe }}{% endpartial %}`, data: { n: "Z" } },
+  { id: "nested-each-if", tpl: `{% each (lookup this "xs") %}{% if (gt this 1) %}{{{this}}}{% endif %}{% endeach %}`, maxTpl: `{% for (lookup this "xs") %}{% if (gt this 1) %}{{ this | safe }}{% endif %}{% endfor %}`, data: { xs: [1, 2, 3] } },
 ];
 for (const c of CORPUS) {
   const { eq, ok: rendered, raw, max } = both(c.tpl, c.maxTpl ?? c.tpl, c.data);
