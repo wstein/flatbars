@@ -1713,6 +1713,7 @@
       import { toast, openShareMenu, closeShareMenu } from "./app/ui-chrome.mjs?v=1";
       import { createCmLanguages } from "./app/cm-languages.mjs?v=1";
       import { previewDoc, applyEscape, outputHasContent } from "./app/render-helpers.mjs?v=2";
+      import { renderPerformance } from "./app/dock/performance.mjs?v=1";
       import { EditorState, Annotation, StateField, StateEffect, Compartment } from "https://esm.sh/@codemirror/state@6.5.2/es2022/state.mjs";
       import {
         Decoration,
@@ -5128,7 +5129,7 @@
             if (lastTimings.totalMs > 500) return "danger";
             return "success";
           },
-          render: renderPerformance },
+          render: (body) => renderPerformance(body, lastTimings) },
         { id: "coverage", label: "Coverage",
           count: () => lastCoverage.filter((r) => !r.executed).length,
           badge: () => {
@@ -5566,39 +5567,9 @@
         body.append(section);
       }
 
-      // ── Panel #6: Performance ─────────────────────────────────────────
-      // Coarse per-phase timings for the last run. Cheap; serves as a
-      // canary for regressions during interactive edits.
-      function renderPerformance(body) {
-        const t = lastTimings;
-        const section = makeEl("div", { class: "pf-section" });
-        if (!t) {
-          section.append(makeEl("div", { class: "pf-empty" }, "No run yet."));
-          body.append(section);
-          return;
-        }
-        const fmt = (ms) => `${ms.toFixed(2)} ms`;
-        section.append(makeEl("div", { class: "pf-head" }, [
-          makeEl("strong", {}, "Performance"),
-          " — wall-clock per phase, this run",
-        ]));
-        const grid = makeEl("div", { class: "pf-grid" });
-        const row = (k, v, sub) => {
-          grid.append(makeEl("div", { class: "pf-k" }, k));
-          grid.append(makeEl("div", { class: "pf-v" }, fmt(v)));
-          grid.append(makeEl("div", { class: "pf-sub" }, sub || ""));
-        };
-        row("Parse (parse_ast × N)", t.parseMs, "static analysis for every dock panel");
-        row("Compile", t.compileMs, "source → wire program (span-mapped)");
-        row("Render", t.renderMs, `output: ${t.outBytes.toLocaleString()} bytes`);
-        row("Total", t.totalMs, "");
-        section.append(grid);
-        if (t.totalMs > 100) {
-          section.append(makeEl("div", { class: "pf-warn" },
-            "⚠ Total run > 100 ms. Most of the cost is usually Parse on N partials — collapse small partials inline or simplify expressions."));
-        }
-        body.append(section);
-      }
+      // Panel #6: Performance now lives in ./app/dock/performance.mjs — the first
+      // dock panel migrated to the ctx form (it takes its one cache, lastTimings,
+      // as an argument; the descriptor above passes it).
 
       // ── Panel #7: Coverage map ────────────────────────────────────────
       // Static branch coverage from the current data: each `if`/`unless`/
