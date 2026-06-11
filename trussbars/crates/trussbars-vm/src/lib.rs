@@ -124,9 +124,25 @@ enum Op {
     /// Advance the innermost iteration; if more elements remain, rebind and jump back to
     /// `body`, else pop the loop context and fall through (to the post-loop `Jump`).
     EachNext(usize),
+    /// `{% scope subject %}` — evaluate `subject`; if truthy, push a re-rooted child [`Env`]
+    /// and fall into the body; if falsy, jump to `otherwise` (the `{% else %}` body, which
+    /// runs in the *parent* scope — no push, so it is not paired with a `ScopeEnd`).
+    ScopeStart {
+        /// The subject to re-root onto (and test for truthiness).
+        subject: Expr,
+        /// Jump here when the subject is falsy.
+        otherwise: usize,
+    },
+    /// End a truthy `{% scope %}` body: pop the re-rooted env and jump past the else body.
+    ScopeEnd(usize),
+    /// `{% local a=(e) b=(e)… %}` — push a child [`Env`] and bind each `(name, value)` in
+    /// order (a later value sees an earlier binding), then fall into the body.
+    LocalStart(Box<[(Rc<str>, Expr)]>),
+    /// End a `{% local %}` body: pop the child env.
+    LocalEnd,
     /// Render a node through the shared interpreter eval (the blocks not yet given native
-    /// bytecode: `with`/`let`/`case`/partials/host block helpers/raw). Byte-identical by
-    /// construction; promoted to native ops opportunistically (perf), never for coverage.
+    /// bytecode: `case`/partials/host block helpers/raw). Byte-identical by construction;
+    /// promoted to native ops opportunistically (perf), never for coverage.
     Delegate(Node),
 }
 
@@ -347,6 +363,32 @@ impl Program {
                     envs.pop();
                     loops.pop();
                 }
+                Op::ScopeStart { subject, otherwise } => {
+                    let subj = eval_expr(envs.last().unwrap(), subject)?;
+                    if subj.truthy_in(mode) {
+                        let child = envs.last().unwrap().rerooted(subj);
+                        envs.push(child);
+                    } else {
+                        pc = *otherwise; // the else body, in the parent scope (no push)
+                        continue;
+                    }
+                }
+                Op::ScopeEnd(target) => {
+                    envs.pop();
+                    pc = *target;
+                    continue;
+                }
+                Op::LocalStart(bindings) => {
+                    // A child env; each value is evaluated with the prior bindings in scope.
+                    envs.push(envs.last().unwrap().clone());
+                    for (name, value) in bindings.iter() {
+                        let v = eval_expr(envs.last().unwrap(), value)?;
+                        envs.last_mut().unwrap().bind(name, v);
+                    }
+                }
+                Op::LocalEnd => {
+                    envs.pop();
+                }
                 Op::Delegate(node) => {
                     eval_nodes(envs.last().unwrap(), core::slice::from_ref(node), &mut out)?;
                 }
@@ -390,6 +432,8 @@ fn patch(ops: &mut [Op], at: usize, to: usize) {
         | Op::JumpUnlessPath { target, .. }
         | Op::JumpUnlessFirst(target)
         | Op::Jump(target)
+        | Op::ScopeStart { otherwise: target, .. }
+        | Op::ScopeEnd(target)
         | Op::EachStart { empty: target, .. } => {
             *target = to;
         }
@@ -523,8 +567,36 @@ fn compile_node(n: &Node, ops: &mut Vec<Op>) {
             let end = ops.len();
             patch(ops, after, end);
         }
-        // The blocks not yet bytecoded (with/let/case/partials/host block helpers/raw) and
-        // any leftover node render through the shared interpreter eval — full coverage.
+        // `{% scope subject %} body {% else %} otherwise {% endscope %}` — re-root on a
+        // truthy subject. The body runs in the pushed env (ScopeEnd pops); the else body
+        // runs in the parent scope (no push).
+        Node::With(w) => {
+            let start = ops.len();
+            ops.push(Op::ScopeStart {
+                subject: w.subject.clone(),
+                otherwise: 0,
+            });
+            compile_nodes(&w.body, ops);
+            let scope_end = ops.len();
+            ops.push(Op::ScopeEnd(0)); // pop + jump past the else body
+            let else_start = ops.len();
+            patch(ops, start, else_start); // ScopeStart.otherwise → the else body
+            compile_nodes(&w.otherwise, ops);
+            let end = ops.len();
+            patch(ops, scope_end, end);
+        }
+        // `{% local a=… b=… %} body {% endlocal %}` — sequential block-scoped aliases.
+        Node::Let { bindings, body, .. } => {
+            let binds: Box<[(Rc<str>, Expr)]> = bindings
+                .iter()
+                .map(|(name, value)| (Rc::from(name.as_str()), value.clone()))
+                .collect();
+            ops.push(Op::LocalStart(binds));
+            compile_nodes(body, ops);
+            ops.push(Op::LocalEnd);
+        }
+        // The blocks not yet bytecoded (case/partials/host block helpers/raw) and any
+        // leftover node render through the shared interpreter eval — full coverage.
         other => ops.push(Op::Delegate(other.clone())),
     }
 }
@@ -596,9 +668,12 @@ mod tests {
             // each bindings + index + else; loop metadata in output.
             ("{% for x i in xs %}{{i}}:{{x}}/{{loop.last}} {% else %}none{% endfor %}", obj(&[("xs", arr(&[s("a"), s("b")]))])),
             ("{% for xs %}x{% else %}EMPTY{% endfor %}", obj(&[("xs", arr(&[]))])),
-            // with / scope (re-root) and let / local (bindings) — delegated, still exact.
+            // with / scope (re-root, native ScopeStart/ScopeEnd) — truthy body + falsy else.
             ("{% scope p %}{{n}}{% endscope %}", obj(&[("p", obj(&[("n", s("Z"))]))])),
+            ("{% scope p %}{{n}}{% else %}NO:{{n}}{% endscope %}", obj(&[("p", Value::Null), ("n", s("R"))])),
+            // let / local (native LocalStart/LocalEnd) — single + sequential (b sees a).
             ("{% local t=(multiply n 2) %}{{t}}{% endlocal %}", obj(&[("n", Value::Num(3.0))])),
+            ("{% local a=(n) b=(add a 1) %}{{a}}-{{b}}{% endlocal %}", obj(&[("n", Value::Num(5.0))])),
             // case.
             ("{% case s %}{% when \"a\" %}A{% when \"b\" %}B{% else %}Z{% endcase %}", obj(&[("s", s("b"))])),
             // inline partial + yield.
