@@ -327,13 +327,6 @@ is `{% … %}` / `{# … #}`; there is no triple-stache, no `{{& }}`, and no qua
 is the same lexical contract Trussbars enforces, so a RawBars/MaxBars template and a Trussbars template
 share one `{{ }}`/`{% %}`/`{# #}` grammar (modulo the typed subset Trussbars layers on top).
 
-*Net surface after this amendment (RawBars/MaxBars):* the `{{ }}` family is **output-only**
-(`{{ expr }}`, `{{ expr | safe }}`); every block, clause, binding, comment, partial, and verbatim
-region is `{% … %}` / `{# … #}`; there is no triple-stache, no `{{& }}`, and no quad-stache. This is
-the same lexical contract Trussbars enforces, so a `.truss`-style RawBars/MaxBars template and a
-Trussbars template now share one `{{ }}`/`{% %}`/`{# #}` grammar (modulo the typed subset Trussbars
-layers on top).
-
 ### Implementation & gates (this amendment)
 
 The change is small and localised, because everything else already shipped:
@@ -346,17 +339,27 @@ The change is small and localised, because everything else already shipped:
 2. **Tests.** The MaxBars/RawBars suites flip the `{{{{#op}}}}`-is-accepted case to a rejection (the
    old "unaffected" assertion becomes a `DisallowedShape` assertion), and gain a regression that the
    `{{{{#raw}}}}` fix-it and the new helper fix-it are distinct.
-3. **Editor tooling (ADR-017)** — *deferred polish.* The `raw-block` semantic-token kind stays (it
-   still paints `{% raw %}` and ClassicBars's `{{{{ }}}}`), because `{% raw %}` and the now-invalid
-   `{{{{ … }}}}` lex to the *same* `RRaw` token — recolouring only the brace-origin one as `error`
-   needs the painter to do the source-origin `isBrace` check `braceControlViolation` does, which the
-   highlighters don't thread today. The render/compile path already rejects `{{{{#op}}}}` with the
-   located fix-it; surfacing it as an LSP diagnostic + recolouring is a follow-up (the `dialectDiagnostics`
-   inventory, `check:dialect-diagnostics`). `check:highlight`/`check:vocab`/`check:tmgrammar` stay
-   green unchanged.
-4. **`check:hbs-conformance` / `check:mustache-conformance` inert** — ClassicBars keeps `{{{{ }}}}`
+3. **Editor highlighting (ADR-017) — deferred, with the real reason.** It is *not* that the painter
+   can't tell the forms apart — `{% raw %}` and `{{{{ … }}}}` both lex to `RRaw`, but `tokenizeSpans
+   src` has `src` in scope, so a one-line `isBrace` check (span opens `{{` vs `{%`, the same check
+   `braceControlViolation` uses) recolours the brace form to `error` cleanly. The blocker is **paint
+   parity** (ADR-026, `check:paint-parity`): the offline TextMate floor is **one dialect-agnostic
+   grammar** (`editors/flatbars.tmLanguage.json`) that paints `{{{{ … }}}}` as a raw-block for *every*
+   dialect — ClassicBars *needs* that — and the gate requires the engine/LSP painting to **agree** with
+   that floor per dialect. Recolouring the engine to `error` for RawBars/MaxBars alone diverges from the
+   grammar (8 chars, proven by `check:paint-parity`). A correct recolour therefore needs the TextMate
+   grammar to become *dialect-aware* (per-dialect raw-block scoping), which the single-grammar
+   architecture doesn't support today — a larger ADR-017/026 change. So the highlighter keeps painting
+   `{{{{ … }}}}` as `raw-block` in all dialects for now; the render/compile path is the source of truth
+   that rejects it.
+4. **LSP diagnostic — follow-up.** Independently, the LSP `dialectDiagnostics` (a regex pass in
+   `editors/lsp/src/tokens.mjs`) does not yet publish a *squiggle* for `{{{{#op}}}}` (nor for the other
+   brace-control violations generally) — only the render/compile path rejects it. Adding those is a
+   separable editor-tooling change (a `dialectDiagnostics` rule + `check:dialect-diagnostics` pin +
+   the dialect-aware grammar above, so the floor and the squiggle agree).
+5. **`check:hbs-conformance` / `check:mustache-conformance` inert** — ClassicBars keeps `{{{{ }}}}`
    raw blocks (Handlebars-faithful) and MinBars its Mustache sigils; `braceControlViolation` runs only
    under `statementTags`, so their byte-identical counts (49/50, 184/184) cannot move.
-5. **Corpus/docs.** The golden `examples/*.truss` corpus is already `{% %}`-only; migrate any remaining
+6. **Corpus/docs.** The golden `examples/*.truss` corpus is already `{% %}`-only; migrate any remaining
    `{{{{#op}}}}` in the tutorials and spec MDX. **Trussbars** already rejects every `{{{{ }}}}`, so its
    conformance harness is unaffected — this brings the *oracle* to parity with the engine it specifies.
