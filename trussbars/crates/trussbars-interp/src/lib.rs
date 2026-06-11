@@ -375,6 +375,13 @@ impl Env {
     pub fn root_value(&self) -> &Value {
         &self.root
     }
+
+    /// `Some(true)` if the innermost loop is on its first iteration, `Some(false)` if a
+    /// later one, `None` outside any loop — the VM's `{% if loop.first %}` fast-op.
+    #[must_use]
+    pub fn loop_first(&self) -> Option<bool> {
+        self.loop_frame.as_ref().map(|f| f.index0.get() == 0)
+    }
 }
 
 type HostHelper = Box<dyn Fn(&[Value]) -> Result<Value, String>>;

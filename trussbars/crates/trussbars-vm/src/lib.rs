@@ -100,6 +100,9 @@ enum Op {
         /// Jump here when the value is falsy / missing.
         target: usize,
     },
+    /// `{% if loop.first %}`: read the innermost loop frame; if **not** the first
+    /// iteration, jump to `target`. The zero-eval form of the per-iteration check.
+    JumpUnlessFirst(usize),
     /// Unconditional jump — skips the remaining arms of a conditional / the `{% else %}` of
     /// a non-empty loop.
     Jump(usize),
@@ -263,6 +266,18 @@ impl Program {
                         continue;
                     }
                 }
+                Op::JumpUnlessFirst(target) => {
+                    // `{% if loop.first %}` — match the interpreter, including the
+                    // out-of-loop error (oracle-invalid input is skipped by conformance).
+                    match envs.last().unwrap().loop_first() {
+                        Some(true) => {}
+                        Some(false) => {
+                            pc = *target;
+                            continue;
+                        }
+                        None => return Err("'loop' used outside an each".into()),
+                    }
+                }
                 Op::JumpUnless {
                     cond,
                     negate,
@@ -373,6 +388,7 @@ fn patch(ops: &mut [Op], at: usize, to: usize) {
     match &mut ops[at] {
         Op::JumpUnless { target, .. }
         | Op::JumpUnlessPath { target, .. }
+        | Op::JumpUnlessFirst(target)
         | Op::Jump(target)
         | Op::EachStart { empty: target, .. } => {
             *target = to;
@@ -411,11 +427,26 @@ fn classify_path(e: &Expr) -> Option<(Base, Box<[Rc<str>]>)> {
     }
 }
 
+/// `true` iff `cond` is exactly `loop.first` — the per-iteration check the `JumpUnlessFirst`
+/// fast-op reads straight off the loop frame instead of routing through `eval_expr`.
+fn is_loop_first(e: &Expr) -> bool {
+    let Expr::App(name, args) = e else {
+        return false;
+    };
+    matches!(
+        (name.as_str(), args.as_slice()),
+        ("lookup", [Expr::App(h, ha), Expr::Lit(Lit::Str(k))])
+            if ha.is_empty() && h == "loop" && k == "first"
+    )
+}
+
 /// Push a conditional jump for `cond`, preferring the borrow-based `JumpUnlessPath` fast-op
 /// for a non-negated `this`/`root` path; returns the op's index (to patch its target).
 fn push_jump_unless(ops: &mut Vec<Op>, cond: &Expr, negate: bool) -> usize {
     let at = ops.len();
-    if !negate
+    if !negate && is_loop_first(cond) {
+        ops.push(Op::JumpUnlessFirst(0));
+    } else if !negate
         && let Some((base, keys)) = classify_path(cond)
     {
         ops.push(Op::JumpUnlessPath {
