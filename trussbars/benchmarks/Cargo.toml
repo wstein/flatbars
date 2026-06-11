@@ -11,8 +11,8 @@ publish = false
 trussbars-core = { path = "../crates/trussbars-core", features = ["derive"] }
 trussbars-macros = { path = "../crates/trussbars-macros" }
 trussbars-std = { path = "../crates/trussbars-std" }
-# The two dynamic backends: the tree-walk interpreter (always-correct) and the bytecode
-# VM (a subset — the optimization path, docs/11 §4).
+# The two dynamic backends: the tree-walk interpreter (the reference) and the bytecode
+# VM (first-class, full coverage — byte-identical, the optimization path, docs/11 §4.3).
 trussbars-interp = { path = "../crates/trussbars-interp" }
 trussbars-vm = { path = "../crates/trussbars-vm" }
 serde = { version = "1", features = ["derive"] }

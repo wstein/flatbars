@@ -90,8 +90,8 @@ before deserializing into `T`). See [docs/01 §10][spec].
 | [`trussbars-core`](crates/trussbars-core) | Runtime: `Safe`/`ToText`/`escape_html`, `nonEmpty` `Truthy` (minus numbers), the `Loop` frame, `SizeHint`. `no_std + alloc`. |
 | [`trussbars-std`](crates/trussbars-std) | The prelude/stdlib operations as monomorphized functions (string / number / array packs). |
 | [`trussbars-derive`](crates/trussbars-derive) | `#[derive(Trussbars)]` — the `Truthy` impl for context structs. |
-| [`trussbars-interp`](crates/trussbars-interp) | The dynamic **tree-walk interpreter** backend (runtime templates, same no-data-derived-names law) — the always-correct dynamic path; `no_std + alloc`. |
-| [`trussbars-vm`](crates/trussbars-vm) | The dynamic **bytecode VM** backend: a flat instruction array + borrow-based machine over the interpreter's `Value`. Covers a subset of the interpreter, ~1.5–2.9× faster where it does (docs/11 §4). |
+| [`trussbars-interp`](crates/trussbars-interp) | The dynamic **tree-walk interpreter** backend (runtime templates, same no-data-derived-names law) — the reference dynamic backend the VM is byte-identical to; `no_std + alloc`. |
+| [`trussbars-vm`](crates/trussbars-vm) | The dynamic **bytecode VM** backend: a flat bytecode skeleton over the shared `trussbars-interp` engine (`if`/`each` structure as bytecode; general expressions + rarer blocks via the shared `eval_expr`/`eval_nodes`), with a borrow-based fast-path for the hot path/loop case. **First-class, full coverage** — compiles every valid template, byte-identical to the interpreter, ~1.6× (big-table)–2.3× (teams) faster (docs/11 §4.3). |
 | [`trussbars-import`](crates/trussbars-import) | Migration **read half**: Mustache / Handlebars / Liquid / StringTemplate4 → faithful spanned ASTs. |
 | [`trussbars-i18n`](crates/trussbars-i18n) | The host-locale translator seam (English fallback). |
 

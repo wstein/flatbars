@@ -36,8 +36,9 @@ cargo +1.96.0 bench --manifest-path trussbars/benchmarks/Cargo.toml
 The columns. The **three Trussbars execution strategies** for the *same* MaxBars language
 (docs/11), fastest to slowest: **Trussbars (AOT)** (verbatim `compileMaxRust` output —
 compiled straight-line Rust), **Trussbars (VM)** (the **bytecode VM**, `trussbars-vm` — a
-flat instruction array run by a borrow-based machine; **first-class, full coverage** — every
-valid template, no subset), and **Trussbars (interpreter)** (the **tree-walk interpreter**,
+flat bytecode skeleton over the shared `trussbars-interp` engine, with a borrow-based fast-path
+for the hot path/loop case; **first-class, full coverage** — every valid template, no subset),
+and **Trussbars (interpreter)** (the **tree-walk interpreter**,
 `trussbars-interp` — the reference dynamic backend, **byte-identical** to the VM). Both
 dynamic backends render *everything*; the VM is the speed-optimized one. Then the peers:
 **Sailfish** and **vy** (the
