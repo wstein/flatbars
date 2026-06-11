@@ -10,8 +10,10 @@ import Data.String (Pattern(..), contains)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
+import FlatBars.Parser (parseWith)
 import FlatBars.Value (Value(..))
-import RawBars (compileJs, render, renderWithOperations)
+import RawBars (compileJs, coreOptions, render, renderWithOperations)
+import RawBars.Parser as RawParser
 import Test.Assert (assert')
 
 obj :: Array (Tuple String Value) -> Value
@@ -164,5 +166,21 @@ main = do
     Left e -> assert' ("compileJs: unexpected error " <> show e) false
     Right js -> assert' ("compileJs: expected a module\n" <> js)
       (contains (Pattern "rt.scope(data") js && contains (Pattern "rt.out(c0.ctx)") js)
+
+  -- ADR-041: the owned `RawBars.Parser` must be byte-identical to the shared parser
+  -- driven with `coreOptions` (same `Template` AND errors) — the equivalence gate that
+  -- pins the fork to the reference until the shared `{% %}` machinery is removed.
+  let
+    parseEquiv name src = assert' ("parse-equiv " <> name)
+      (show (RawParser.parse src) == show (parseWith coreOptions src))
+  parseEquiv "output" "Hi {{ name }}!"
+  parseEquiv "raw-output" "{{{ html }}}"
+  parseEquiv "statement-if" "{% if x %}A{% elif y %}B{% else %}C{% endif %}"
+  parseEquiv "for-set" "{% for i in xs %}{% set n = i %}{{ n }}{% endfor %}"
+  parseEquiv "comment" "a {# note #} b {{! also }} c"
+  parseEquiv "raw-block" "{{{{#raw}}}}verbatim {{x}}{{{{/raw}}}}"
+  parseEquiv "standalone" "  {% if a %}\n  x\n  {% endif %}\n"
+  parseEquiv "reject-amp" "{{&x}}"
+  parseEquiv "reject-rawblock-hbs" "{{{{r}}}}b{{{{/r}}}}"
 
   log "all RawBars tests passed"

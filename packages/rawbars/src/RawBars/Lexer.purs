@@ -1,0 +1,1083 @@
+-- | The **RawBars structural lexer** — forked from the shared `FlatBars.Lexer`
+-- | (ADR-041) so the RawBars surface (the native, desugared-core `{% %}` family with
+-- | MaxBars/Trussbars) owns its front-end. RawBars's config is baked in (`rawLexConfig`:
+-- | `{% … %}` statement tags + `{# … #}` comments on, no set delimiters), but RawBars
+-- | keeps the Handlebars `{{{ … }}}` raw output and `{{! … }}` comment forms (it is
+-- | the *desugared core* surface), so — unlike MaxBars — `bracesOutputOnly` is off.
+-- |
+-- | `tokenizeTemplate` scans source into a flat `RawTok` stream — content runs and
+-- | tag tokens — handling comment stripping, raw-block capture, backslash escaping,
+-- | and `~`/`-` whitespace control. The interior expression text is lexed by the
+-- | shared `FlatBars.Token.tokenizeInterior` (the path/name grammar RawBars shares
+-- | with ClassicBars/MinBars). The scanner is structural only.
+module RawBars.Lexer
+  ( RawTok(..)
+  , LexConfig
+  , defaultLexConfig
+  , rawLexConfig
+  , tokenize
+  , tokenizeTemplate
+  , trimStandalone
+  ) where
+
+import Prelude
+
+import Data.Array as Array
+import Data.Either (Either(..))
+import Data.List (List(..), (:))
+import Data.List as List
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
+import Data.String (Pattern(..))
+import Data.String.CodeUnits as SCU
+import Data.String.Common (joinWith, trim)
+import FlatBars.Error (ParseError(..))
+import FlatBars.Span (Span)
+import FlatBars.Syntax (Sigil(..))
+import FlatBars.Token (Interior, tokenizeInterior)
+
+-- | A flat template token. Comments never appear (they are dropped); `~`
+-- | whitespace control has already been applied to the `Content` runs. Each tag
+-- | carries its `Span`, the source offset of its interior (`Int`), the interior
+-- | text, and — for the expression-bearing tags — that interior already lexed
+-- | (`Interior`, the meaning-free `PosToken` stream or its deferred lex error).
+-- | The parser and the highlighter consume the pre-lexed `Interior` rather than
+-- | re-lexing the text; the text is retained for directive lifting,
+-- | standalone-whitespace head-words, and raw-block close-matching.
+data RawTok
+  = RContent Span String -- span of the source run, text
+  | ROutput Span Int String Interior -- {{{ <interior> }}}
+  | RAmp Span Int String Interior -- {{& <interior> }} — unescaped output (Handlebars `&`)
+  | ROpen Span Sigil Int String Interior -- {{# / {{^ / {{< / {{$ <interior> }} — sigil distinguishes them
+  | RClose Span Int String Interior -- {{/ <interior> }}
+  | RSep Span Int String Interior -- {{ <interior> }} — a name-agnostic separator
+  -- span, `hasHash` (true for the `{{{{# }}}}` FlatBars spelling, false for the
+  -- bare `{{{{ }}}}` Handlebars spelling — gated separately per dialect), base,
+  -- head, the head's `Interior`, body. `{{{{# <interior> }}}} <body> {{{{/ name }}}}`.
+  | RRaw Span Boolean Int String Interior String
+  -- {{! <interior> }} — a *short* comment, kept for directive lifting (the parser
+  -- scans its interior for `@key` heads). Long `{{!-- … --}}` comments are never
+  -- emitted (inert prose).
+  | RComment Span Int String
+  -- {{=<% %>=}} — a Mustache set-delimiter tag (only recognized when
+  -- `LexConfig.mustacheDelims` is on). It changes the active delimiter pair for
+  -- all following content and renders nothing; the parser drops it (like a
+  -- comment) after the standalone-whitespace pass, where it is eligible.
+  | RSetDelim Span
+  -- {{!-- … --}} (and {{~!--) — a *long* comment, inert prose. It is normally
+  -- dropped (it carries no directives and produces no output), but is emitted as
+  -- this span-only token when `LexConfig.keepLongComments` is on, so the
+  -- highlighter can colour it (the parser/compiler never set that flag, so they
+  -- still never see it). Standalone-whitespace and `~` trimming are unchanged —
+  -- handled by the surrounding flush regardless of whether the token is emitted.
+  | RLongComment Span
+  -- An unterminated construct: a `{{` / `{{!` / `{{!--` / `{{{{` opener with no
+  -- closer. The *recovering* scanner (ADR-023, extended to the lexer) emits this
+  -- instead of bailing — it spans the orphan opener up to the next opener (or
+  -- EOF), carries the structural `ParseError`, and resyncs there so the rest of
+  -- the template still lexes (so highlighting survives a half-typed tag). The
+  -- parser harvests its error; `tokenizeSpans` paints it as the `unterminated`
+  -- kind; the fail-fast `parse` still reports it.
+  | RError Span ParseError
+
+derive instance eqRawTok :: Eq RawTok
+
+instance showRawTok :: Show RawTok where
+  show = case _ of
+    RContent _ s -> "RContent " <> show s
+    ROutput _ _ s _ -> "ROutput " <> show s
+    RAmp _ _ s _ -> "RAmp " <> show s
+    ROpen _ sig _ s _ -> "ROpen " <> show sig <> " " <> show s
+    RClose _ _ s _ -> "RClose " <> show s
+    RSep _ _ s _ -> "RSep " <> show s
+    RRaw _ hash _ s _ b -> "RRaw " <> show hash <> " " <> show s <> " " <> show b
+    RComment _ _ s -> "RComment " <> show s
+    RSetDelim _ -> "RSetDelim"
+    RLongComment _ -> "RLongComment"
+    RError _ e -> "RError " <> show e
+
+--------------------------------------------------------------------------------
+-- Character helpers
+--------------------------------------------------------------------------------
+
+isSpace :: Char -> Boolean
+isSpace c = c == ' ' || c == '\t' || c == '\n' || c == '\r'
+
+-- | Does `cs` contain the literal `pat` starting at index `i`?
+matchAt :: Array Char -> Int -> String -> Boolean
+matchAt cs i pat =
+  let
+    pcs = SCU.toCharArray pat
+  in
+    Array.slice i (i + Array.length pcs) cs == pcs
+
+-- | First index `>= from` at which `pat` occurs, if any.
+findFrom :: Array Char -> Int -> String -> Maybe Int
+findFrom cs from pat = go from
+  where
+  len = Array.length cs
+  go i
+    | i > len = Nothing
+    | matchAt cs i pat = Just i
+    | otherwise = go (i + 1)
+
+slice :: Array Char -> Int -> Int -> String
+slice cs i j = SCU.fromCharArray (Array.slice i j cs)
+
+trimStartWs :: String -> String
+trimStartWs s = SCU.fromCharArray (Array.dropWhile isSpace (SCU.toCharArray s))
+
+trimEndWs :: String -> String
+trimEndWs s =
+  SCU.fromCharArray (Array.reverse (Array.dropWhile isSpace (Array.reverse (SCU.toCharArray s))))
+
+-- | The first whitespace-delimited word of a string (leading whitespace skipped) — the
+-- | head keyword of a `{% … %}` statement tag. `""` for an all-whitespace string.
+firstWord :: String -> String
+firstWord s =
+  SCU.fromCharArray
+    (Array.takeWhile (not <<< isSpace) (Array.dropWhile isSpace (SCU.toCharArray s)))
+
+-- | A `{% endX %}` close head (`endif`, `endeach`, …): `end` + a non-empty block name.
+isStmtClose :: String -> Boolean
+isStmtClose h = SCU.take 3 h == "end" && SCU.length h > 3
+
+-- | A `{% %}` clause separator head — splits the enclosing block (docs-19), the `{% %}`
+-- | analogue of the bare `{{else}}` / `{{when}}` / `{{elif}}`.
+isStmtSep :: String -> Boolean
+isStmtSep h = h == "else" || h == "elif" || h == "when"
+
+--------------------------------------------------------------------------------
+-- Standalone whitespace removal (Handlebars-style)
+--------------------------------------------------------------------------------
+
+-- | Strip the line a "standalone" tag sits on: when a block open/close or a
+-- | comment is alone on its line (only whitespace before it back to a newline or
+-- | the start, and only whitespace after it to a newline or the end), remove
+-- | that indentation and the trailing newline so the tag leaves no blank line.
+-- |
+-- | Block opens/closes (`{{#…}}` / `{{/…}}`) and comments (`{{! }}`) are always
+-- | eligible. Output tags (`{{ }}` / `{{{ }}}`) never are. A bare separator
+-- | (`RSep`) is eligible only when its head name is in `seps` — the caller's
+-- | clause-separator names (`["else", "elif"]`): at the structural level a
+-- | `{{ x }}` separator is indistinguishable from surface output, so only the
+-- | known clause markers are trimmed (a `{{else}}` / `{{elif …}}` alone on its
+-- | line leaves no blank line), never an arbitrary `{{ x }}`. Composes with `~`:
+-- | it runs on the already tilde-trimmed content.
+trimStandalone :: Array String -> Array RawTok -> Array RawTok
+trimStandalone seps toks = Array.mapWithIndex trimContent toks
+  where
+
+  -- standalone-eligible: a block open/close/comment, or a separator whose head
+  -- name is a known clause marker (so `{{else}}`/`{{elif}}` strip, output does not).
+  eligible :: RawTok -> Boolean
+  eligible t = blockLevel t || case t of
+    RSep _ _ s _ -> Array.elem (sepHead s) seps
+    _ -> false
+
+  trimContent :: Int -> RawTok -> RawTok
+  trimContent j = case _ of
+    RContent sp s ->
+      let
+        -- the tag *before* this content is standalone ⇒ drop its trailing line.
+        s1 = if standaloneAt (j - 1) then dropLeadingLine s else s
+        -- the tag *after* this content is standalone ⇒ drop this line's indent.
+        s2 = if standaloneAt (j + 1) then dropTrailingIndent s1 else s1
+      in
+        -- the source span is kept (the original run's location) — trimming removes
+        -- whitespace from the rendered text, not from where it sits in the source.
+        RContent sp s2
+    other -> other
+
+  standaloneAt :: Int -> Boolean
+  standaloneAt i = case Array.index toks i of
+    Just t | eligible t -> leftBlank i && rightBlank i
+    _ -> false
+
+  -- everything from the previous newline (or start of input) to the tag is blank.
+  -- Scans *through* blank content runs but stops at any other tag: an
+  -- interpolation or block tag earlier on the same line is non-whitespace source,
+  -- so the tag is not standalone (Handlebars/Mustache parity — without this, the
+  -- space in `pass:[{{#each xs}}{{this}} {{/each}}]` was wrongly stripped).
+  leftBlank :: Int -> Boolean
+  leftBlank i = goLeft (i - 1)
+    where
+    goLeft k = case Array.index toks k of
+      Nothing -> true -- start of input
+      Just (RContent _ s)
+        | hasNL s -> allWs (afterLastNL s) -- reached this line's start
+        | allWs s -> goLeft (k - 1) -- a wholly-blank run; keep scanning left
+        | otherwise -> false -- visible text on this line
+      Just _ -> false -- another tag on this line ⇒ not standalone
+
+  -- everything from the tag to the next newline (or end of input) is blank.
+  rightBlank :: Int -> Boolean
+  rightBlank i = goRight (i + 1)
+    where
+    goRight k = case Array.index toks k of
+      Nothing -> true -- end of input
+      Just (RContent _ s)
+        | hasNL s -> allWs (beforeFirstNL s) -- reached this line's end
+        | allWs s -> goRight (k + 1) -- a wholly-blank run; keep scanning right
+        | otherwise -> false -- visible text on this line
+      Just _ -> false -- another tag on this line ⇒ not standalone
+
+blockLevel :: RawTok -> Boolean
+blockLevel = case _ of
+  ROpen _ _ _ _ _ -> true
+  RClose _ _ _ _ -> true
+  RComment _ _ _ -> true
+  RSetDelim _ -> true -- standalone-eligible (a lone `{{=<% %>=}}` line is stripped)
+  _ -> false
+
+-- | The head name of a separator interior — its first whitespace-delimited word
+-- | (leading whitespace skipped): `"else"` from `{{else}}`, `"elif"` from
+-- | `{{elif (gt x 0)}}`. Used only to decide standalone-whitespace eligibility.
+sepHead :: String -> String
+sepHead s =
+  let
+    cs = Array.dropWhile isSpace (SCU.toCharArray s)
+  in
+    SCU.fromCharArray (Array.takeWhile (not <<< isSpace) cs)
+
+allWs :: String -> Boolean
+allWs = Array.all isSpace <<< SCU.toCharArray
+
+hasNL :: String -> Boolean
+hasNL s = nlIndex true s /= Nothing
+
+-- index of the first ('true') or last ('false') newline, in code units.
+nlIndex :: Boolean -> String -> Maybe Int
+nlIndex first s =
+  let
+    f = if first then Array.findIndex else Array.findLastIndex
+  in
+    f (_ == '\n') (SCU.toCharArray s)
+
+afterLastNL :: String -> String
+afterLastNL s = case nlIndex false s of
+  Just i -> SCU.drop (i + 1) s
+  Nothing -> s
+
+beforeFirstNL :: String -> String
+beforeFirstNL s = case nlIndex true s of
+  Just i -> SCU.take i s
+  Nothing -> s
+
+-- drop the leading blank run through the first newline (the standalone tag's
+-- line break); with no newline it is trailing EOF whitespace, dropped whole.
+dropLeadingLine :: String -> String
+dropLeadingLine s = case nlIndex true s of
+  Just i -> SCU.drop (i + 1) s
+  Nothing -> ""
+
+-- drop the trailing blank indentation after the last newline (keep the newline);
+-- with no newline the whole run is indentation on the first line, dropped whole.
+dropTrailingIndent :: String -> String
+dropTrailingIndent s = case nlIndex false s of
+  Just i -> SCU.take (i + 1) s
+  Nothing -> ""
+
+--------------------------------------------------------------------------------
+-- Template tokenizer
+--------------------------------------------------------------------------------
+
+-- | Lexer configuration for the *template* scanner (distinct from
+-- | `FlatBars.Token.LexOptions`, which configures the *interior* expression
+-- | tokenizer). `open`/`close` are the initial delimiter pair; `mustacheDelims`
+-- | enables the Mustache `{{=<% %>=}}` set-delimiter tag — when on, the scanner
+-- | swaps the active pair mid-stream (ADR-015). When `mustacheDelims` is off
+-- | (the ladder's default) and the pair is the default `{{`/`}}`, the scan is
+-- | byte-identical to the fixed-delimiter lexer.
+-- | `keepLongComments` makes the scanner emit `{{!-- … --}}` long comments as
+-- | span-only `RLongComment` tokens instead of dropping them; only the syntax
+-- | highlighter sets it (rendering/compilation leave it off, so their token
+-- | stream — and output — is unchanged).
+-- | `statementTags` enables the Django-style `{% … %}` statement surface (ADR/docs-19,
+-- | RawBars/MaxBars/Trussbars): when on, a `{% … %}` tag lexes into the *same* structural
+-- | tokens its `{{ … }}` counterpart would — `{% if %}`/`{% each %}`/… → `ROpen Section`,
+-- | `{% endX %}` → `RClose X`, `{% else %}`/`{% elif %}`/`{% when %}` → `RSep` — so the
+-- | parser, engine, and every backend are unchanged (docs-19 §3). Off (the default) the
+-- | `{%` opener is ordinary content, byte-identical to before; ClassicBars/MinBars keep it
+-- | off.
+type LexConfig =
+  { open :: String
+  , close :: String
+  , mustacheDelims :: Boolean
+  , keepLongComments :: Boolean
+  , statementTags :: Boolean
+  -- | `{{ … }}` is OUTPUT-ONLY (ADR-039): no Handlebars `{{{ … }}}` raw sigil (unescaped
+  -- | output is `{{ x | safe }}`) and no `{{! … }}` / `{{!-- --}}` comments (a comment is
+  -- | `{# … #}`). On for the pure native surface (MaxBars/Trussbars), so a `{{{` is a lex
+  -- | error and a `{{!` lexes as ordinary output (`! x` ⇒ `not x`), matching Trussbars.
+  -- | Off (the default) keeps the full Handlebars grammar — ClassicBars/MinBars and the
+  -- | desugared-core RawBars surface (which still spells raw output `{{{op}}}`).
+  , bracesOutputOnly :: Boolean
+  }
+
+-- | Default template-lexer config: `{{`/`}}`, no set-delimiter switching, long
+-- | comments dropped (the render/compile default), no `{% %}` statement tags, the full
+-- | Handlebars output/comment grammar (`bracesOutputOnly` off).
+defaultLexConfig :: LexConfig
+defaultLexConfig =
+  { open: "{{"
+  , close: "}}"
+  , mustacheDelims: false
+  , keepLongComments: false
+  , statementTags: false
+  , bracesOutputOnly: false
+  }
+
+-- | The frozen RawBars lexer config: `{{`/`}}`, `{% %}` statement tags + `{# %}`
+-- | comments on, no set delimiters, the full Handlebars `{{{ }}}`/`{{! }}` output and
+-- | comment grammar kept (`bracesOutputOnly` off). `keepLongComments` is the one
+-- | render-vs-highlight axis (the highlighter keeps `{{!-- --}}` so it can colour them).
+rawLexConfig :: Boolean -> LexConfig
+rawLexConfig keepLongComments = defaultLexConfig
+  { statementTags = true, keepLongComments = keepLongComments }
+
+-- | Tokenize RawBars source into the flat `RawTok` stream — the owned entry, no
+-- | knobs (ADR-041); the RawBars config is baked in. Long comments are dropped (the
+-- | render/compile default); `RawBars.Highlight` calls `tokenizeTemplate (rawLexConfig
+-- | true)` to keep them.
+tokenize :: String -> Either ParseError (Array RawTok)
+tokenize = tokenizeTemplate (rawLexConfig false)
+
+type TagResult = { mtok :: Maybe RawTok, next :: Int, trimL :: Boolean, trimR :: Boolean }
+
+-- | Result of reading a set-delimiter tag: the token, the next index, and the
+-- | new active delimiter pair the scan continues with.
+type SetDelimResult =
+  { tok :: RawTok
+  , next :: Int
+  , open :: String
+  , close :: String
+  , trimL :: Boolean
+  , trimR :: Boolean
+  }
+
+-- | Scan a template into the flat `RawTok` stream. Each tag's interior is lexed
+-- | *here*, at scan time, by the shared path/name-only `tokenizeInterior` and
+-- | carried on the token. The structural shape (tag boundaries, sigils, spans, raw
+-- | bodies, set-delimiter state) is interior-grammar-independent.
+tokenizeTemplate :: LexConfig -> String -> Either ParseError (Array RawTok)
+tokenizeTemplate cfg src = map finalize (go 0 cfg.open cfg.close 0 [] Nil false)
+  where
+  cs = SCU.toCharArray src
+  len = Array.length cs
+
+  -- Lex a tag interior at its source offset — the pre-lexed `Interior` every
+  -- expression-bearing `RawTok` carries.
+  interiorAt :: Int -> String -> Interior
+  interiorAt base s = tokenizeInterior base s
+
+  -- Find a tag's close delimiter from `from` — the plain first match. (The
+  -- brace-aware close finder for `{k: v}` dict literals is MaxBars-only and lives in
+  -- `MaxBars.Lexer`; the dialects this shared scanner serves have no `{` interior.)
+  closeFrom :: Int -> String -> Maybe Int
+  closeFrom from close = findFrom cs from close
+
+  -- Tokens accumulate in a *reversed* `List` (O(1) prepend) and are reversed
+  -- into an `Array` once, for the same O(n²)-avoidance as the content scan.
+  finalize :: List RawTok -> Array RawTok
+  finalize = Array.fromFoldable <<< List.reverse
+
+  -- The content run is tracked as a *slice* `[segStart, i)` of the source plus
+  -- `frags`, the fragments split off by backslash escapes (which rewrite text,
+  -- so the run is not one contiguous slice). A normal character just advances
+  -- `i` — O(1), no per-char copy — so a long content run is linear, not the
+  -- O(n²) `Array.snoc`-per-char it used to be. `frags` is flushed by joining.
+  --
+  -- Every recursive `go` must stay in *tail* position (explicit `case`, never
+  -- `do`) or PureScript abandons the tail-call loop and the scan overflows the
+  -- stack on large input.
+  go
+    :: Int
+    -> String
+    -> String
+    -> Int
+    -> Array String
+    -> List RawTok
+    -> Boolean
+    -> Either ParseError (List RawTok)
+  go i open close segStart frags acc pend
+    | i >= len = Right
+        (flush { start: segStart, end: i } (contentTo segStart frags i) acc pend false)
+    | otherwise = case Array.index cs i of
+        Nothing -> Right
+          (flush { start: segStart, end: i } (contentTo segStart frags i) acc pend false)
+        Just c
+          -- A set-delimiter tag `<open>=A B=<close>` (Mustache; gated). Checked
+          -- before the opener probe so `{{=…=}}` is not read as a bare separator.
+          -- It swaps the active pair for everything that follows.
+          | cfg.mustacheDelims && matchAt cs i (open <> "=") -> case readSetDelim i open close of
+              Left e -> recoverFrom i e segStart frags acc pend open close
+              Right sd ->
+                let
+                  acc1 = flush { start: segStart, end: i } (contentTo segStart frags i) acc pend
+                    sd.trimL
+                in
+                  go sd.next sd.open sd.close sd.next [] (sd.tok : acc1) sd.trimR
+          -- A Django-style statement tag `{% … %}` (docs-19; gated on `statementTags`).
+          -- Checked before the `{{` opener probe; it re-delimits the same structural tokens
+          -- (`ROpen`/`RClose`/`RSep`) so the parser is unchanged. It never switches delimiters.
+          | cfg.statementTags && matchAt cs i "{%" -> case readStatementTag i of
+              Left e -> recoverFrom i e segStart frags acc pend open close
+              Right res ->
+                let
+                  acc2 = consTok res.mtok
+                    ( flush { start: segStart, end: i } (contentTo segStart frags i) acc pend
+                        res.trimL
+                    )
+                in
+                  go res.next open close res.next [] acc2 res.trimR
+          -- A Django/Jinja inline comment `{# … #}` (ADR-039 item 1; gated on
+          -- `statementTags`, replacing the Handlebars `{{! … }}` in those dialects). It
+          -- renders nothing — emitted as an `RComment` the parser drops. Checked before
+          -- the `{{` opener probe so a leading `{#` is never read as a dict literal.
+          | cfg.statementTags && matchAt cs i "{#" -> case readInlineComment i of
+              Left e -> recoverFrom i e segStart frags acc pend open close
+              Right res ->
+                let
+                  acc2 = consTok res.mtok
+                    ( flush { start: segStart, end: i } (contentTo segStart frags i) acc pend
+                        res.trimL
+                    )
+                in
+                  go res.next open close res.next [] acc2 res.trimR
+          -- Default delimiters `{{`/`}}`: the full Handlebars-flavored grammar,
+          -- byte-identical to the fixed-delimiter lexer (backslash escapes, triple,
+          -- raw blocks, long comments, `~`). The opener probe is gated on `{`, so
+          -- non-brace content costs one comparison.
+          | open == "{{" && close == "}}" && c == '\\' ->
+              if matchAt cs (i + 1) "\\" then
+                go (i + 2) open close (i + 2) (pushSeg segStart frags i "\\") acc pend
+              else case escapedOpenerAt (i + 1) of
+                Just lit ->
+                  let
+                    next = i + 1 + SCU.length lit
+                  in
+                    go next open close next (pushSeg segStart frags i lit) acc pend
+                Nothing -> go (i + 1) open close (i + 1) (pushSeg segStart frags i "\\") acc pend
+          | open == "{{" && close == "}}" && c == '{' && isOpenerAt i -> case readTag i of
+              Left e -> recoverFrom i e segStart frags acc pend open close
+              Right res ->
+                let
+                  acc2 = consTok res.mtok
+                    ( flush { start: segStart, end: i } (contentTo segStart frags i) acc pend
+                        res.trimL
+                    )
+                in
+                  case delimSwitch res.mtok of
+                    Left e -> Left e
+                    Right Nothing -> go res.next open close res.next [] acc2 res.trimR
+                    Right (Just d) -> go res.next d.open d.close res.next [] acc2 res.trimR
+          | open == "{{" && close == "}}" -> go (i + 1) open close segStart frags acc pend
+          -- Custom delimiters: the reduced Mustache grammar (no triple/raw/long
+          -- comment/`~` — those forms do not rebase, ADR-015).
+          | matchAt cs i open -> case readCustomTag i open close of
+              Left e -> recoverFrom i e segStart frags acc pend open close
+              Right res ->
+                let
+                  acc2 = consTok res.mtok
+                    ( flush { start: segStart, end: i } (contentTo segStart frags i) acc pend
+                        res.trimL
+                    )
+                in
+                  case delimSwitch res.mtok of
+                    Left e -> Left e
+                    Right Nothing -> go res.next open close res.next [] acc2 res.trimR
+                    Right (Just d) -> go res.next d.open d.close res.next [] acc2 res.trimR
+          | otherwise -> go (i + 1) open close segStart frags acc pend
+
+  -- Push an optional tag token onto the (reversed) accumulator.
+  consTok :: Maybe RawTok -> List RawTok -> List RawTok
+  consTok mtok acc1 = maybe acc1 (\t -> t : acc1) mtok
+
+  -- Recover from an unterminated construct (ADR-023, extended to the lexer): emit
+  -- an `RError` spanning the orphan opener `i` up to the *next* opener (or EOF) so
+  -- a later valid tag still lexes, flush the content before it, and resume there.
+  -- This is the COLD path (errors are rare) — the mutual call back into `go` does
+  -- not grow the hot content scan's stack, which stays in `go`'s self-recursion.
+  recoverFrom
+    :: Int
+    -> ParseError
+    -> Int
+    -> Array String
+    -> List RawTok
+    -> Boolean
+    -> String
+    -> String
+    -> Either ParseError (List RawTok)
+  recoverFrom i e segStart frags acc pend open close =
+    let
+      resync = fromMaybe len (findFrom cs (i + SCU.length open) open)
+      acc2 = RError { start: i, end: resync } e : flush { start: segStart, end: i }
+        (contentTo segStart frags i)
+        acc
+        pend
+        false
+    in
+      go resync open close resync [] acc2 false
+
+  -- Decide whether a just-read token switches the delimiters. A
+  -- `{{! @delimiters: A B }}` short comment is *positional* (like an inline
+  -- `{{=A B=}}`): when `mustacheDelims` is on it switches the active pair from
+  -- here on (the comment is still emitted, so it is carried as a directive the
+  -- engine ignores — lexer-acted, like `@trim`). Gated on `mustacheDelims`, so
+  -- the Handlebars family (ClassicBars, default) never treats `@delimiters`
+  -- specially. `Right Nothing` ⇒ no switch; this is a pure decision, never
+  -- recursing — `go` must call itself directly to keep its tail-call loop.
+  delimSwitch :: Maybe RawTok -> Either ParseError (Maybe { open :: String, close :: String })
+  delimSwitch = case _ of
+    Just (RComment _ _ interior) | cfg.mustacheDelims -> case parseDelimDirective interior of
+      Nothing -> Right Nothing
+      Just (Left e) -> Left e
+      Just (Right d) -> Right (Just d)
+    _ -> Right Nothing
+
+  -- A `@delimiters: A B` directive comment ⇒ `Just (Right {open,close})`; a
+  -- malformed one ⇒ `Just (Left err)`; any other comment ⇒ `Nothing`.
+  parseDelimDirective :: String -> Maybe (Either ParseError { open :: String, close :: String })
+  parseDelimDirective interior =
+    let
+      t = trimStartWs interior
+    in
+      case
+        SCU.stripPrefix (Pattern "@delimiters") t >>=
+          (trimStartWs >>> SCU.stripPrefix (Pattern ":"))
+        of
+        Nothing -> Nothing
+        Just val -> Just case delimWords val of
+          Just d | validDelim d.open && validDelim d.close -> Right d
+          _ -> Left (LexError "@delimiters expects two whitespace-separated delimiters (no '=')" 0)
+
+  -- The content string for a run: prior escape fragments followed by the
+  -- still-uncopied slice `[segStart, end)`.
+  contentTo :: Int -> Array String -> Int -> String
+  contentTo segStart frags end = joinWith "" (Array.snoc frags (slice cs segStart end))
+
+  -- Close the current segment `[segStart, end)` and append a literal fragment.
+  pushSeg :: Int -> Array String -> Int -> String -> Array String
+  pushSeg segStart frags end lit = Array.snoc (Array.snoc frags (slice cs segStart end)) lit
+
+  -- Flush a content string (prepending to the reversed token list), applying a
+  -- pending leading trim and an optional trailing trim (from the following tag).
+  -- `span` is the source run `[segStart, i)`; kept even when `~`-trimming shortens
+  -- the rendered text (the literal still sits at that source location).
+  flush :: Span -> String -> List RawTok -> Boolean -> Boolean -> List RawTok
+  flush span s0 acc pend trimR =
+    let
+      s1 = if pend then trimStartWs s0 else s0
+      s2 = if trimR then trimEndWs s1 else s1
+    in
+      if s2 == "" then acc else RContent span s2 : acc
+
+  -- The brace-prefixed openers, longest first. The `~` whitespace-control
+  -- variants (`{{~#`, `{{~/`, …) are recognized so a left-trim tilde may sit
+  -- between the braces and the sigil. `{{#` is the only block *opener*; the bare
+  -- double-stash `{{ … }}` is a name-agnostic *separator* (handled separately).
+  openerLiteralAt :: Int -> Maybe String
+  openerLiteralAt i
+    | matchAt cs i "{{{{#" = Just "{{{{#"
+    | matchAt cs i "{{{{" = Just "{{{{" -- raw block, Handlebars form (no `#`)
+    | matchAt cs i "{{~!--" = Just "{{~!--"
+    | matchAt cs i "{{!--" = Just "{{!--"
+    | matchAt cs i "{{{^" = Just "{{{^" -- inverse block, triple-brace variant
+    | matchAt cs i "{{{/" = Just "{{{/" -- close, triple-brace variant
+    | matchAt cs i "{{{" = Just "{{{"
+    | matchAt cs i "{{~!" = Just "{{~!"
+    | matchAt cs i "{{!" = Just "{{!"
+    | matchAt cs i "{{~#" = Just "{{~#"
+    | matchAt cs i "{{#" = Just "{{#"
+    | matchAt cs i "{{~^" = Just "{{~^"
+    | matchAt cs i "{{^" = Just "{{^" -- inverse block (Handlebars inverted section)
+    | matchAt cs i "{{~<" = Just "{{~<"
+    | matchAt cs i "{{<" = Just "{{<" -- parent block (Mustache inheritance `{{<name}}`)
+    | matchAt cs i "{{~$" = Just "{{~$"
+    | matchAt cs i "{{$" = Just "{{$" -- override block (Mustache inheritance `{{$name}}`)
+    | matchAt cs i "{{~/" = Just "{{~/"
+    | matchAt cs i "{{/" = Just "{{/"
+    | matchAt cs i "{{~&" = Just "{{~&"
+    | matchAt cs i "{{&" = Just "{{&" -- unescaped output (Handlebars `&`)
+    | otherwise = Nothing
+
+  -- A separator is any `{{` that is not `{{{` and not one of the bracketed
+  -- openers above — a bare double-stash whose head is an identifier. The lexer
+  -- recognizes the *shape*, never the name.
+  isSeparatorAt :: Int -> Boolean
+  isSeparatorAt i = matchAt cs i "{{" && not (matchAt cs i "{{{") && case openerLiteralAt i of
+    Just _ -> false
+    Nothing -> true
+
+  isOpenerAt :: Int -> Boolean
+  isOpenerAt i = case openerLiteralAt i of
+    Just _ -> true
+    Nothing -> isSeparatorAt i
+
+  -- The literal text emitted for a backslash-escaped opener.
+  escapedOpenerAt :: Int -> Maybe String
+  escapedOpenerAt i = case openerLiteralAt i of
+    Just s -> Just s
+    Nothing -> if isSeparatorAt i then Just "{{" else Nothing
+
+  readTag :: Int -> Either ParseError TagResult
+  readTag i
+    | matchAt cs i "{{{{#" = readRaw i 5 -- `{{{{#name}}}}` (FlatBars/back-compat)
+    | matchAt cs i "{{{{" = readRaw i 4 -- `{{{{name}}}}` (Handlebars raw block)
+    -- `bracesOutputOnly` (MaxBars/Trussbars, ADR-039): the Handlebars comments
+    -- `{{! }}` / `{{!-- --}}` are not recognized (the comment is `{# … #}`), so they fall
+    -- through to `{{` output (`! x` ⇒ `not x`); a glued `{{{` is rejected (unescaped
+    -- output is `{{ x | safe }}`). RawBars keeps the Handlebars forms (`bracesOutputOnly`
+    -- off) — it still spells raw output `{{{op}}}`.
+    | not cfg.bracesOutputOnly && matchAt cs i "{{~!--" = readLongComment i "{{~!--"
+    | not cfg.bracesOutputOnly && matchAt cs i "{{!--" = readLongComment i "{{!--"
+    | cfg.bracesOutputOnly && matchAt cs i "{{{" =
+        Left
+          ( LexError
+              "`{{{ … }}}` is not a tag here — unescaped output is `{{ x | safe }}`, a verbatim region is `{% raw %}`"
+              i
+          )
+    | matchAt cs i "{{{^" = readBlockOpen i "{{{^" Inverse "}}}"
+    | matchAt cs i "{{{/" = readClose i "{{{/" "}}}"
+    | matchAt cs i "{{{" = readOutput i
+    | not cfg.bracesOutputOnly && matchAt cs i "{{~!" = readShortComment i "{{~!"
+    | not cfg.bracesOutputOnly && matchAt cs i "{{!" = readShortComment i "{{!"
+    -- `{{#*name}}` (inline-partial decorator) and `{{#>name}}` (partial block) are
+    -- distinct openers — matched before bare `{{#}}` so the `*`/`>` is consumed as
+    -- part of the opener, not folded into the head.
+    | matchAt cs i "{{~#*" = readBlockOpen i "{{~#*" Decorator "}}"
+    | matchAt cs i "{{#*" = readBlockOpen i "{{#*" Decorator "}}"
+    | matchAt cs i "{{~#>" = readBlockOpen i "{{~#>" PartialBlock "}}"
+    | matchAt cs i "{{#>" = readBlockOpen i "{{#>" PartialBlock "}}"
+    | matchAt cs i "{{~#" = readBlockOpen i "{{~#" Section "}}"
+    | matchAt cs i "{{#" = readBlockOpen i "{{#" Section "}}"
+    | matchAt cs i "{{~^" = readBlockOpen i "{{~^" Inverse "}}"
+    | matchAt cs i "{{^" = readBlockOpen i "{{^" Inverse "}}"
+    | matchAt cs i "{{~<" = readBlockOpen i "{{~<" Parent "}}"
+    | matchAt cs i "{{<" = readBlockOpen i "{{<" Parent "}}"
+    | matchAt cs i "{{~$" = readBlockOpen i "{{~$" BlockDef "}}"
+    | matchAt cs i "{{$" = readBlockOpen i "{{$" BlockDef "}}"
+    | matchAt cs i "{{~/" = readClose i "{{~/" "}}"
+    | matchAt cs i "{{/" = readClose i "{{/" "}}"
+    | matchAt cs i "{{~&" = readAmp i "{{~&"
+    | matchAt cs i "{{&" = readAmp i "{{&"
+    | matchAt cs i "{{" = readSeparator i
+    | otherwise = Left (LexError "internal: no opener" i)
+
+  -- The explicit whitespace-control marker. The Handlebars family spells it `~`
+  -- (`{{~ … ~}}`); the Django/Jinja/Liquid `{% %}` family spells it `-`
+  -- (`{%- … -%}` / `{{- … -}}`, ADR-039 item 3). The two are mutually exclusive by
+  -- dialect — `statementTags` selects which one the scanner trims on — so the `~`
+  -- spelling is simply inert in the statement-tag dialects (the ADR's "`~` not
+  -- adopted"), and `-` is inert (an ordinary operator char) everywhere else.
+  trimMark :: String
+  trimMark = if cfg.statementTags then "-" else "~"
+
+  -- A left-trim marker may sit immediately after the braces, before the sigil.
+  leadTrimAt :: Int -> Boolean
+  leadTrimAt i = matchAt cs (i + 2) trimMark
+
+  -- Split a tag interior on a leading/trailing trim marker, returning
+  -- (trimL, trimR, core). The marker must be *glued* to the delimiter (it is the
+  -- interior's first/last char), so a spaced operator (`{{ a - b }}`, `{{ -x }}`)
+  -- never trims — exactly the Jinja rule.
+  splitTrims :: String -> { trimL :: Boolean, trimR :: Boolean, core :: String }
+  splitTrims raw =
+    let
+      trimL = SCU.take 1 raw == trimMark
+      r1 = if trimL then SCU.drop 1 raw else raw
+      trimR = SCU.takeRight 1 r1 == trimMark
+      core = if trimR then SCU.dropRight 1 r1 else r1
+    in
+      { trimL, trimR, core }
+
+  readOutput :: Int -> Either ParseError TagResult
+  readOutput i =
+    let
+      start = i + 3
+    in
+      case closeFrom start "}}}" of
+        Nothing -> Left (UnterminatedTag i)
+        Just q ->
+          let
+            t = splitTrims (slice cs start q)
+          in
+            Right
+              { mtok: Just (ROutput { start: i, end: q + 3 } start t.core (interiorAt start t.core))
+              , next: q + 3
+              , trimL: t.trimL
+              , trimR: t.trimR
+              }
+
+  -- A block opener `{{# / {{^ [~] name args [~] close`, carrying its `sigil`
+  -- (Section/Inverse). `close` is `}}` for double-brace openers, `}}}` for the
+  -- triple-brace inverse variant `{{{^…}}}`.
+  readBlockOpen :: Int -> String -> Sigil -> String -> Either ParseError TagResult
+  readBlockOpen i opener sigil close =
+    let
+      start = i + SCU.length opener
+      cl = SCU.length close
+    in
+      case closeFrom start close of
+        Nothing -> Left (UnterminatedTag i)
+        Just q ->
+          let
+            t = splitTrims (slice cs start q)
+          in
+            Right
+              { mtok: Just
+                  (ROpen { start: i, end: q + cl } sigil start t.core (interiorAt start t.core))
+              , next: q + cl
+              , trimL: leadTrimAt i || t.trimL
+              , trimR: t.trimR
+              }
+
+  -- A close `{{/ [~] name [~] close`; `close` is `}}` or `}}}` (the triple-brace
+  -- `{{{/…}}}` that pairs with the triple-brace inverse open).
+  readClose :: Int -> String -> String -> Either ParseError TagResult
+  readClose i opener close =
+    let
+      start = i + SCU.length opener
+      cl = SCU.length close
+    in
+      case closeFrom start close of
+        Nothing -> Left (UnterminatedTag i)
+        Just q ->
+          let
+            t = splitTrims (slice cs start q)
+          in
+            Right
+              { mtok: Just (RClose { start: i, end: q + cl } start t.core (interiorAt start t.core))
+              , next: q + cl
+              , trimL: leadTrimAt i || t.trimL
+              , trimR: t.trimR
+              }
+
+  -- Unescaped output `{{& [~] expr [~] }}` (Handlebars' `&` alias for `{{{…}}}`).
+  readAmp :: Int -> String -> Either ParseError TagResult
+  readAmp i opener =
+    let
+      start = i + SCU.length opener
+    in
+      case closeFrom start "}}" of
+        Nothing -> Left (UnterminatedTag i)
+        Just q ->
+          let
+            t = splitTrims (slice cs start q)
+          in
+            Right
+              { mtok: Just (RAmp { start: i, end: q + 2 } start t.core (interiorAt start t.core))
+              , next: q + 2
+              , trimL: leadTrimAt i || t.trimL
+              , trimR: t.trimR
+              }
+
+  -- A bare double-stash separator `{{ [~] name args [~] }}`. The leading `~`
+  -- (if any) sits before the interior; the head is an identifier the lexer does
+  -- not interpret.
+  readSeparator :: Int -> Either ParseError TagResult
+  readSeparator i =
+    let
+      start = if leadTrimAt i then i + 3 else i + 2
+    in
+      case closeFrom start "}}" of
+        Nothing -> Left (UnterminatedTag i)
+        Just q ->
+          let
+            t = splitTrims (slice cs start q)
+          in
+            Right
+              { mtok: Just (RSep { start: i, end: q + 2 } start t.core (interiorAt start t.core))
+              , next: q + 2
+              , trimL: leadTrimAt i || t.trimL
+              , trimR: t.trimR
+              }
+
+  -- A Django-style statement tag `{% [~] head args [~] %}` (docs-19), lexed into the
+  -- structural token its `{{ }}` counterpart would yield, so the parser/engine never see
+  -- `{% %}`: `{% endX %}` → `RClose X`; `{% else %}` / `{% elif … %}` / `{% when … %}` → a
+  -- clause `RSep`; anything else (`{% if … %}`, `{% each … %}`, host block heads) →
+  -- `ROpen Section`. The leading/trailing `~` trim works as for any tag.
+  readStatementTag :: Int -> Either ParseError TagResult
+  readStatementTag i =
+    let
+      start = if leadTrimAt i then i + 3 else i + 2
+    in
+      case closeFrom start "%}" of
+        Nothing -> Left (UnterminatedTag i)
+        Just q ->
+          let
+            t = splitTrims (slice cs start q)
+            core = t.core
+            headWord = firstWord core
+            span = { start: i, end: q + 2 }
+            mk tok = Right
+              { mtok: Just tok, next: q + 2, trimL: leadTrimAt i || t.trimL, trimR: t.trimR }
+          in
+            if headWord == "" then Left (LexError "empty statement tag '{% %}'" i)
+            -- The verbatim region `{% raw %}…{% endraw %}` (ADR-039 item 2). It is NOT a
+            -- section open: the body is captured untouched (to the matching `{% endraw %}`),
+            -- reusing the very `RRaw`/`RawBlock "raw"` pipeline the `{{{{#raw}}}}` spelling
+            -- feeds — pure surface sugar. Only the bare head `raw` (no args) opens a region.
+            else if trim core == "raw" then readRawBody i start (q + 2)
+            else if isStmtClose headWord then
+              let
+                name = SCU.drop 3 headWord
+              in
+                mk (RClose span start name (interiorAt start name))
+            -- a clause separator (`else`/`elif`/`when`) OR a block-LESS statement that
+            -- lexes to a name-agnostic `RSep` (no `{% end… %}` to pair): the forward
+            -- binding `{% set … %}` (docs-17, reparented by `Kernel.SetSugar`), the
+            -- block-partial placeholder `{% yield %}` (ADR-039 item 5 — the surface
+            -- outputs the scoped `yield` op, exactly as the retired `{{yield}}`), and the
+            -- inheritance parent-body splice `{% super %}` (ADR-040 — the named-block
+            -- sibling of `{% yield %}`, consumed by `Kernel.Inherit`).
+            else if
+              isStmtSep headWord || headWord == "set" || trim core == "yield"
+                || trim core == "super" then
+              mk (RSep span start core (interiorAt start core))
+            -- the inheritance directive `{% extends "base" %}` (ADR-040): a block-LESS
+            -- statement (no `{% endextends %}`) consumed by the `Kernel.Inherit` flatten
+            -- pre-pass; it never reaches the engine. Lexed to a name-agnostic `RSep` whose
+            -- name is `extends` and whose one argument is the base name (a string literal).
+            else if headWord == "extends" then
+              mk (RSep span start core (interiorAt start core))
+            -- the partial include `{% include "name" [ctx] [k=v] %}` (ADR-039 item 5).
+            -- It lexes to the SAME `>`-prefixed `RSep` the retired `{{> name …}}` does —
+            -- pure surface sugar, reusing the existing partial reinterpretation — by
+            -- prefixing a `> ` to the args *as they sit in the source*: the interior is
+            -- lexed with the args' real source offset so its spans stay accurate (a
+            -- synthetic offset mis-resolves the partial name).
+            else if headWord == "include" then
+              let
+                skipSp j =
+                  if j < q && maybe false isSpace (Array.index cs j) then skipSp (j + 1) else j
+                argsOff = skipSp (skipSp start + SCU.length headWord)
+                pcore = "> " <> slice cs argsOff q
+              in
+                mk (RSep span start pcore (interiorAt (argsOff - 2) pcore))
+            else
+              mk (ROpen span Section start core (interiorAt start core))
+
+  -- Capture a `{% raw %}…{% endraw %}` body verbatim (ADR-039 item 2): from the
+  -- opening tag's close (`bodyStart`) to the matching `{% endraw %}`. Emits the same
+  -- `RRaw` the FlatBars `{{{{#raw}}}}` spelling does (`isHash` = `true`, so it clears
+  -- the statement-tag dialects' `rawBlockHash` gate) → `RawBlock "raw"` → `rawH`.
+  readRawBody :: Int -> Int -> Int -> Either ParseError TagResult
+  readRawBody i headStart bodyStart = case findEndrawFrom bodyStart of
+    Nothing -> Left (UnterminatedRaw i)
+    Just close -> Right
+      { mtok: Just
+          ( RRaw { start: i, end: close.tagEnd } true headStart "raw"
+              (interiorAt headStart "raw")
+              (slice cs bodyStart close.tagStart)
+          )
+      , next: close.tagEnd
+      , trimL: leadTrimAt i
+      , trimR: false
+      }
+
+  -- Scan for the first `{% endraw %}` from `j0`. A `{% … %}` that is not `endraw`
+  -- (and a `{%` with no `%}` close) is verbatim body, scanned past — `{% raw %}` does
+  -- not nest, exactly as Liquid: the first `{% endraw %}` closes the region.
+  findEndrawFrom :: Int -> Maybe { tagStart :: Int, tagEnd :: Int }
+  findEndrawFrom = scan
+    where
+    scan j
+      | j >= len = Nothing
+      | matchAt cs j "{%" = case closeFrom (j + 2) "%}" of
+          Just q
+            | firstWord (splitTrims (slice cs (j + 2) q)).core == "endraw" ->
+                Just { tagStart: j, tagEnd: q + 2 }
+            | otherwise -> scan (q + 2)
+          Nothing -> scan (j + 1)
+      | otherwise = scan (j + 1)
+
+  -- A short comment `{{! [~] … [~] }}` is *kept* as an `RComment` carrying its
+  -- interior (trailing `~` stripped) and offset, so the parser can lift any
+  -- `@key` directives from it. It still produces no output — the parser drops it
+  -- after directive extraction — and its `~` trims as before.
+  readShortComment :: Int -> String -> Either ParseError TagResult
+  readShortComment i opener =
+    let
+      start = i + SCU.length opener
+    in
+      -- comments are prose: never brace-aware (a stray `{` must not swallow the
+      -- close), so the plain first-match `}}` regardless of dialect.
+      case findFrom cs start "}}" of
+        Nothing -> Left (UnterminatedComment i)
+        Just q ->
+          let
+            trimR = matchAt cs (q - 1) "~"
+            interior = slice cs start (if trimR then q - 1 else q)
+          in
+            Right
+              { mtok: Just (RComment { start: i, end: q + 2 } start interior)
+              , next: q + 2
+              , trimL: leadTrimAt i
+              , trimR
+              }
+
+  -- A Django/Jinja inline comment `{# … #}` (ADR-039 item 1). The body runs verbatim to
+  -- the first `#}` (never brace-aware, like `{{! }}` — a stray `{`/`}` must not swallow
+  -- the close); it renders nothing (an `RComment` the parser drops) and lifts no
+  -- directive. No `~` trims (the `{%- -%}` markers are statement-tag-only).
+  readInlineComment :: Int -> Either ParseError TagResult
+  readInlineComment i =
+    let
+      start = i + 2
+    in
+      case findFrom cs start "#}" of
+        Nothing -> Left (UnterminatedComment i)
+        Just q ->
+          Right
+            { mtok: Just (RComment { start: i, end: q + 2 } start (slice cs start q))
+            , next: q + 2
+            , trimL: false
+            , trimR: false
+            }
+
+  -- A long comment `{{!-- … --}}` renders nothing and carries no directive, so
+  -- it is dropped (`mtok: Nothing`) — except under `keepLongComments`, where it
+  -- is emitted as a span-only `RLongComment` for the highlighter. Either way the
+  -- `~`/standalone trims are the same, so render output never depends on this.
+  readLongComment :: Int -> String -> Either ParseError TagResult
+  readLongComment i opener = case findFrom cs (i + SCU.length opener) "--}}" of
+    Nothing -> Left (UnterminatedComment i)
+    Just q -> Right
+      { mtok: if cfg.keepLongComments then Just (RLongComment { start: i, end: q + 4 }) else Nothing
+      , next: q + 4
+      , trimL: leadTrimAt i
+      , trimR: matchAt cs (q - 1) "~"
+      }
+
+  -- `sigil` is the opener length: 5 for `{{{{#`, 4 for the bare `{{{{`. Both
+  -- close with the name-matched `{{{{/name}}}}`; the head is read from `start`.
+  readRaw :: Int -> Int -> Either ParseError TagResult
+  readRaw i sigil =
+    let
+      start = i + sigil
+    in
+      case findFrom cs start "}}}}" of
+        Nothing -> Left (UnterminatedRaw i)
+        Just qh ->
+          let
+            head = slice cs start qh
+            bodyStart = qh + 4
+            -- the close is name-matched (`{{{{/name}}}}`); the name is the
+            -- leading whitespace-delimited token of the head, which is exactly
+            -- the head identifier the parser will read from `head`.
+            closePat = "{{{{/" <> rawName head <> "}}}}"
+          in
+            case findFrom cs bodyStart closePat of
+              Nothing -> Left (UnterminatedRaw i)
+              Just qc ->
+                let
+                  end = qc + SCU.length closePat
+                in
+                  Right
+                    { mtok: Just
+                        ( RRaw { start: i, end } (sigil == 5) start head (interiorAt start head)
+                            (slice cs bodyStart qc)
+                        )
+                    , next: end
+                    , trimL: false
+                    , trimR: false
+                    }
+
+  -- The leading whitespace-delimited token of a raw-block head, used to build
+  -- the name-matched close delimiter.
+  rawName :: String -> String
+  rawName s =
+    SCU.fromCharArray
+      (Array.takeWhile (not <<< isSpace) (Array.dropWhile isSpace (SCU.toCharArray s)))
+
+  -- A set-delimiter tag `<open>=NEW-OPEN NEW-CLOSE=<close>`. Reads the two
+  -- whitespace-separated delimiters, validates them (per the Mustache manual:
+  -- non-empty, no whitespace — guaranteed by the split — and no `=`), and returns
+  -- the new active pair for the continuing scan. Renders nothing (`RSetDelim`).
+  readSetDelim :: Int -> String -> String -> Either ParseError SetDelimResult
+  readSetDelim i open close =
+    let
+      start = i + SCU.length open + 1 -- after `<open>=`
+      closePat = "=" <> close
+    in
+      case findFrom cs start closePat of
+        Nothing -> Left
+          (LexError ("unterminated set-delimiter tag (expected '=" <> close <> "')") i)
+        Just q -> case delimWords (slice cs start q) of
+          Nothing -> Left (LexError "set-delimiter expects two whitespace-separated delimiters" i)
+          Just d
+            | validDelim d.open && validDelim d.close -> Right
+                { tok: RSetDelim { start: i, end: q + SCU.length closePat }
+                , next: q + SCU.length closePat
+                , open: d.open
+                , close: d.close
+                , trimL: false
+                , trimR: false
+                }
+            | otherwise -> Left (LexError "set-delimiter values may not contain '='" i)
+
+  -- The two whitespace-separated delimiter words of a set-delimiter interior
+  -- (exactly two; nothing may follow the second).
+  delimWords :: String -> Maybe { open :: String, close :: String }
+  delimWords s =
+    let
+      a0 = Array.dropWhile isSpace (SCU.toCharArray s)
+      w1 = Array.takeWhile (not <<< isSpace) a0
+      a1 = Array.dropWhile isSpace (Array.dropWhile (not <<< isSpace) a0)
+      w2 = Array.takeWhile (not <<< isSpace) a1
+      rest = Array.dropWhile isSpace (Array.dropWhile (not <<< isSpace) a1)
+    in
+      if Array.null w1 || Array.null w2 || not (Array.null rest) then Nothing
+      else Just { open: SCU.fromCharArray w1, close: SCU.fromCharArray w2 }
+
+  -- A custom delimiter is non-empty (ensured by `delimWords`) and contains no `=`.
+  validDelim :: String -> Boolean
+  validDelim d = not (Array.elem '=' (SCU.toCharArray d))
+
+  -- A tag under *custom* delimiters: `<open> [sigil] interior <close>`. The reduced
+  -- Mustache grammar — the sigil (if any) is the single character immediately
+  -- after `open` (mirroring how the default openers require `{{#` with no gap);
+  -- `>` partials and bare interpolation fall through to `RSep` (keeping the full
+  -- interior, exactly as `{{> x}}` / `{{ x }}` do under default delimiters).
+  readCustomTag :: Int -> String -> String -> Either ParseError TagResult
+  readCustomTag i open close =
+    let
+      start = i + SCU.length open
+      cl = SCU.length close
+    in
+      -- custom (set-delimiter) tags are MinBars-only, which has no collection
+      -- literals, so the plain first-match close (never brace-aware).
+      case findFrom cs start close of
+        Nothing -> Left (UnterminatedTag i)
+        Just q ->
+          let
+            span = { start: i, end: q + cl }
+            next = q + cl
+            afterSig = slice cs (start + 1) q
+            afterHash = slice cs (start + 2) q
+            interior = slice cs start q
+            mk tok = Right { mtok: Just tok, next, trimL: false, trimR: false }
+            -- The interior is lexed inside the chosen branch (these helpers are
+            -- functions, so `interiorAt` fires only when the branch is taken) — so
+            -- each tag tokenizes its interior exactly once, never the unused
+            -- sigil/hash variant.
+            sigOpen sig = mk (ROpen span sig (start + 1) afterSig (interiorAt (start + 1) afterSig))
+            hashOpen sig = mk
+              (ROpen span sig (start + 2) afterHash (interiorAt (start + 2) afterHash))
+          in
+            case Array.index cs start of
+              -- `#*name` (decorator) / `#>name` (partial block): the marker after
+              -- `#` opens a distinct sigil, with the head starting two chars in.
+              Just '#' -> case Array.index cs (start + 1) of
+                Just '*' -> hashOpen Decorator
+                Just '>' -> hashOpen PartialBlock
+                _ -> sigOpen Section
+              Just '^' -> sigOpen Inverse
+              Just '<' -> sigOpen Parent
+              Just '$' -> sigOpen BlockDef
+              Just '/' -> mk (RClose span (start + 1) afterSig (interiorAt (start + 1) afterSig))
+              Just '&' -> mk (RAmp span (start + 1) afterSig (interiorAt (start + 1) afterSig))
+              Just '!' -> mk (RComment span (start + 1) afterSig)
+              _ -> mk (RSep span start interior (interiorAt start interior))

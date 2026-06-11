@@ -43,7 +43,7 @@ import FlatBars.Compile (compile) as Driver
 import FlatBars.Compile.Emit (coreEmit, metaFor)
 import FlatBars.Error (Error(ParseFailure), ParseError(DisallowedShape), renderParseErrorsAt)
 import FlatBars.Lexer (defaultLexConfig)
-import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
+import FlatBars.Parser (ParseOptions, defaultParseOptions)
 import FlatBars.Syntax (Directive, Template)
 import FlatBars.Value (Value)
 import Kernel.CaseSugar (braceControlViolation, caseLeadingViolation)
@@ -57,6 +57,7 @@ import Kernel.Render (formatError, runResolved)
 import Kernel.SetSugar (liftSet, reservedBindingViolation)
 import Kernel.ToValue (class ToValue, toValue)
 import Kernel.Value (nonEmpty)
+import RawBars.Parser as RawParser
 
 --------------------------------------------------------------------------------
 -- Rendering (core syntax + the ClassicBars engine)
@@ -98,7 +99,7 @@ parseCore
   :: ParseOptions
   -> String
   -> Either (NEA.NonEmptyArray ParseError) { directives :: Array Directive, nodes :: Template }
-parseCore opts src = case parseWith opts src of
+parseCore opts src = case RawParser.parse src of
   Left pes -> Left pes
   Right r -> case firstViolation r.nodes of
     Just v -> Left (NEA.singleton (DisallowedShape v.shape v.off))

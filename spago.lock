@@ -332,9 +332,11 @@
             "flatbars-compile",
             "foldable-traversable",
             "kernel",
+            "lists",
             "maybe",
             "ordered-collections",
             "prelude",
+            "strings",
             "transformers",
             "tuples"
           ]
