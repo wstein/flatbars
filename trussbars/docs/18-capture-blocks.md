@@ -11,7 +11,8 @@
 > shares; `capture` is *"set whose RHS is a rendered body"*), `docs/19` (the `{% %}` surface it
 > lives in), `docs/01`/`docs/06` (subset + freeze, amended §5), `docs/09` (host helpers — a
 > frequent consumer of captured strings), `docs/04` (conformance), `docs/05` (the perf note:
-> capture is the one intentional buffer).
+> capture is the one intentional buffer), `docs/25` (the **dynamic-backend port** — interp/VM —
+> and the `Value::Safe` model it needs; this ADR's oracle/AOT framing predates those backends).
 >
 > **Naming.** The keyword is **`capture`** (Liquid/Ruby; Jinja spells the same idea `{% set x %}…
 > {% endset %}`), a block (`{% capture name %}…{% endcapture %}`) because it *has* a body — unlike
