@@ -77,7 +77,7 @@
     "test:compile": "spago build && node packages/compile/conformance.mjs",
     "test:trussbars-conformance": "spago build && node trussbars/conformance/harness.mjs",
     "test:trussbars-v2": "spago build && node trussbars/conformance/harness.mjs --v2",
-    "test:trussbars-vm": "spago build && node trussbars/conformance/harness.mjs --vm",
+    "test:trussbars-interp": "spago build && node trussbars/conformance/harness.mjs --interp",
     "gen:trussbars-snapshots": "spago build && node trussbars/conformance/harness.mjs --update",
     "test:minbars-spec": "spago build && node packages/minbars/test/spec-conformance.mjs",
     "gen:editors-manifests": "node editors/scripts/sync-manifests.mjs",

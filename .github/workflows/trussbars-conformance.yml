@@ -63,7 +63,7 @@ jobs:
       - name: v2 emit gate (v2 ≡ v1, byte-identical)
         run: npm run test:trussbars-v2
 
-      # The VM backend (`truss-vm`): the lenient tree-walk renders the corpus and
-      # must byte-match the interpreter on every covered case.
-      - name: VM gate (tree-walk ≡ interpreter)
-        run: npm run test:trussbars-vm
+      # The interpreter backend (`truss-interp`): the lenient tree-walk renders the corpus
+      # and must byte-match the oracle on every covered case.
+      - name: Interpreter gate (tree-walk ≡ oracle)
+        run: npm run test:trussbars-interp

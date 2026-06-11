@@ -63,17 +63,19 @@ function ctxFor(c) {
 }
 const { compileMaxRust } = await import(emitterPath);
 
-// `--vm`: render through the Trussbars VM backend (`trussbars-vm`, docs/11) — a
-// dynamic-Value tree-walk, no codegen. The SPIKE is lenient + a subset, so cases the
-// VM doesn't yet implement are reported as `unsupported` (honest coverage), and the
-// gate is: every COVERED case must byte-match the golden. The CLI renders directly.
-if (process.argv.includes("--vm")) {
-  console.error("building truss-vm (VM CLI)…");
-  execFileSync("cargo", ["+1.96.0", "build", "--quiet", "--bin", "truss-vm"], {
-    cwd: resolve(root, "trussbars/crates/trussbars-vm"),
+// `--interp`: render through the Trussbars dynamic backend — the tree-walk
+// **interpreter** (`trussbars-interp`, docs/11), no codegen — the always-correct dynamic
+// path (the separate bytecode `trussbars-vm` crate covers only a subset, so it is not the
+// conformance axis). It is lenient, so cases the interpreter doesn't yet implement are
+// reported as `unsupported` (honest coverage), and the gate is: every COVERED case must
+// byte-match the golden. The CLI renders directly.
+if (process.argv.includes("--interp")) {
+  console.error("building truss-interp (interpreter CLI)…");
+  execFileSync("cargo", ["+1.96.0", "build", "--quiet", "--bin", "truss-interp"], {
+    cwd: resolve(root, "trussbars/crates/trussbars-interp"),
     stdio: ["ignore", "inherit", "inherit"],
   });
-  const binPath = resolve(root, "trussbars/target/debug/truss-vm");
+  const binPath = resolve(root, "trussbars/target/debug/truss-interp");
   const snapPath = resolve(here, "snapshots.json");
   const golden = existsSync(snapPath) ? JSON.parse(readFileSync(snapPath, "utf8")) : {};
 
@@ -103,8 +105,8 @@ if (process.argv.includes("--vm")) {
   }
   const covered = matched + fails.length;
   console.log(
-    `Trussbars VM spike (lenient tree-walk): ${matched}/${covered} covered byte-matched, ` +
-      `${unsup.length} unsupported (spike subset), ${oracleErrors} oracle errors, of ${cases.length} total.`,
+    `Trussbars interpreter (lenient tree-walk): ${matched}/${covered} covered byte-matched, ` +
+      `${unsup.length} unsupported (subset), ${oracleErrors} oracle errors, of ${cases.length} total.`,
   );
   for (const u of unsup) console.log(`  unsupported ${u.id}: ${u.reason}`);
   for (const m of fails) {
