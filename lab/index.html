@@ -1710,6 +1710,7 @@
       import { resolveEngine, engineLabel, templateExt, templateFence } from "./app/engine-config.mjs?v=1";
       import { byId, qs } from "./app/dom.mjs?v=1";
       import { showBootError, bootFail } from "./app/boot-error.mjs?v=1";
+      import { toast, openShareMenu, closeShareMenu } from "./app/ui-chrome.mjs?v=1";
       import { EditorState, Annotation, StateField, StateEffect, Compartment } from "https://esm.sh/@codemirror/state@6.5.2/es2022/state.mjs";
       import {
         Decoration,
@@ -4567,26 +4568,9 @@
         "dl-md": () => downloadWorkspace("md"),
         "dl-zip": () => downloadWorkspace("zip"),
       };
-      function openShareMenu() {
-        byId("share-menu").hidden = false;
-        byId("share").dataset.open = "true";
-        byId("share-btn").setAttribute("aria-expanded", "true");
-      }
-      function closeShareMenu() {
-        byId("share-menu").hidden = true;
-        byId("share").dataset.open = "false";
-        byId("share-btn").setAttribute("aria-expanded", "false");
-      }
-
-      // ── Toast ─────────────────────────────────────────────────────────
-      function toast(msg) {
-        let t = qs(".toast");
-        if (!t) { t = document.createElement("div"); t.className = "toast"; document.body.append(t); }
-        t.textContent = msg;
-        requestAnimationFrame(() => t.classList.add("show"));
-        clearTimeout(t._hide);
-        t._hide = setTimeout(() => t.classList.remove("show"), 1400);
-      }
+      // openShareMenu / closeShareMenu and toast now live in ./app/ui-chrome.mjs
+      // (imported above). The share *actions* below stay inline — they depend on
+      // saveHash / buildMarkdownDoc / downloadWorkspace, still in this file.
 
       async function copyShareLink() {
         await saveHash();

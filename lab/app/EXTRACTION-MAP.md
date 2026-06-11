@@ -46,7 +46,7 @@ instead of re-closing over it.
 | Splitter (4158) + Focus mode (4251) | `app/layout.mjs` | reads state | ⛔ |
 | Examples (4265) + vendored fixtures (4402) | `app/examples.mjs` | **FileProvider seam** (Phase 3) | ⛔ |
 | URL state (4490) | `app/url-state.mjs` | reads/writes state | ⛔ |
-| Share menu (4596) + Toast (4618) | `app/ui-chrome.mjs` | local | 🔜 |
+| Share menu (4596) + Toast (4618) | `app/ui-chrome.mjs` | local | ✅ (toast + menu toggles; share *actions* stay inline pending saveHash/download extraction) |
 | Tweaks panel (4639) | `app/tweaks.mjs` | reads/writes state | ⛔ |
 | Find in all files (4845) | `app/search.mjs` | reads tabs | ⛔ |
 | Wire events (5136) | `app/boot.mjs` (entry) | wires everything | ⛔ (last) |
@@ -57,8 +57,8 @@ instead of re-closing over it.
 ## Recommended commit order
 
 1. ✅ `engine-config.mjs` + `dom.mjs` — pure leaves, prove the pipeline.
-2. ✅ `boot-error.mjs` (smoke-covered) + `app/state.mjs` primitive (tested, ready).
-   `ui-chrome.mjs` (toast/share) remains a safe DOM-only leaf for a follow-up.
+2. ✅ `boot-error.mjs` (smoke-covered), `app/state.mjs` primitive (tested, ready),
+   and `ui-chrome.mjs` (toast + share-menu toggles, tested).
 3. **Adopt `app/state.mjs`** — the first stateful extraction (`editors.mjs`) imports
    the record; its readers/writers move WITH it (contained rename, smoke-verified).
 4. `editors.mjs`, then `tabs.mjs`/`explorer.mjs` (they sit on the store).
