@@ -1722,6 +1722,7 @@
       import { renderLint } from "./app/dock/lint.mjs?v=1";
       import { renderProblems } from "./app/dock/problems.mjs?v=1";
       import { renderContext } from "./app/dock/context.mjs?v=1";
+      import { createSetOutput } from "./app/output.mjs?v=1";
       import { TRANSFORMER_RISK } from "./app/transformer-risk.mjs?v=1";
       import { EditorState, Annotation, StateField, StateEffect, Compartment } from "https://esm.sh/@codemirror/state@6.5.2/es2022/state.mjs";
       import {
@@ -3047,16 +3048,13 @@
       // lastProgram, lastOutput } from a cache snapshot — ctx.caches has exactly
       // those keys (plus lastSegments, which it ignores), so pass it directly.
 
-      function setOutput(str, segments = []) {
-        ctx.caches.lastOutput = str;
-        ctx.caches.lastSegments = segments;
-        paintTextView();
-        renderPreview();
-        qs(".output-body").dataset.empty = outputHasContent(outputView, ctx.caches) ? "false" : "true";
-        renderDock();
-        renderDataInspect();
-        refreshSearchPanel();
-      }
+      // setOutput now lives in ./app/output.mjs — the factory binds ctx + the five
+      // host refreshers (still in this file, hoisted) + the active-view getter, and
+      // returns the same setOutput(str, segments) so every call site is unchanged.
+      const setOutput = createSetOutput(ctx, {
+        getOutputView: () => outputView,
+        paintTextView, renderPreview, renderDock, renderDataInspect, refreshSearchPanel,
+      });
 
       // Copy the active output to the clipboard. For the text views (Plain Text /
       // Render Data / Bytecode) that is exactly what the read-only editor shows;

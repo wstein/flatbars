@@ -49,6 +49,8 @@ becomes `ctx.caches.lastOutput = x`. No semantic change.
   lastProgram) migrated into `ctx.caches.*` via a word-boundary sweep (43 sites),
   rename-only — verified by the smoke (a missed site throws a loud ReferenceError).
   Other last* caches migrate into ctx.caches as their owning subsystem moves.
+- ✅ `setOutput` → `app/output.mjs` (createSetOutput factory: binds ctx + the five
+  host refreshers + the active-view getter; call sites unchanged). First core fn.
 
 ## Move order (leaf-most consumers first, run() last)
 
