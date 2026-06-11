@@ -53,11 +53,11 @@ import Data.String (joinWith)
 import Data.String as String
 import Data.Tuple (Tuple(..), fst, snd)
 import FlatBars.Error (ParseError)
-import FlatBars.Parser (defaultParseOptions, parseWith)
 import FlatBars.Span (Span)
 import FlatBars.Syntax (Expr(..), Ident, Node(..), Sigil, Template)
 import FlatBars.Value (Value(..))
 import Kernel.Prelude (loopFieldCanonical, preludeUnaryHelpers)
+import RawBars.Parser as RawParser
 
 -- | One advisory ambiguity flag raised during a lift. `kind` is a stable tag
 -- | (`"lookup-path"`, `"unrecognised-filter"`, `"multi-arg-call"`); `span` locates
@@ -137,11 +137,9 @@ binaryOps =
 liftToMaxBars :: String -> Either ParseError LiftResult
 liftToMaxBars src = do
   -- Lift reports the first parse error (the recovering parser's full list is for
-  -- the render/CLI paths); `lmap NEA.head` keeps the simpler `ParseError`.
-  let
-    opts = defaultParseOptions
-      { extras = false, lexConfig = defaultParseOptions.lexConfig { statementTags = true } }
-  { nodes } <- lmap NEA.head (parseWith opts src)
+  -- the render/CLI paths); `lmap NEA.head` keeps the simpler `ParseError`. Parses
+  -- through the owned `RawBars.Parser` (ADR-041) — the input is RawBars/core source.
+  { nodes } <- lmap NEA.head (RawParser.parse src)
   pure (printTemplate nodes)
 
 --------------------------------------------------------------------------------

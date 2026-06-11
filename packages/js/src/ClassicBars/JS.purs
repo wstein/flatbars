@@ -109,6 +109,8 @@ import MinBars.Inspect as MinInspect
 import MinBars.Provenance as MinProv
 import MinBars.Surface (desugar) as MinSurface
 import RawBars as RawBars
+import RawBars.Highlight as RawHighlight
+import RawBars.Parser as RawParser
 
 -- | A render outcome as a plain JS object: `ok` selects `value` vs `error`.
 type Result = { ok :: Boolean, value :: String, error :: String }
@@ -214,7 +216,7 @@ lint = mkFn2 \tpl dialect ->
     parseDialect = case dialect of
       "maxbars" -> MaxParser.parse
       "classicbars" -> parseWith defaultParseOptions
-      _ -> parseWith RawBars.coreOptions
+      _ -> RawParser.parse
   in
     case parseDialect tpl of
       Left pes -> { ok: false, findings: [], report: "", error: renderParseErrorsAt tpl pes }
@@ -757,8 +759,9 @@ compileResultAt src = case _ of
 -- | `FlatBars.Highlight`.
 highlightSpans :: Fn2 String String (Array Highlight.HSpan)
 highlightSpans = mkFn2 \tpl dialect -> case dialect of
-  -- MaxBars owns its highlighter (ADR-041), running the owned lexer.
+  -- MaxBars and RawBars own their highlighters (ADR-041), running the owned lexers.
   "maxbars" -> MaxHighlight.highlightSpans tpl
+  "rawbars" -> RawHighlight.highlightSpans tpl
   _ -> Highlight.highlightSpans (highlightConfig dialect) tpl
 
 -- | Tokenize template source into the full ADR-017 token vocabulary for the given
@@ -769,8 +772,9 @@ highlightSpans = mkFn2 \tpl dialect -> case dialect of
 -- | semantic-tokens server consumes it. See `FlatBars.Highlight`.
 tokenize :: Fn2 String String (Array Highlight.TSpan)
 tokenize = mkFn2 \tpl dialect -> case dialect of
-  -- MaxBars owns its highlighter (ADR-041), running the owned lexer.
+  -- MaxBars and RawBars own their highlighters (ADR-041), running the owned lexers.
   "maxbars" -> MaxHighlight.tokenizeSpans tpl
+  "rawbars" -> RawHighlight.tokenizeSpans tpl
   _ -> Highlight.tokenizeSpans (highlightConfig dialect) tpl
 
 -- | Located parse diagnostics for `src` under `dialect` (ADR-023):
@@ -787,7 +791,7 @@ diagnostics = mkFn2 \src dialect ->
     recover = case dialect of
       "maxbars" -> MaxParser.parseRecovering
       "minbars" -> parseRecovering MinBars.minOptions
-      "rawbars" -> parseRecovering RawBars.coreOptions
+      "rawbars" -> RawParser.parseRecovering
       _ -> parseRecovering defaultParseOptions -- classicbars (the default options)
   in
     map (parseErrorAt src) (recover src).errors
@@ -801,24 +805,10 @@ diagnostics = mkFn2 \src dialect ->
 -- | than painted valid: RawBars sets `extras = false`; only MinBars enables
 -- | `inheritance` (the Mustache `{{<}}`/`{{$}}` shapes). The interior grammar is the
 -- | shared path/name one (`+`/`-`/`*`/`/` stay path punctuation).
--- | (MaxBars is not here — it owns its highlighter, `MaxBars.Highlight`, ADR-041.)
+-- | (MaxBars and RawBars are not here — they own their highlighters,
+-- | `MaxBars.Highlight` / `RawBars.Highlight`, ADR-041.)
 highlightConfig :: String -> Highlight.HighlightConfig
 highlightConfig = case _ of
-  "rawbars" ->
-    -- RawBars does not enable set-delim (per ADR-015 amendment); use the
-    -- default lex config so highlighting agrees with parsing and the
-    -- editor flags `{{=A B=}}` in `.rawbars` files instead of accepting it.
-    -- `lexConfig` and `clauseSeps` both derive from RawBars' own parse options (the
-    -- single source) so highlighting agrees with parsing: `{{when}}` — the `{{#case}}`
-    -- arm separator — paints as a keyword like `{{else}}`/`{{elif}}`, and the `{% %}`
-    -- statement tags (docs-19, `statementTags` on for RawBars) highlight too.
-    { lexConfig: RawBars.coreOptions.lexConfig { keepLongComments = true }
-    , clauseSeps: RawBars.coreOptions.standaloneSeps
-    , extras: false
-    , inheritance: false
-    , rawBlockHbs: false
-    , rawBlockHash: true
-    }
   "minbars" ->
     { lexConfig: withSetDelims
     , clauseSeps: []
@@ -869,7 +859,7 @@ astJson = mkFn2 \dialect src ->
     -- MaxBars owns its recovering parser (ADR-041); the others route through the shared one.
     recover = case dialect of
       "maxbars" -> MaxParser.parseRecovering
-      "core" -> parseRecovering RawBars.coreOptions
+      "core" -> RawParser.parseRecovering
       "minbars" -> parseRecovering MinBars.minOptions
       _ -> parseRecovering defaultParseOptions
     r = recover src

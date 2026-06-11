@@ -17,6 +17,7 @@ package:
     - maxbars
     - maybe
     - prelude
+    - rawbars
     - strings
     - tuples
   test:

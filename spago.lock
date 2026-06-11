@@ -242,6 +242,7 @@
             "maxbars",
             "maybe",
             "prelude",
+            "rawbars",
             "strings",
             "tuples"
           ]

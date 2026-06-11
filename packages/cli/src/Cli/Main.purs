@@ -40,7 +40,8 @@ import MaxBars.Parser as MaxBarsP
 import MinBars (renderMinCompat, renderMinDelimsCompatDiag, renderMinDelimsDiag, renderMinDiag, renderMinWith) as MinBars
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync (readTextFile, readdir)
-import RawBars (compileJsWith, compileWith, coreOptions)
+import RawBars (compileJsWith, compileWith)
+import RawBars.Parser as RawBarsP
 
 foreign import argv :: Effect (Array String)
 foreign import writeStdout :: String -> Effect Unit
@@ -458,11 +459,12 @@ runLint args
               Left err -> die ("flatbars lint: cannot read template '" <> tplPath <> "': " <> err)
               Right tpl ->
                 let
-                  -- MaxBars owns its parser (ADR-041); the others route through the shared one.
+                  -- MaxBars and RawBars own their parsers (ADR-041); ClassicBars routes
+                  -- through the shared one.
                   parseDialect =
                     if a.surface then parseWith defaultParseOptions
                     else if a.maxbars then MaxBarsP.parse
-                    else parseWith coreOptions
+                    else RawBarsP.parse
                 in
                   case parseDialect tpl of
                     Left pes -> die

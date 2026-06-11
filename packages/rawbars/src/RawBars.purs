@@ -43,7 +43,7 @@ import FlatBars.Compile (compile) as Driver
 import FlatBars.Compile.Emit (coreEmit, metaFor)
 import FlatBars.Error (Error(ParseFailure), ParseError(DisallowedShape), renderParseErrorsAt)
 import FlatBars.Lexer (defaultLexConfig)
-import FlatBars.Parser (ParseOptions, defaultParseOptions)
+import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Syntax (Directive, Template)
 import FlatBars.Value (Value)
 import Kernel.CaseSugar (braceControlViolation, caseLeadingViolation)
@@ -95,50 +95,72 @@ coreOptions = defaultParseOptions
 -- | engine operation (`Kernel.Prelude.caseH`) — the `{{#case}}` block flows to the engine
 -- | unchanged; this only adds the located leading-content error. Every RawBars entry point
 -- | parses through here so the rule is enforced consistently.
-parseCore
-  :: ParseOptions
+type Parsed = { directives :: Array Directive, nodes :: Template }
+
+-- | The RawBars surface-strict checks over a parse result: the `{{#case}}`
+-- | leading-content rule (docs/12), and — in the statementTags surface — rejecting
+-- | legacy `{{ }}` control flow + reserved-name bindings, then lifting
+-- | `{% set NAME = … %}` → `{% local %}` over its sibling tail (docs-17). Shared by the
+-- | owned RawBars parse (`parseRaw`) and the configurable one (`parseCore`).
+checkCore
+  :: Boolean
   -> String
-  -> Either (NEA.NonEmptyArray ParseError) { directives :: Array Directive, nodes :: Template }
-parseCore opts src = case RawParser.parse src of
+  -> Either (NEA.NonEmptyArray ParseError) Parsed
+  -> Either (NEA.NonEmptyArray ParseError) Parsed
+checkCore stmtTags src = case _ of
   Left pes -> Left pes
   Right r -> case firstViolation r.nodes of
     Just v -> Left (NEA.singleton (DisallowedShape v.shape v.off))
-    -- `{% set NAME = … %}` (docs-17) is lifted to a `{% local %}` over its sibling
-    -- tail before render (statementTags only); the validation above saw the original.
-    Nothing -> Right (if opts.lexConfig.statementTags then r { nodes = liftSet r.nodes } else r)
+    Nothing -> Right (if stmtTags then r { nodes = liftSet r.nodes } else r)
   where
-  -- In the statementTags surface (docs-19) RawBars rejects legacy `{{ }}` control
-  -- (it is output-only there); the `{{#case}}` leading-content rule applies in both.
   firstViolation nodes
-    | opts.lexConfig.statementTags =
+    | stmtTags =
         case braceControlViolation [ "else", "elif", "when" ] src nodes of
           Just v -> Just v
-          -- a binding name may not shadow a reserved scope root / block head (docs-17 §2).
           Nothing -> case reservedBindingViolation blockHelperNames nodes of
             Just v -> Just v
             Nothing -> caseLeadingViolation nodes
     | otherwise = caseLeadingViolation nodes
 
--- | Parse core source and return a pure renderer (the engine's fixed `handlebars`
--- | truthiness rule applies; ADR-022).
-compile :: String -> Either ParseError (Value -> Either Error String)
-compile = compileWith coreOptions
+-- | Parse RawBars-dialect source through the *owned* `RawBars.Parser` (ADR-041),
+-- | applying the surface-strict checks (statement tags always on). Every RawBars
+-- | render/compile entry parses through here.
+parseRaw :: String -> Either (NEA.NonEmptyArray ParseError) Parsed
+parseRaw src = checkCore true src (RawParser.parse src)
 
--- | `compile` with explicit parse options; RawBars always rejects extras.
+-- | Parse with explicit `ParseOptions` through the *shared* parser — the configurable
+-- | path the CLI uses for core syntax with custom `--delimiters` (RawBars-the-dialect
+-- | has no set delimiters, but the CLI may set the initial pair). `statementTags`
+-- | follows the supplied options.
+parseCore :: ParseOptions -> String -> Either (NEA.NonEmptyArray ParseError) Parsed
+parseCore opts src = checkCore opts.lexConfig.statementTags src (parseWith opts src)
+
+-- | Build a pure renderer from a parsed template (the engine's fixed `nonEmpty`
+-- | truthiness rule applies; ADR-022).
+mkRenderer :: Parsed -> Value -> Either Error String
+mkRenderer { directives, nodes } =
+  let
+    h = hoistInline nodes
+  in
+    \dat -> runResolved directives
+      (withTruthy nonEmpty <<< withYieldName "yield" <<< registerPartials h.partials)
+      h.template
+      dat
+
+-- | Parse RawBars source and return a pure renderer.
+compile :: String -> Either ParseError (Value -> Either Error String)
+compile src = mkRenderer <$> lmap NEA.head (parseRaw src)
+
+-- | `compile` with explicit parse options (the CLI's configurable core path); RawBars
+-- | always rejects extras.
 compileWith :: ParseOptions -> String -> Either ParseError (Value -> Either Error String)
-compileWith opts src = do
-  { directives, nodes } <- lmap NEA.head $ parseCore
-    (opts { extras = false, decorators = false, partialBlocks = false })
-    src
-  let h = hoistInline nodes
-  pure \dat -> runResolved directives
-    (withTruthy nonEmpty <<< withYieldName "yield" <<< registerPartials h.partials)
-    h.template
-    dat
+compileWith opts src =
+  mkRenderer <$> lmap NEA.head
+    (parseCore (opts { extras = false, decorators = false, partialBlocks = false }) src)
 
 -- | One-shot render of core source against data.
 render :: String -> Value -> Either String String
-render src dat = case parseCore coreOptions src of
+render src dat = case parseRaw src of
   Left pes -> Left (show (ParseFailure pes))
   Right { directives, nodes } ->
     let
@@ -153,7 +175,7 @@ render src dat = case parseCore coreOptions src of
 
 -- | `render` with located parse-error messages (`line:column:`).
 renderDiag :: String -> Value -> Either String String
-renderDiag src dat = case parseCore coreOptions src of
+renderDiag src dat = case parseRaw src of
   Left pes -> Left (renderParseErrorsAt src pes)
   Right { directives, nodes } ->
     let
@@ -185,7 +207,7 @@ renderWithOperations
 renderWithOperations operations partialSrcs src dat =
   case traverse compilePartial partialSrcs of
     Left e -> Left e
-    Right ps -> case parseCore coreOptions src of
+    Right ps -> case parseRaw src of
       Left pes -> Left (renderParseErrorsAt src pes)
       Right { directives, nodes } ->
         let
@@ -201,7 +223,7 @@ renderWithOperations operations partialSrcs src dat =
         in
           lmap (formatError src) (runResolved directives setup h.template dat)
   where
-  compilePartial (Tuple name s) = case parseCore coreOptions s of
+  compilePartial (Tuple name s) = case parseRaw s of
     Left es -> Left (renderParseErrorsAt s es)
     Right { nodes } -> Right { name, template: nodes }
 
@@ -220,7 +242,7 @@ renderMappedWith
 renderMappedWith partialSrcs src dat =
   case traverse compilePartial partialSrcs of
     Left e -> Left e
-    Right ps -> case parseCore coreOptions src of
+    Right ps -> case parseRaw src of
       Left pes -> Left (renderParseErrorsAt src pes)
       Right { nodes } ->
         let
@@ -237,7 +259,7 @@ renderMappedWith partialSrcs src dat =
         in
           lmap (formatError src) (runResolvedMapped setup h.template dat)
   where
-  compilePartial (Tuple name s) = case parseCore coreOptions s of
+  compilePartial (Tuple name s) = case parseRaw s of
     Left es -> Left (renderParseErrorsAt s es)
     Right { nodes } -> Right { name, template: nodes }
 
@@ -256,7 +278,7 @@ inspectWith
 inspectWith target partialSrcs src dat =
   case traverse compilePartial partialSrcs of
     Left e -> Left e
-    Right ps -> case parseCore coreOptions src of
+    Right ps -> case parseRaw src of
       Left pes -> Left (renderParseErrorsAt src pes)
       Right { nodes } ->
         let
@@ -272,13 +294,13 @@ inspectWith target partialSrcs src dat =
         in
           lmap (formatError src) (inspectResolvedStrict setup target h.template dat)
   where
-  compilePartial (Tuple name s) = case parseCore coreOptions s of
+  compilePartial (Tuple name s) = case parseRaw s of
     Left es -> Left (renderParseErrorsAt s es)
     Right { nodes } -> Right { name, template: nodes }
 
 -- | The async instantiation: the same engine in `ExceptT Error Aff`.
 renderAff :: String -> Value -> Aff (Either Error String)
-renderAff src dat = case parseCore coreOptions src of
+renderAff src dat = case parseRaw src of
   Left pe -> pure (Left (ParseFailure pe))
   Right { directives, nodes } ->
     let
@@ -300,16 +322,20 @@ renderAff src dat = case parseCore coreOptions src of
 -- | exactly as `render` does and as ClassicBars/MaxBars compile — so RawBars differs
 -- | only in surface syntax, not capability (ADR-005/008).
 compileJs :: String -> Either ParseError String
-compileJs = compileJsWith coreOptions
+compileJs src = emitJs <$> lmap NEA.head (parseRaw src)
 
--- | `compileJs` with explicit parse options; RawBars always rejects extras.
+-- | `compileJs` with explicit parse options (the CLI's configurable core path); RawBars
+-- | always rejects extras.
 compileJsWith :: ParseOptions -> String -> Either ParseError String
-compileJsWith opts src = do
-  { nodes } <- lmap NEA.head $ parseCore
-    (opts { extras = false, decorators = false, partialBlocks = false })
-    src
-  let h = hoistInline nodes
-  pure
-    ( Driver.compile (metaFor "rt.truthyNonEmpty" "yield") coreEmit (Map.toUnfoldable h.partials)
-        h.template
-    )
+compileJsWith opts src =
+  emitJs <$> lmap NEA.head
+    (parseCore (opts { extras = false, decorators = false, partialBlocks = false }) src)
+
+-- | Emit the compiled JS ES module for a parsed RawBars template.
+emitJs :: Parsed -> String
+emitJs { nodes } =
+  let
+    h = hoistInline nodes
+  in
+    Driver.compile (metaFor "rt.truthyNonEmpty" "yield") coreEmit (Map.toUnfoldable h.partials)
+      h.template

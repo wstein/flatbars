@@ -24,7 +24,6 @@ import Data.String (Pattern(..), contains)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
-import FlatBars.Parser (parseWith)
 import FlatBars.Span (Span)
 import FlatBars.Value (Value(..))
 import Kernel.Lower (RNode(..), lower)
@@ -33,6 +32,7 @@ import Linter.Migrate (migrateToMaxBars)
 import MaxBars (maxLoopVars, renderMax)
 import MaxBars.Parser as MBP
 import RawBars as RawBars
+import RawBars.Parser as RawParser
 import Test.Assert (assert')
 import Test.Linter.Aliases as Aliases
 import Test.Linter.Lift as Lift
@@ -49,7 +49,7 @@ maxAst src = case MBP.parse src of
 loweredAst :: String -> Either String (Array RNode)
 loweredAst src = case lowerToRawBars src of
   Left e -> Left ("lower failed: " <> show e)
-  Right lowered -> case parseWith RawBars.coreOptions lowered of
+  Right lowered -> case RawParser.parse lowered of
     Left e -> Left ("re-parse of lowered RawBars failed: " <> show e <> "\n  lowered = " <> lowered)
     Right { nodes } -> Right (lower nodes)
 
