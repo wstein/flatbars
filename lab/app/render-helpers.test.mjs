@@ -5,7 +5,23 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { previewDoc, applyEscape } from "./render-helpers.mjs";
+import { previewDoc, applyEscape, outputHasContent } from "./render-helpers.mjs";
+
+// ── outputHasContent: empty-state gating over a cache snapshot ─────────────────
+
+test("outputHasContent gates each view on the right cache", () => {
+  const empty = { lastData: null, lastProgram: null, lastOutput: "" };
+  assert.equal(outputHasContent("data", empty), false);
+  assert.equal(outputHasContent("data", { ...empty, lastData: {} }), true);
+  assert.equal(outputHasContent("bytecode", empty), false);
+  assert.equal(outputHasContent("bytecode", { ...empty, lastProgram: {} }), true);
+  // compiled / migrated depend only on the template source → always have content
+  assert.equal(outputHasContent("compiled", empty), true);
+  assert.equal(outputHasContent("migrated", empty), true);
+  // every other view needs rendered output
+  assert.equal(outputHasContent("source", empty), false);
+  assert.equal(outputHasContent("source", { ...empty, lastOutput: "x" }), true);
+});
 
 // ── previewDoc: the iframe sandbox document + CSP boundary ────────────────────
 

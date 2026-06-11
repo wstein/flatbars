@@ -24,6 +24,20 @@ export function previewDoc(body, allowScripts = false) {
   );
 }
 
+// Whether the given output view has content to show (drives the empty-state
+// placeholder): Render Data needs data, Bytecode needs a compiled program, the
+// compiled/migrated views depend only on the template source, the rest need
+// rendered output. Pure: it reads a snapshot of the three relevant render caches
+// rather than closing over them — the gateway form for the ctx restructure
+// (CTX-DESIGN.md), where these become `ctx.caches.*`.
+export function outputHasContent(view, { lastData, lastProgram, lastOutput }) {
+  if (view === "data") return lastData != null;
+  if (view === "bytecode") return lastProgram != null;
+  if (view === "compiled") return true; // depends only on the template source
+  if (view === "migrated") return true; // depends only on the template source
+  return !!lastOutput;
+}
+
 // Rewrite every `emit` instruction's escape mode in place. This walks the
 // stem-bc/v1 wire directly, so it is meaningful only for an engine that declares
 // `escape-modes` (ADR-0020) — `escapeModesSupported` carries that capability so

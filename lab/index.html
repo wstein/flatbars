@@ -1712,7 +1712,7 @@
       import { showBootError, bootFail } from "./app/boot-error.mjs?v=1";
       import { toast, openShareMenu, closeShareMenu } from "./app/ui-chrome.mjs?v=1";
       import { createCmLanguages } from "./app/cm-languages.mjs?v=1";
-      import { previewDoc, applyEscape } from "./app/render-helpers.mjs?v=1";
+      import { previewDoc, applyEscape, outputHasContent } from "./app/render-helpers.mjs?v=2";
       import { EditorState, Annotation, StateField, StateEffect, Compartment } from "https://esm.sh/@codemirror/state@6.5.2/es2022/state.mjs";
       import {
         Decoration,
@@ -3055,23 +3055,16 @@
       let lastRequiredAssigns = []; // engine reflection: assign names the program reads
       let lastMissingAssigns = [];  // intersection: requiredAssigns NOT in current data
 
-      // Whether the given output view has content to show (drives the empty-state
-      // placeholder): the Render Data needs data, Bytecode needs a compiled program,
-      // the rest need rendered output.
-      function outputHasContent(view) {
-        if (view === "data") return lastData != null;
-        if (view === "bytecode") return lastProgram != null;
-        if (view === "compiled") return true; // depends only on the template source
-        if (view === "migrated") return true; // depends only on the template source
-        return !!lastOutput;
-      }
+      // outputHasContent now lives in ./app/render-helpers.mjs — it takes a snapshot
+      // of { lastData, lastProgram, lastOutput } (the ctx-restructure gateway form).
+      const outputCaches = () => ({ lastData, lastProgram, lastOutput });
 
       function setOutput(str, segments = []) {
         lastOutput = str;
         lastSegments = segments;
         paintTextView();
         renderPreview();
-        qs(".output-body").dataset.empty = outputHasContent(outputView) ? "false" : "true";
+        qs(".output-body").dataset.empty = outputHasContent(outputView, outputCaches()) ? "false" : "true";
         renderDock();
         renderDataInspect();
         refreshSearchPanel();
@@ -3801,7 +3794,7 @@
         // calls renderPreview directly, so they stay instant.)
         if (isText) { paintTextView(); outputEditor.requestMeasure(); }
         else requestAnimationFrame(renderPreview);
-        qs(".output-body").dataset.empty = outputHasContent(view) ? "false" : "true";
+        qs(".output-body").dataset.empty = outputHasContent(view, outputCaches()) ? "false" : "true";
         caretLinkKey = null; syncOutputToCaret();
         // Re-render the dock (Coverage panel) and the inspector pane (Context
         // Inspector) so their render-only placeholders show when switching
