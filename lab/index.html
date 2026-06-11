@@ -1723,6 +1723,7 @@
       import { renderProblems } from "./app/dock/problems.mjs?v=1";
       import { renderContext } from "./app/dock/context.mjs?v=1";
       import { createOutputView } from "./app/output.mjs?v=2";
+      import { createRun } from "./app/render.mjs?v=1";
       import { TRANSFORMER_RISK } from "./app/transformer-risk.mjs?v=1";
       import { EditorState, Annotation, StateField, StateEffect, Compartment } from "https://esm.sh/@codemirror/state@6.5.2/es2022/state.mjs";
       import {
@@ -3296,291 +3297,33 @@
         return i >= 0 ? tabs[i].source : "";
       }
 
-      function run() {
-        // run() is synchronous, so once it returns the output and its segments
-        // match the current sources again — clear the stale-offset guard.
-        renderPending = false;
-        setRecomputing(false); // I-1 · debounce window ended; clear before sync work
-        ctx.caches.lastData = null; // reset; reassigned once data is parsed + transformed below
-        ctx.caches.dockProblems = []; // success leaves this empty; error paths populate it below
-        // Reset per-run analyses so a stale value never leaks into the dock.
-        ctx.caches.lastTimings = null; ctx.caches.lastAst = null; ctx.caches.lastDataAccess = []; ctx.caches.lastWhitespace = [];
-        ctx.caches.lastDeps = null; ctx.caches.lastCalls = []; ctx.caches.lastEscapeRuns = null; ctx.caches.lastCoverage = [];
-        ctx.caches.lastAnalyse = { ok: true, findings: [] };
-        ctx.caches.lastLint = { ok: true, findings: [] };
-        ctx.caches.lastRequiredAssigns = []; ctx.caches.lastMissingAssigns = [];
-        const dataSource = yamlSrc; // the YAML tab's source (editor may show the transform)
-        const mainSource = tabs[0].source;
-        const tCompileStart = performance.now();
-        // Compile with span provenance so the rendered output can be mapped back
-        // to its source files/tags in the Source view.
-        const compiled = renderer.compile(mainSource, partialsMap(), { map: true, standalone });
-        const tCompileEnd = performance.now();
-
-        if (compiled.errors) {
-          ctx.caches.lastProgram = null;
-          ctx.caches.lastUsedTransformers = [];
-          // The compiler reports every recoverable parse error in one pass, in
-          // source order. Each names the file ("main" or a partial) it occurred
-          // in; map its byte span into that file's source for line/column, and
-          // underline only the errors in the tab currently shown.
-          const activeFile = tabs[activeTabIdx]?.name;
-          const diags = [];
-          const seen = new Set();
-          const problems = [];
-          for (const e of compiled.errors) {
-            const file = e.file || "main";
-            const src = fileSource(file);
-            const [from, to] = spanRange(src, e.start, e.end);
-            const pos = charToLineColumn(src, from);
-            // Dedupe identical errors (e.g. a partial expanded at several sites).
-            const key = `${file}:${pos.line}:${pos.column}:${e.message}`;
-            if (seen.has(key)) continue;
-            seen.add(key);
-            if (file === activeFile) diags.push({ from, to, severity: "error", message: e.message });
-            problems.push({ severity: "error", file, line: pos.line, col: pos.column, message: e.message });
-          }
-          updateDiagnostics(diags);
-          const more = problems.length > 1 ? ` (+${problems.length - 1} more)` : "";
-          const first = problems[0];
-          setError(`compile error: ${first.file} · ${first.message} (Ln ${first.line}, Col ${first.col})${more}`);
-          ctx.caches.dockProblems = problems;
-          renderDock();
-          setOutput(""); saveHash(); return;
-        }
-
-        ctx.caches.lastProgram = compiled.program;
-        ctx.caches.lastUsedTransformers = renderer.usedTransformers(compiled.program);
-        ctx.caches.lastRequiredAssigns = renderer.requiredAssigns(compiled.program);
-        clearDiagnostics();
-
-        // Static analyses — every panel that doesn't need rendered output runs
-        // here. parseAst is best-effort: a parse error on a partial leaves an
-        // empty AST for that file so the dock degrades gracefully.
-        const tParseStart = performance.now();
-        const astsByFile = {};
-        const mainAst = renderer.parseAst(mainSource);
-        astsByFile.main = mainAst.ast ? mainAst.ast.nodes : [];
-        for (const [name, src] of Object.entries(partialsMap())) {
-          const a = renderer.parseAst(src);
-          astsByFile[name] = a.ast ? a.ast.nodes : [];
-        }
-        ctx.caches.lastAst = astsByFile;
-        ctx.caches.lastCalls = analyseCalls(astsByFile);
-        ctx.caches.lastEscapeRuns = analyseEscapeRuns(astsByFile);
-        ctx.caches.lastDeps = buildDependencyGraph(astsByFile);
-        ctx.caches.lastWhitespace = [];
-        for (const [file, src] of [["main", mainSource]].concat(Object.entries(partialsMap()))) {
-          for (const w of analyseWhitespace(src, file)) ctx.caches.lastWhitespace.push(w);
-        }
-        const tParseEnd = performance.now();
-
-        let data;
-        try {
-          data = loadYaml(dataSource || "null");
-          if (typeof data === "undefined") data = null;
-        } catch (err) {
-          setError("invalid YAML: " + err.message);
-          ctx.caches.dockProblems = [{ severity: "error", file: "data.yaml", line: (err.mark?.line ?? 0) + 1, col: (err.mark?.column ?? 0) + 1, message: "YAML · " + err.message }];
-          setOutput(""); saveHash(); return;
-        }
-
-        // Data overlays (Phase 3) — parse each overlay's YAML, then deep-merge
-        // them onto `data` in tab order. A per-overlay YAML parse error fails
-        // the whole render the same way `data.yaml` does, attributed to the
-        // overlay's tab. Type clashes (`object` vs `scalar` at the same path)
-        // become warn-severity Problems rows but don't abort the render.
-        const parsedOverlays = [];
-        for (const ov of dataOverlays) {
-          if (!ov.source.trim()) continue;
-          try {
-            const value = loadYaml(ov.source);
-            parsedOverlays.push({ name: ov.name, value });
-          } catch (err) {
-            setError("invalid YAML: " + ov.name + " · " + err.message);
-            ctx.caches.dockProblems = [{
-              severity: "error", file: ov.name,
-              line: (err.mark?.line ?? 0) + 1, col: (err.mark?.column ?? 0) + 1,
-              message: "YAML · " + err.message,
-            }];
-            setOutput(""); saveHash(); return;
-          }
-        }
-        const overlayResult = mergeDataOverlays(data, parsedOverlays);
-        data = overlayResult.merged;
-        for (const c of overlayResult.clashes) {
-          ctx.caches.dockProblems.push({
-            severity: "missing", // re-use the warn-colour Problems styling
-            file: "data.yaml", line: 1, col: 1,
-            message: `overlay clash at \`${c.path || "(root)"}\` — ${c.was} replaced by ${c.now}`,
-          });
-        }
-
-        // Transform step: a JSONata data → view-model preprocess (all engines).
-        // Custom helpers are a separate concern, applied at render below.
-        if (transformSrc.trim()) {
-          try {
-            data = jsonata(transformSrc).evaluate(data);
-          } catch (err) {
-            ctx.caches.lastData = null;
-            const message = "transform · " + (err.message || err.code || "invalid JSONata");
-            setError("transform error: " + (err.message || err.code || "invalid JSONata"));
-            ctx.caches.dockProblems = [{ severity: "error", file: "transform", line: 1, col: 1, message }];
-            setOutput(""); saveHash(); return;
-          }
-        }
-        ctx.caches.lastData = data; // expose the view-model to the "Render Data" output view
-
-        // Inject catalog-driven transformer lists for the cheat-sheet example so
-        // the template never hard-codes transformer metadata. The original data.yaml
-        // carries `categories` / `overrides` / `entries` on each group; this step
-        // populates `transformers` from the live engine catalog.
-        if (loadedExampleIdx >= 0 && examples[loadedExampleIdx]?.id === "cheat-sheet") {
-          data = buildCheatSheetData(data, renderer.catalog());
-          ctx.caches.lastData = data;
-        }
-
-        // Data-aware analyses, now that the view-model is finalized. Coverage
-        // uses the engine's default truthiness for dead-branch classification.
-        ctx.caches.lastDataAccess = analyseDataAccess(astsByFile, data);
-        ctx.caches.lastCoverage = analyseCoverage(astsByFile, data);
-        // ADR-022: trace the render and collect the truthiness portability
-        // findings for the Truthiness dock panel (FlatBars engine only). ADR-030:
-        // when config.yaml declares safe paths, route through analyzeWith so the
-        // panel suppresses those paths' potential + miss findings.
-        ctx.caches.lastAnalyseSuppressed = 0;
-        if (typeof renderer.analyze !== "function") {
-          ctx.caches.lastAnalyse = { ok: true, findings: [] };
-        } else if (labPathSchema.length && typeof renderer.analyzeWith === "function") {
-          // ADR-030: the schema'd pass is what the panel shows; an unschema'd pass
-          // counts how many potential/miss findings the schema removed (advisory
-          // findings only — observed findings are never suppressed).
-          ctx.caches.lastAnalyse = renderer.analyzeWith((p) => !labPathSchema.includes(p), { source: mainSource }, data);
-          const unsch = renderer.analyze({ source: mainSource }, data);
-          const advisory = (r) => (r.findings || []).filter((f) => f.kind === "potential" || f.kind === "miss").length;
-          if (ctx.caches.lastAnalyse.ok && unsch.ok) ctx.caches.lastAnalyseSuppressed = Math.max(0, advisory(unsch) - advisory(ctx.caches.lastAnalyse));
-        } else {
-          ctx.caches.lastAnalyse = renderer.analyze({ source: mainSource }, data);
-        }
-        // ADR-019: deprecated-alias + non-canonical scoped-variable findings for
-        // the active dialect (the Lint dock panel; FlatBars engines only).
-        ctx.caches.lastLint = typeof renderer.lint === "function"
-          ? renderer.lint(mainSource)
-          : { ok: true, findings: [] };
-        refreshCoverageGutter();
-        // Engine-reported assigns that aren't present at the data root — a
-        // tight, false-positive-free "missing assigns" signal (Data Access).
-        const dataKeys = (data && typeof data === "object" && !Array.isArray(data))
-          ? new Set(Object.keys(data)) : new Set();
-        ctx.caches.lastMissingAssigns = ctx.caches.lastRequiredAssigns.filter((n) => !dataKeys.has(n));
-        // Promote each missing assign to a Problems row at warn severity, so
-        // the dock's auto-open behaviour fires for a missing key just like it
-        // does for compile errors. The first source span that references the
-        // assign is the jump target; locating it by re-using the data-access
-        // walk (which already classifies bare identifiers).
-        for (const name of ctx.caches.lastMissingAssigns) {
-          const firstHit = ctx.caches.lastDataAccess.find((r) => r.path === name || r.path.startsWith(name + "."));
-          const file = firstHit?.file || "main";
-          const src = fileSource(file);
-          const pos = firstHit && typeof firstHit.start === "number"
-            ? charToLineColumn(src, spanRange(src, firstHit.start, firstHit.end)[0])
-            : { line: 1, column: 1 };
-          ctx.caches.dockProblems.push({
-            severity: "missing",
-            file, line: pos.line, col: pos.column,
-            message: `missing assign '${name}' — referenced by the template but not present in data`,
-          });
-        }
-
-        const tRenderStart = performance.now();
-        // Transformer allow-list (Render Config, ADR-0013) — refuse to render
-        // when the compiled program calls a name outside the configured
-        // positive list. `allowList === null` (the default) means "no
-        // constraint": every built-in is callable. Mirrors a host policy
-        // refusal: amber "cap" Problems row, no output. Analyses above still
-        // ran, so the dock can show what was used and why it was blocked.
-        const denied = allowList !== null
-          ? [...new Set(ctx.caches.lastUsedTransformers.filter((n) => !allowList.includes(n)))]
-          : [];
-        if (denied.length) {
-          const plural = denied.length > 1 ? "s" : "";
-          setError(`not in allow-list: transformer${plural} '${denied.join("', '")}'`);
-          ctx.caches.dockProblems.push({
-            severity: "cap", file: "main", line: 1, col: 1,
-            message: `transformer${plural} '${denied.join("', '")}' not in the render-config allow-list — add to \`transformers.allow\` to render`,
-          });
-          setOutput(""); renderDock(); saveHash();
-          ctx.caches.lastTimings = null;
-          return;
-        }
-        try {
-          const program = applyEscape(compiled.program, escapeMode, engineHas("escape-modes"));
-          // Custom-helper render (ADR-018/019): the registerHelper source runs in
-          // the Worker sandbox, out of band. Use the cached result when it
-          // matches the current inputs; otherwise show "rendering…" and let the
-          // async render re-run. Provenance segments aren't produced for helper
-          // renders (as the in-process renderWith path also returns none).
-          // Both helpers.js and the catalog (t/number/…) work on every FlatBars
-          // dialect — the t-surfaces RawBars/ClassicBars/MaxBars (ADR-029) — MinBars
-          // excluded (logic-less). The Worker routes each to the dialect's
-          // operations-aware entry (renderRawWith/renderWith/renderMaxWith), with
-          // the locale from config.yaml.
-          const helperSrc = (ENGINE !== "minbars") ? (helpersSrc || "").trim() : "";
-          const catSrc = (ENGINE !== "minbars") ? (catalogSource || "").trim() : "";
-          let output, segments;
-          if (helperSrc || catSrc) {
-            const key = helperKey(mainSource, partialsMap(), data, helperSrc, catSrc, labLocale, ENGINE);
-            if (helperCache.key !== key) {
-              requestHelperRender(key, { dialect: ENGINE, template: mainSource, data, partials: partialsMap(), helperSrc, catalogSrc: catSrc, locale: labLocale });
-              setOutput("rendering…"); setError(""); renderDock(); saveHash(); ctx.caches.lastTimings = null;
-              return;
-            }
-            if (helperCache.error) {
-              setError(helperCache.error); setOutput(""); renderDock(); saveHash(); ctx.caches.lastTimings = null;
-              return;
-            }
-            output = helperCache.output; segments = [];
-          } else {
-            ({ output, segments } = renderer.render(program, data, { map: true, compat: minbarsCompat }));
-          }
-          setOutput(output, segments);
-          setError("");
-        } catch (err) {
-          // `err.kind === "policy"` flags an allow-list / `eval`-gate refusal
-          // (badged amber); anything else is a runtime render error (red).
-          const isPolicy = err && err.kind === "policy";
-          // The engine prefixes a located error with `line:col: ` — lift that into
-          // the problem's position so the header reads e.g. `main:15:1` (not the
-          // default `main:1:1`), and drop the now-redundant prefix from the message.
-          let line = 1, col = 1, message = (err && err.message) || String(err);
-          const at = /^(\d+):(\d+):\s*/.exec(message);
-          if (at) { line = +at[1]; col = +at[2]; message = message.slice(at[0].length); }
-          setError("render error: " + message);
-          ctx.caches.dockProblems = [{ severity: isPolicy ? "cap" : "render", file: "main", line, col, message }];
-          setOutput("");
-        }
-        const tRenderEnd = performance.now();
-        ctx.caches.lastTimings = {
-          parseMs: tParseEnd - tParseStart,
-          compileMs: tCompileEnd - tCompileStart,
-          renderMs: tRenderEnd - tRenderStart,
-          totalMs: (tCompileEnd - tCompileStart) + (tParseEnd - tParseStart) + (tRenderEnd - tRenderStart),
-          outBytes: (ctx.caches.lastOutput || "").length,
-        };
-        renderDock();
-        saveHash();
-        // Re-apply the caret→output highlight against the freshly rendered runs.
-        caretLinkKey = null;
-        syncOutputToCaret();
-      }
-
-      const debouncedRun = debounce(run, 100);
-
       // True between a source edit and the debounced render that follows it: in
       // that window the output segments still carry the pre-edit byte offsets, so
       // the hover link-highlight is suppressed to avoid pointing at stale source.
       let renderPending = false;
-      function scheduleRun() { markCustom(); renderPending = true; setRecomputing(true); debouncedRun(); }
+      // run() and scheduleRun() — the render root — now live in ./app/render.mjs.
+      // The factory binds ctx + the live-state getters + the host fns (hoisted /
+      // defined-above) + the library helpers (injected to reuse the page's single
+      // instances). renderPending is set via the injected setter; caretLinkKey via
+      // resetCaretLink (the caret subsystem owns it).
+      const { run, scheduleRun } = createRun(ctx, {
+        getYamlSrc: () => yamlSrc, getTabs: () => tabs, getActiveTabIdx: () => activeTabIdx,
+        getStandalone: () => standalone, getTransformSrc: () => transformSrc,
+        getHelpersSrc: () => helpersSrc, getCatalogSource: () => catalogSource,
+        getAllowList: () => allowList, getEscapeMode: () => escapeMode,
+        getMinbarsCompat: () => minbarsCompat, getLabLocale: () => labLocale,
+        getLabPathSchema: () => labPathSchema, getDataOverlays: () => dataOverlays,
+        getLoadedExampleIdx: () => loadedExampleIdx, getHelperCache: () => helperCache,
+        examples, ENGINE,
+        renderer, partialsMap, fileSource, engineHas,
+        setError, setOutput, renderDock, saveHash, clearDiagnostics, updateDiagnostics,
+        setRecomputing, setRenderPending: (v) => { renderPending = v; },
+        refreshCoverageGutter, requestHelperRender, resetCaretLink: () => { caretLinkKey = null; },
+        syncOutputToCaret, markCustom, debounce,
+        loadYaml, jsonata, spanRange, charToLineColumn, mergeDataOverlays,
+        analyseCalls, analyseEscapeRuns, analyseWhitespace, analyseDataAccess, analyseCoverage,
+        buildDependencyGraph, buildCheatSheetData,
+      });
 
       function updateDiagnostics(diags) {
         templateDiagnostics = diags;

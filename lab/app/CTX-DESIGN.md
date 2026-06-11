@@ -53,7 +53,10 @@ becomes `ctx.caches.lastOutput = x`. No semantic change.
   host refreshers + the active-view getter; call sites unchanged). First core fn.
 - ✅ paintTextView + renderPreview + setOutputDoc + buildProvenance folded into the
   same `createOutputView(ctx, host)` factory. lastSegViews migrated into ctx.caches.
-  Output subsystem fully modular. Next: run()/scheduleRun → app/render.mjs.
+  Output subsystem fully modular.
+- ✅ run() + scheduleRun → app/render.mjs (createRun(ctx, host) factory, ~40 deps).
+  THE render root — the most-coupled fn — is out. Branch-tested (compile/YAML/
+  transform/denial/helper/missing-assign) since the smoke covers only the happy path.
 
 ## Move order (leaf-most consumers first, run() last)
 
