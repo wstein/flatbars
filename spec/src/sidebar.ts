@@ -179,6 +179,10 @@ export const sidebar = [
         "link": "/adr/adr-0040-template-inheritance-extends-block/"
       },
       {
+        "label": "ADR-041: per-surface front-end",
+        "link": "/adr/adr-0041-per-surface-lexer-parser/"
+      },
+      {
         "label": "Final ADR review (2026-06-01)",
         "link": "/adr/adr-final-review/"
       }
