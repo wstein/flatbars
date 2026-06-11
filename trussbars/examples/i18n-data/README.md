@@ -54,7 +54,7 @@ byte-identical for en/de/fr/pl.
 
 ## The template ([`src/receipt.truss`](src/receipt.truss))
 
-```handlebars
+```django
 == {{t catalog locale "title"}} ==
 {{t catalog locale "greeting"}}, {{customer}}!
 {{t catalog locale "placed"}}: {{date placed "%d %B %Y" locale}}
