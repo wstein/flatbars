@@ -258,17 +258,28 @@ byte-identical (`--vm` stays 75/75):
   `{% local %}` (block aliases) drive the `Env` stack natively instead of delegating.
 
 `Delegate` now carries only `case`, partials, host block helpers, and raw blocks (none hot in
-the corpus). Perf gate green, `AOT ≤ VM ≤ interpreter ≤ handlebars`: big-table VM ≈ 1.3× the
-interpreter, teams ≈ 1.9× (was 0.9× before specialization).
+the corpus). These restored `VM ≤ interpreter`, but **not** the old subset VM's numbers
+(≈326 µs / ≈420 ns): the VM was 423 µs / 732 ns. Root cause — the rewrite replaced the old
+VM's 2-field borrow-frame loop (`Frame{ items, index }`: alloc-free push, a lone `index += 1`
+per step, a lazy `&items[i]` for `this`) with the **shared `Env`/`LoopFrame` loop driver**,
+which per loop *entry* heap-allocs a `LoopFrame` + a `ParentNode` and clones the whole 11-field
+`Env`, and per *iteration* runs `set_iter` (a `Cell`/`RefCell` write, an element clone into
+`env.this`, and double index bookkeeping — `LoopState.idx` *and* `loop_frame.index0`). The
+`OutPath` specialization recovered only the *read* side; the loop *driver* stayed heavy because
+materializing `this` is the price of letting a `Delegate`d node share the engine.
 
-**Declined (assessed, not built): borrowing loop elements.** `set_iter` clones the current
-element into `env.this` each iteration; the old subset VM borrowed `&items[i]` instead. Eliding
-the clone would need either lifetime-threading the shared `Env` (invasive — every `eval_*`
-reads `env.this`) or a fragile dirty-flag / lazy-sync scheme (byte-divergence risk). And it
-buys almost nothing on the actual workloads: big-table's elements are `Value::Num` (a Copy enum
-— the "clone" is free), teams' are `Value::Object` (one `Rc` bump ×4). big-table's real cost is
-`core::fmt` integer formatting + loop dispatch, which this does not touch. Per the rule above
-— promote only when the benchmark demands it — it stays unbuilt while the gate is green.
+- **`FastEach` / `run_fast` (the native-loop fast-path)** — a **binding-free** loop whose body
+  and `else` are *wholly static* (only text, `this`/`root` paths, `loop.first`, and nested such
+  loops) compiles to a `Fast` plan and renders on a borrow machine over `&this`/`&root`: **no
+  `Env`, no per-entry alloc/clone, no per-iteration element clone** — the old borrow-frame loop,
+  recovered. The instant a body needs the shared engine (a general expression, a named binding,
+  `scope`/`local`/`case`/a partial) the whole loop falls back to the `Env`-stack path, so
+  coverage is untouched. big-table and teams are wholly static, so they hit it.
+
+Perf gate green, `AOT ≤ VM ≤ interpreter ≤ handlebars`: big-table VM ≈ **315 µs** (1.5× the
+interpreter — *below* the old subset VM), teams ≈ **440 ns** (≈2.4×; the old ≈420 ns, with the
+top-level `{{ year }}` still on the shared path). The full-coverage rewrite's loop-driver
+regression is recovered with the subset gone.
 
 [`Value`]: ../crates/trussbars-interp/src/lib.rs
 

@@ -17,10 +17,20 @@
 //!   so the catalog is **single-sourced** — there is no second implementation to keep in
 //!   sync, and VM output is **byte-identical** to the interpreter by construction (the
 //!   conformance axis just proves the structural compiler dropped nothing).
-//! - **The less-common blocks** (`with`/`scope`, `let`/`local`, `case`, partials, host
-//!   block helpers, raw) render through a `Delegate` op → [`trussbars_interp::eval_nodes`]
-//!   — full coverage first; promoted to native bytecode ops opportunistically (perf),
-//!   never as a gate on coverage.
+//! - **The less-common blocks** (`case`, partials, host block helpers, raw) render through a
+//!   `Delegate` op → [`trussbars_interp::eval_nodes`] — full coverage first; promoted to
+//!   native bytecode ops opportunistically (perf), never as a gate on coverage.
+//!
+//! ## The native-loop fast-path (docs/11 §4.3)
+//!
+//! Driving a loop through the shared `Env` (so its body can call `eval_expr`) costs an `Env`
+//! clone per entry and an element clone per iteration. A **binding-free loop whose body is
+//! wholly static** (only text, `this`/`root` paths, `loop.first`, and nested such loops)
+//! needs none of that, so it compiles to a [`Fast`] plan and renders through [`run_fast`]: a
+//! borrow machine over `&this`/`&root` — no `Env`, no allocation, no per-iteration clone. The
+//! moment a body needs the shared engine (a general expression, a named binding, `scope`/
+//! `local`/`case`/a partial), the whole loop falls back to the `Env`-stack path. Output is
+//! identical either way; the fast path is a perf specialization, not a second engine.
 //!
 //! It reuses [`trussbars_interp::Value`], the interpreter's [`write_escaped`] /
 //! [`Value::raw_text`] writers, and its `Env`/loop machinery — which is what keeps the two
@@ -50,6 +60,51 @@ enum Base {
     This,
     /// The render's top-level data.
     Root,
+}
+
+/// A condition a fast `if` can test without the shared engine.
+enum FastTest {
+    /// `loop.first` — the current (innermost fast) iteration is element 0.
+    First,
+    /// A `this`/`root` field path's truthiness.
+    Path(Base, Box<[Rc<str>]>),
+}
+
+/// A node in a **fast render plan** — the Env-free form a fully-static loop body compiles to
+/// (docs/11 §4.3). Driven by [`run_fast`] over a borrowed `this`/`root`: no [`Env`], no
+/// per-entry `Env` clone, no per-iteration element clone — the old borrow-frame machine,
+/// recovered for loops that need nothing from the shared engine. A loop whose body is not
+/// wholly expressible here uses the general `Env`-stack path instead (full coverage).
+enum Fast {
+    /// Literal text.
+    Text(Rc<str>),
+    /// Write a borrow-resolved `this`/`root` field path (escaped, or raw for `| safe`).
+    Out {
+        /// Where the path starts.
+        base: Base,
+        /// The field keys (empty → `base` itself).
+        keys: Box<[Rc<str>]>,
+        /// Write raw instead of HTML-escaped.
+        raw: bool,
+    },
+    /// `if`/`unless` + `elif`s + `else`: the first arm whose (optionally negated) test holds
+    /// renders; otherwise the `else_` body does. Every test is a path or `loop.first`.
+    If {
+        /// `(test, negate, body)` arms in order (the primary first, then each `elif`).
+        arms: Vec<(FastTest, bool, Vec<Fast>)>,
+        /// The trailing `else` body (empty when absent).
+        else_: Vec<Fast>,
+    },
+    /// A nested binding-free loop over a `this`/`root` path: each element becomes the body's
+    /// `this`; an empty / non-collection subject renders `empty` in the current scope.
+    Loop {
+        /// The collection path (resolved from the borrow frame).
+        subject: (Base, Box<[Rc<str>]>),
+        /// The per-element body.
+        body: Vec<Fast>,
+        /// The `{% else %}` (empty-collection) body.
+        empty: Vec<Fast>,
+    },
 }
 
 /// A VM instruction. Jump targets are absolute instruction indices. The straight-line
@@ -140,6 +195,18 @@ enum Op {
     LocalStart(Box<[(Rc<str>, Expr)]>),
     /// End a `{% local %}` body: pop the child env.
     LocalEnd,
+    /// A fully-static `each`: drive the loop with the Env-free [`run_fast`] borrow machine
+    /// (no `Env` clone per entry, no element clone per iteration). The `subject` is resolved
+    /// **once** against the current `Env` at entry; the body / `empty` run as fast plans.
+    /// Emitted only when the whole loop is fast-eligible — otherwise `EachStart`/`EachNext`.
+    FastEach {
+        /// The collection expression (evaluated against the current `Env` at loop entry).
+        subject: Expr,
+        /// The per-element fast body.
+        body: Rc<[Fast]>,
+        /// The `{% else %}` (empty-collection) fast body, run in the parent scope.
+        empty: Rc<[Fast]>,
+    },
     /// Render a node through the shared interpreter eval (the blocks not yet given native
     /// bytecode: `case`/partials/host block helpers/raw). Byte-identical by construction;
     /// promoted to native ops opportunistically (perf), never for coverage.
@@ -389,6 +456,30 @@ impl Program {
                 Op::LocalEnd => {
                     envs.pop();
                 }
+                Op::FastEach {
+                    subject,
+                    body,
+                    empty,
+                } => {
+                    // Resolve the collection once against the current Env, then iterate with
+                    // the borrow machine — `this` is a borrow into the live data, never cloned.
+                    let subj = eval_expr(envs.last().unwrap(), subject)?;
+                    let env = envs.last().unwrap();
+                    let root = env.root_value();
+                    match &subj {
+                        Value::Array(a) if !a.is_empty() => {
+                            for (j, elem) in a.iter().enumerate() {
+                                run_fast(body, elem, root, j == 0, &mut out, mode);
+                            }
+                        }
+                        Value::Object(o) if !o.is_empty() => {
+                            for (j, (_, v)) in o.iter().enumerate() {
+                                run_fast(body, v, root, j == 0, &mut out, mode);
+                            }
+                        }
+                        _ => run_fast(empty, env.this(), root, false, &mut out, mode),
+                    }
+                }
                 Op::Delegate(node) => {
                     eval_nodes(envs.last().unwrap(), core::slice::from_ref(node), &mut out)?;
                 }
@@ -415,6 +506,86 @@ fn resolve_path<'a>(env: &'a Env, base: Base, keys: &[Rc<str>]) -> Option<&'a Va
         }
     }
     Some(v)
+}
+
+/// Borrow-resolve a `this`/`root` path against explicit `this`/`root` borrows — the Env-free
+/// twin of [`resolve_path`] for the fast machine. Lenient (missing key / non-object → `None`),
+/// **zero clones**.
+fn resolve_fast<'a>(
+    base: Base,
+    keys: &[Rc<str>],
+    this: &'a Value,
+    root: &'a Value,
+) -> Option<&'a Value> {
+    let mut v = match base {
+        Base::This => this,
+        Base::Root => root,
+    };
+    for k in keys {
+        match v {
+            Value::Object(o) => v = o.get(&**k)?,
+            _ => return None,
+        }
+    }
+    Some(v)
+}
+
+/// Render a fast plan against a borrowed `this`/`root` — no `Env`, no allocation, no element
+/// clone. `is_first` is the enclosing iteration's first-element flag (for `loop.first`). A
+/// nested `Loop` recurses with each element as the new `this`, so the whole nest stays on the
+/// borrow machine. Infallible: fast ops never evaluate a fallible expression.
+fn run_fast(plan: &[Fast], this: &Value, root: &Value, is_first: bool, out: &mut String, mode: TruthMode) {
+    for f in plan {
+        match f {
+            Fast::Text(s) => out.push_str(s),
+            Fast::Out { base, keys, raw } => {
+                if let Some(v) = resolve_fast(*base, keys, this, root) {
+                    if *raw {
+                        v.raw_text(out);
+                    } else {
+                        write_escaped(v, out);
+                    }
+                }
+            }
+            Fast::If { arms, else_ } => {
+                let mut taken = false;
+                for (test, negate, body) in arms {
+                    let mut t = match test {
+                        FastTest::First => is_first,
+                        FastTest::Path(base, keys) => {
+                            resolve_fast(*base, keys, this, root).is_some_and(|v| v.truthy_in(mode))
+                        }
+                    };
+                    if *negate {
+                        t = !t;
+                    }
+                    if t {
+                        run_fast(body, this, root, is_first, out, mode);
+                        taken = true;
+                        break;
+                    }
+                }
+                if !taken {
+                    run_fast(else_, this, root, is_first, out, mode);
+                }
+            }
+            Fast::Loop { subject, body, empty } => {
+                match resolve_fast(subject.0, &subject.1, this, root) {
+                    Some(Value::Array(a)) if !a.is_empty() => {
+                        for (j, elem) in a.iter().enumerate() {
+                            run_fast(body, elem, root, j == 0, out, mode);
+                        }
+                    }
+                    Some(Value::Object(o)) if !o.is_empty() => {
+                        for (j, (_, v)) in o.iter().enumerate() {
+                            run_fast(body, v, root, j == 0, out, mode);
+                        }
+                    }
+                    _ => run_fast(empty, this, root, is_first, out, mode),
+                }
+            }
+        }
+    }
 }
 
 // ── compiler (AST → bytecode) ─────────────────────────────────────────────────
@@ -484,6 +655,62 @@ fn is_loop_first(e: &Expr) -> bool {
     )
 }
 
+/// Build an Env-free [`Fast`] plan for `nodes`, or `None` if any node needs the shared engine
+/// — a general expression (operators/pipes/helpers/bare names), a non-path / non-`loop.first`
+/// condition, a named-binding or non-path nested loop, or any `scope`/`local`/`case`/partial/
+/// raw block. All-or-nothing: one disqualifying node sends the whole enclosing loop to the
+/// general path, so the fast machine only ever runs wholly-static bodies.
+fn fast_plan(nodes: &[Node]) -> Option<Vec<Fast>> {
+    let mut plan = Vec::with_capacity(nodes.len());
+    for n in nodes {
+        match n {
+            Node::Text(s) => plan.push(Fast::Text(Rc::from(s.as_str()))),
+            Node::Output { expr, raw, .. } => {
+                let (base, keys) = classify_path(expr)?;
+                plan.push(Fast::Out {
+                    base,
+                    keys,
+                    raw: *raw,
+                });
+            }
+            Node::Cond(c) => {
+                let mut arms = Vec::with_capacity(1 + c.elifs.len());
+                arms.push((fast_test(&c.cond)?, c.negated, fast_plan(&c.body)?));
+                for (econd, ebody) in &c.elifs {
+                    arms.push((fast_test(econd)?, false, fast_plan(ebody)?));
+                }
+                plan.push(Fast::If {
+                    arms,
+                    else_: fast_plan(&c.otherwise)?,
+                });
+            }
+            // A nested loop is fast only with no bindings (the element is `this`) and a
+            // this/root collection path (resolvable from the borrow frame).
+            Node::For(e)
+                if e.item.is_none() && e.index.is_none() && e.label.is_none() =>
+            {
+                plan.push(Fast::Loop {
+                    subject: classify_path(&e.subject)?,
+                    body: fast_plan(&e.body)?,
+                    empty: fast_plan(&e.otherwise)?,
+                });
+            }
+            _ => return None, // a binding loop / scope / local / case / partial / raw → general
+        }
+    }
+    Some(plan)
+}
+
+/// A condition a fast `if` can test: `loop.first`, or a `this`/`root` path's truthiness.
+fn fast_test(e: &Expr) -> Option<FastTest> {
+    if is_loop_first(e) {
+        Some(FastTest::First)
+    } else {
+        let (base, keys) = classify_path(e)?;
+        Some(FastTest::Path(base, keys))
+    }
+}
+
 /// Push a conditional jump for `cond`, preferring the borrow-based `JumpUnlessPath` fast-op
 /// for a non-negated `this`/`root` path; returns the op's index (to patch its target).
 fn push_jump_unless(ops: &mut Vec<Op>, cond: &Expr, negate: bool) -> usize {
@@ -546,7 +773,22 @@ fn compile_node(n: &Node, ops: &mut Vec<Op>) {
                 patch(ops, ej, end);
             }
         }
-        // `{% for … %} body {% else %} otherwise {% endfor %}`.
+        // Fast path: a binding-free loop whose body + else are wholly Env-free render through
+        // the borrow machine — no Env clone per entry, no element clone per iteration.
+        Node::For(e)
+            if e.item.is_none()
+                && e.index.is_none()
+                && e.label.is_none()
+                && let Some(body) = fast_plan(&e.body)
+                && let Some(empty) = fast_plan(&e.otherwise) =>
+        {
+            ops.push(Op::FastEach {
+                subject: e.subject.clone(),
+                body: Rc::from(body),
+                empty: Rc::from(empty),
+            });
+        }
+        // General `{% for … %} body {% else %} otherwise {% endfor %}` (full coverage).
         Node::For(e) => {
             let start = ops.len();
             ops.push(Op::EachStart {
@@ -680,6 +922,40 @@ mod tests {
             (r#"{% inline "card" %}<{% yield %}>{% endinline %}{% partial "card" %}hi{% endpartial %}"#, Value::Null),
             // a parent-chain path inside a loop + collection op.
             ("{% for xs %}{{parent.t}}:{{this}} {% endfor %}", obj(&[("t", s("T")), ("xs", arr(&[s("a")]))])),
+        ];
+        for (tpl, data) in cases {
+            let prog = Program::compile(tpl).unwrap_or_else(|e| panic!("compile {tpl}: {e}"));
+            assert_eq!(
+                prog.render(data).unwrap_or_else(|e| panic!("render {tpl}: {e}")),
+                render(tpl, data.clone()).unwrap(),
+                "{tpl}"
+            );
+        }
+    }
+
+    /// The native-loop fast-path (`FastEach` + `run_fast`, docs/11 §4.3): binding-free,
+    /// wholly-static loops bypass the Env stack. These exercise the branches the cases above
+    /// don't — negated cond, an elif-of-paths chain, an inner empty-`else`, object iteration —
+    /// each still byte-identical to the interpreter (the fast machine is not a second engine,
+    /// just a borrow-frame fast path resolving the same lenient semantics).
+    #[test]
+    fn fast_loop_matches_interpreter() {
+        let cases: &[(&str, Value)] = &[
+            // negated cond (`{% unless path %}`) inside a fast body.
+            ("{% for xs %}{% unless this.hide %}{{this.n}} {% endunless %}{% endfor %}",
+             obj(&[("xs", arr(&[obj(&[("n", s("a"))]), obj(&[("hide", Value::Bool(true)), ("n", s("b"))])]))])),
+            // elif chain, every test a path; `else` arm too.
+            ("{% for xs %}{% if this.a %}A{% elif this.b %}B{% else %}Z{% endif %}{% endfor %}",
+             obj(&[("xs", arr(&[obj(&[("a", Value::Bool(true))]), obj(&[("b", Value::Bool(true))]), obj(&[])]))])),
+            // nested fast loop whose inner collection is empty → inner `else` in element scope.
+            ("{% for rows %}[{% for this %}{{this}}{% else %}-{% endfor %}]{% endfor %}",
+             obj(&[("rows", arr(&[arr(&[s("x"), s("y")]), arr(&[])]))])),
+            // object iteration (values become `this`) + loop.first + a root path.
+            ("{% for m %}{% if loop.first %}*{% endif %}{{root.tag}}{{this}};{% endfor %}",
+             obj(&[("tag", s("T")), ("m", obj(&[("a", s("1")), ("b", s("2"))]))])),
+            // top-level empty collection → fast `else` runs in the parent scope.
+            ("{% for xs %}{{this}}{% else %}none:{{tag}}{% endfor %}",
+             obj(&[("tag", s("Z")), ("xs", arr(&[]))])),
         ];
         for (tpl, data) in cases {
             let prog = Program::compile(tpl).unwrap_or_else(|e| panic!("compile {tpl}: {e}"));
