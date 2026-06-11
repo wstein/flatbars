@@ -9,7 +9,7 @@
 //! render helpers; `docs/11` §4.)
 //!
 //! **Status:** *tree-walk, lenient mode.* Covers the **whole** conformance corpus
-//! (71/71 byte-matched vs the oracle, `harness.mjs --vm`): output/paths/operators,
+//! (75/75 byte-matched vs the oracle, `harness.mjs --interp`): output/paths/operators,
 //! `if`/`each`/`with`/`let`, loop metadata incl. `loop.parent`/`loop.root`, the value
 //! helpers, the collection ops (where/reject/some/every/find/pluck/sortBy/groupBy),
 //! `dict`, and partials (`{% inline %}`/`{% include %}`/`{% partial %}`/`{% yield %}`). Anything

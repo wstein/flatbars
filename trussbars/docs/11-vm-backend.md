@@ -232,6 +232,18 @@ metadata), `unless`/`elif`/`else`; (4) `with`/`scope`, `let`/`local`, `case`; (5
 policy (drop the interpreter fallback). Native borrow-based fast ops are added opportunistically,
 gated on the perf benchmark — not on the conformance axis.
 
+**Status — delivered.** The VM is now a first-class, full-coverage backend. The interpreter
+exposes its evaluator (`eval_expr`/`eval_nodes`/`Env` with `root`/`push_loop`/`set_iter`/
+`bind`/`rerooted`, and `hoist`) as the shared engine; `trussbars-vm` compiles the `if`/`each`
+structure to bytecode driving an `Env` stack, routes every expression through the shared
+`eval_expr`, and renders the rarer blocks (`with`/`scope`, `let`/`local`, `case`, partials,
+host block helpers, raw) through a `Delegate` op → `eval_nodes`. There is no subset and no
+fallback — `Program::compile` accepts every valid template. The `truss-vm` CLI + the
+`harness.mjs --vm` axis prove it: **75/75 rendered corpus cases byte-match the oracle**,
+identical to `--interp`. What remains is pure optimization — promoting `Delegate`d blocks and
+hot expressions to native borrow-based ops — and is gated on the perf benchmark, never on
+coverage.
+
 [`Value`]: ../crates/trussbars-interp/src/lib.rs
 
 ## 5. The dynamic `Value` model (the part AOT shed)
