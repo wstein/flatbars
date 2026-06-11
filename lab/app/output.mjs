@@ -13,8 +13,8 @@
 // still-inline host fns, and the library helpers (disassemble/dumpYaml/marked/
 // segmentRanges — injected to reuse the page's single instances) arrive via host.
 
-import { qs, byId } from "./dom.mjs";
-import { outputHasContent, previewDoc } from "./render-helpers.mjs";
+import { qs, byId } from "./dom.mjs?v=24f57cfe";
+import { outputHasContent, previewDoc } from "./render-helpers.mjs?v=bf6bc3dd";
 
 export function createOutputView(ctx, host) {
   const {

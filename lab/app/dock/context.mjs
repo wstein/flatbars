@@ -9,7 +9,7 @@
 // takes an injected `inspectAt` (renderer.inspectAt) + the MinBars compat flag.
 // The pure label/snippet/title helpers live here (used only by this panel).
 
-import { makeEl } from "../dom.mjs";
+import { makeEl } from "../dom.mjs?v=24f57cfe";
 
 // Collapse whitespace and cap the length for a one-line span label.
 export function oneLineLabel(text, max = 60) {

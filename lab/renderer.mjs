@@ -63,9 +63,9 @@ import {
   compileMinbarsWithPartials as bbCompileMinbarsWithPartials,
   compileMinbarsCompat as bbCompileMinbarsCompat,
   compileMinbarsCompatWithPartials as bbCompileMinbarsCompatWith,
-} from "./vendor/flatbars-engine.mjs?v=156";
+} from "./vendor/flatbars-engine.mjs?v=41e2b4e6";
 
-import { buildDependencyGraph } from "./playground_utils.mjs";
+import { buildDependencyGraph } from "./playground_utils.mjs?v=a3b5423f";
 
 const VERSION = "0.1.0";
 

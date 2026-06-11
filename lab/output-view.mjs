@@ -12,7 +12,7 @@
 //   3. PIXELS   — does CodeMirror actually render it? Only a real browser; a
 //      manual checklist in docs/playground-smoke.md.
 
-import { tabVisibleUnder } from "./playground_utils.mjs";
+import { tabVisibleUnder } from "./playground_utils.mjs?v=a3b5423f";
 
 // The output view tabs, mirroring the data sub-pane tab strip. `requires` is the
 // ADR-0020 capability gate: a view shows only when the engine advertises every

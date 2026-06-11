@@ -9,7 +9,7 @@
 // (`lastAnalyseSuppressed`), and the host path schema (`labPathSchema`), and takes
 // `openProblem` for jump-to-source.
 
-import { makeEl } from "../dom.mjs";
+import { makeEl } from "../dom.mjs?v=24f57cfe";
 
 export function renderTruthiness(body, { analyse, suppressed, pathSchema }, { openProblem }) {
   const a = analyse;

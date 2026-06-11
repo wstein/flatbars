@@ -7,7 +7,7 @@
 // wiring) stay inline for now — they depend on still-inline helpers (saveHash,
 // buildMarkdownDoc, downloadWorkspace) and consume the `toast` exported here.
 
-import { byId, qs } from "./dom.mjs";
+import { byId, qs } from "./dom.mjs?v=24f57cfe";
 
 // A transient bottom toast. Reuses the single `.toast` node, shows it for ~1.4s,
 // and resets the hide timer on each call so rapid toasts don't flicker out early.

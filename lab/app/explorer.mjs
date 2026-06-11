@@ -9,7 +9,7 @@
 // constants are injected. The explorer-private state (expCollapsed, pendingExpRename,
 // expRenameFinishing, renderingExplorer) and the EXP_* constants live here.
 
-import { byId } from "./dom.mjs";
+import { byId } from "./dom.mjs?v=24f57cfe";
 
 export function createExplorer(ctx, host) {
   const {

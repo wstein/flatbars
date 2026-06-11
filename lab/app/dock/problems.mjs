@@ -6,7 +6,7 @@
 // action. Reads the dockProblems cache and takes two injected callbacks:
 // openOrCreatePartial(name) and openProblem(p).
 
-import { makeEl } from "../dom.mjs";
+import { makeEl } from "../dom.mjs?v=24f57cfe";
 
 export function renderProblems(body, dockProblems, { openOrCreatePartial, openProblem }) {
   if (!dockProblems.length) {

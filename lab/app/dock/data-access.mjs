@@ -8,7 +8,7 @@
 //   - openProblem({ file, line, col }) — jump-to-source;
 //   - saveAsVector(row) — copy a conformance vector for a failing lookup.
 
-import { makeEl } from "../dom.mjs";
+import { makeEl } from "../dom.mjs?v=24f57cfe";
 
 // One-line value preview for a hit row. Pure.
 export function dxSnippet(v) {

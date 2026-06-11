@@ -5,7 +5,7 @@
 // factory binds the live state getters + the two CM views once and returns the
 // same arg-free function the call sites use.
 
-import { byId } from "./dom.mjs";
+import { byId } from "./dom.mjs?v=24f57cfe";
 
 // HTML-escape for the filename shown in the status bar (its only consumer).
 export function escapeHtml(s) {

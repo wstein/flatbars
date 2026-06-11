@@ -8,7 +8,7 @@
 //
 // Reads the lint cache (`lastLint`) and takes openProblem for jump-to-source.
 
-import { makeEl } from "../dom.mjs";
+import { makeEl } from "../dom.mjs?v=24f57cfe";
 
 export function renderLint(body, lint, { openProblem }) {
   const a = lint;

@@ -7,7 +7,7 @@
 // trim toggle — note the original used a `standaloneState()` accessor because the
 // local `standalone` rows shadow that flag).
 
-import { makeEl } from "../dom.mjs";
+import { makeEl } from "../dom.mjs?v=24f57cfe";
 
 export function renderWhitespace(body, rows, { openProblem, standaloneOn }) {
   const explicit = rows.filter((r) => r.kind === "leading" || r.kind === "trailing");

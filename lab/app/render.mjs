@@ -12,8 +12,8 @@
 // library helpers are injected (the libs to reuse the page's single instances);
 // applyEscape + helperKey are app-local imports. `performance` is a global.
 
-import { applyEscape } from "./render-helpers.mjs";
-import { helperKey } from "./state.mjs";
+import { applyEscape } from "./render-helpers.mjs?v=bf6bc3dd";
+import { helperKey } from "./state.mjs?v=9f8876ec";
 
 export function createRun(ctx, host) {
   const {

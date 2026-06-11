@@ -19,7 +19,7 @@
          generated into the `@chrome` fence in the inline <style> below by
          `npm run gen:tokens` (from shared/flatbars-chrome.css), inline so they are
          in place before first paint. -->
-    <script type="module" src="./vendor/flatbars-topbar.mjs?v=6"></script>
+    <script type="module" src="./vendor/flatbars-topbar.mjs?v=beccc990"></script>
     <style>
       /* ── Design tokens ───────────────────────────────────────────── */
       :root {
@@ -1656,18 +1656,18 @@
       // Cache-bust query (like playground_utils.mjs): bump on any change to the
       // engine adapters so a reload never pairs a fresh index.html / example
       // file with a stale cached adapter module.
-      import { getProvider } from "./app/engines/registry.mjs?v=1";
+      import { getProvider } from "./app/engines/registry.mjs?v=41c15c82";
       // Engine-derived INNER-TOKEN highlighting (ADR-014 amendment): the shared
       // painter + the lexer's own tokenizer, in place of a hand-written tag regex.
-      import { flatbarsHighlight } from "./cm-flatbars.mjs?v=7";
+      import { flatbarsHighlight } from "./cm-flatbars.mjs?v=4a4293cc";
       // The full prelude vocabulary (vendored projection of editors/operations.json)
       // so the editor paints helper names exactly like the LSP / VS Code — NOT the
       // 12-entry user-facing Transformers-panel subset (renderer.allTransformers()).
-      import { OPERATION_NAMES } from "./operation-names.mjs?v=1";
-      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=156";
-      import { createHelperSandbox } from "./helper-sandbox.mjs?v=1";
-      import { renderTransformers as renderTransformersPanel } from "./panels/transformers.mjs";
-      import { renderPartials as renderPartialsPanel } from "./panels/partials.mjs";
+      import { OPERATION_NAMES } from "./operation-names.mjs?v=31ba00fd";
+      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=41e2b4e6";
+      import { createHelperSandbox } from "./helper-sandbox.mjs?v=3b31be18";
+      import { renderTransformers as renderTransformersPanel } from "./panels/transformers.mjs?v=ab148fe1";
+      import { renderPartials as renderPartialsPanel } from "./panels/partials.mjs?v=2bcce028";
       import {
         analyseCalls,
         analyseCoverage,
@@ -1696,7 +1696,7 @@
       // loaded index.html never pairs with a stale cached module (which silently
       // ran the old, uncompressed encodeState). Bumped for `segmentRanges` (the
       // provenance-highlight byte↔UTF-16 fix).
-      } from "./playground_utils.mjs?v=22";
+      } from "./playground_utils.mjs?v=a3b5423f";
       // Output-view decisions (extracted for testability; lab/output-view.test.mjs).
       import {
         VIEW_TABS,
@@ -1704,35 +1704,35 @@
         validView as ovValidView,
         viewKind,
         applyView,
-      } from "./output-view.mjs?v=3";
+      } from "./output-view.mjs?v=a4479905";
       // App shell modules extracted from this file (Phase 0, engine-registry
       // plan). Pure leaves first — engine resolution + the DOM lookup helpers.
-      import { resolveEngine, engineLabel, templateExt, templateFence } from "./app/engine-config.mjs?v=1";
-      import { createAppState } from "./app/state.mjs?v=1";
-      import { createExplorer } from "./app/explorer.mjs?v=1";
-      import { createConfigYaml } from "./app/config-yaml.mjs?v=1";
-      import { mdFence, makeZip } from "./app/export-utils.mjs?v=1";
-      import { snapshotState as snapshotStateFor, buildVector } from "./app/share-state.mjs?v=1";
-      import { TWEAK_OPTS, normalizeTweaks } from "./app/tweaks.mjs?v=1";
-      import { byId, qs, makeEl } from "./app/dom.mjs?v=2";
-      import { showBootError, bootFail } from "./app/boot-error.mjs?v=1";
-      import { toast, openShareMenu, closeShareMenu } from "./app/ui-chrome.mjs?v=1";
-      import { createCmLanguages } from "./app/cm-languages.mjs?v=1";
-      import { applyEscape, outputHasContent } from "./app/render-helpers.mjs?v=2";
-      import { renderPerformance } from "./app/dock/performance.mjs?v=1";
-      import { renderWhitespace } from "./app/dock/whitespace.mjs?v=1";
-      import { renderCoverage } from "./app/dock/coverage.mjs?v=1";
-      import { renderDataAccess } from "./app/dock/data-access.mjs?v=1";
-      import { renderCapabilities } from "./app/dock/capabilities.mjs?v=1";
-      import { renderTruthiness } from "./app/dock/truthiness.mjs?v=1";
-      import { renderLint } from "./app/dock/lint.mjs?v=1";
-      import { renderProblems } from "./app/dock/problems.mjs?v=1";
-      import { renderContext } from "./app/dock/context.mjs?v=1";
-      import { createOutputView } from "./app/output.mjs?v=2";
-      import { createRun } from "./app/render.mjs?v=1";
-      import { httpFileProvider } from "./app/file-provider.mjs?v=1";
-      import { createStatusBar } from "./app/statusbar.mjs?v=1";
-      import { TRANSFORMER_RISK } from "./app/transformer-risk.mjs?v=1";
+      import { resolveEngine, engineLabel, templateExt, templateFence } from "./app/engine-config.mjs?v=cdb47071";
+      import { createAppState } from "./app/state.mjs?v=9f8876ec";
+      import { createExplorer } from "./app/explorer.mjs?v=86f6c620";
+      import { createConfigYaml } from "./app/config-yaml.mjs?v=4c0dc97c";
+      import { mdFence, makeZip } from "./app/export-utils.mjs?v=0799007b";
+      import { snapshotState as snapshotStateFor, buildVector } from "./app/share-state.mjs?v=604d8b63";
+      import { TWEAK_OPTS, normalizeTweaks } from "./app/tweaks.mjs?v=3e1369de";
+      import { byId, qs, makeEl } from "./app/dom.mjs?v=24f57cfe";
+      import { showBootError, bootFail } from "./app/boot-error.mjs?v=15a105d0";
+      import { toast, openShareMenu, closeShareMenu } from "./app/ui-chrome.mjs?v=4d74eeee";
+      import { createCmLanguages } from "./app/cm-languages.mjs?v=2a16182c";
+      import { applyEscape, outputHasContent } from "./app/render-helpers.mjs?v=bf6bc3dd";
+      import { renderPerformance } from "./app/dock/performance.mjs?v=66bf0216";
+      import { renderWhitespace } from "./app/dock/whitespace.mjs?v=3708fade";
+      import { renderCoverage } from "./app/dock/coverage.mjs?v=6cb09960";
+      import { renderDataAccess } from "./app/dock/data-access.mjs?v=77f3d426";
+      import { renderCapabilities } from "./app/dock/capabilities.mjs?v=77a5032a";
+      import { renderTruthiness } from "./app/dock/truthiness.mjs?v=2e78ed45";
+      import { renderLint } from "./app/dock/lint.mjs?v=1d19b351";
+      import { renderProblems } from "./app/dock/problems.mjs?v=9fe78fda";
+      import { renderContext } from "./app/dock/context.mjs?v=9673ce33";
+      import { createOutputView } from "./app/output.mjs?v=55b63f9a";
+      import { createRun } from "./app/render.mjs?v=a8f9db2f";
+      import { httpFileProvider } from "./app/file-provider.mjs?v=72b7ca72";
+      import { createStatusBar } from "./app/statusbar.mjs?v=15b53d45";
+      import { TRANSFORMER_RISK } from "./app/transformer-risk.mjs?v=c55054b4";
       import { EditorState, Annotation, StateField, StateEffect, Compartment } from "https://esm.sh/@codemirror/state@6.5.2/es2022/state.mjs";
       import {
         Decoration,
@@ -1762,8 +1762,8 @@
       import { marked } from "https://esm.sh/marked@12.0.2";
       // js-yaml + jsonata stay vendored: the Node validator (validate.mjs) imports
       // them and runs offline with no npm. Browser-only libs load from the CDN.
-      import { load as loadYaml, dump as dumpYaml } from "./vendor/js-yaml.mjs";
-      import jsonata from "./vendor/jsonata.mjs";
+      import { load as loadYaml, dump as dumpYaml } from "./vendor/js-yaml.mjs?v=6dff692d";
+      import jsonata from "./vendor/jsonata.mjs?v=c897ac5e";
       // Preact + htm (from the CDN, no build step) for the incremental UI
       // migration — panels move from manual DOM to declarative `html` components
       // one at a time. The /hooks subpath reuses this page's preact instance.
@@ -1916,7 +1916,7 @@
       // safe (never their ambiguous value, never absent). Set in config.yaml
       // (`analyse.pathSchema`); drives `analyzeWith` so the Truthiness panel
       // suppresses those paths' potential + miss findings. Empty ⇒ plain `analyze`.
-      const helperSandbox = createHelperSandbox("./helpers-worker.mjs?v=5");
+      const helperSandbox = createHelperSandbox("./helpers-worker.mjs?v=6746ddef");
       function helperKey(tmpl, partials, data, src, catalog, locale, dialect) {
         try { return JSON.stringify([tmpl, partials, data, src, catalog, locale, dialect]); } catch { return null; }
       }

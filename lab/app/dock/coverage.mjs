@@ -9,7 +9,7 @@
 //     module needs no playground_utils import / no dual-instance ?v= hazard);
 //   - `openProblem({ file, line, col })` — jump-to-source.
 
-import { makeEl } from "../dom.mjs";
+import { makeEl } from "../dom.mjs?v=24f57cfe";
 
 export function renderCoverage(body, rows, { rowPosition, openProblem }) {
   const section = makeEl("div", { class: "cv-section" });

@@ -10,7 +10,7 @@
 // Coarse per-phase wall-clock for the last run — a cheap regression canary during
 // interactive edits.
 
-import { makeEl } from "../dom.mjs";
+import { makeEl } from "../dom.mjs?v=24f57cfe";
 
 // Render the Performance panel into `body`. `timings` is the last run's timing
 // record `{ parseMs, compileMs, renderMs, totalMs, outBytes }`, or null before

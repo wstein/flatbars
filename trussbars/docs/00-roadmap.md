@@ -130,7 +130,7 @@ strict-native direction:
    (`renderMinbarsCompat` / `compileMinbarsCompat` / `flatbars --mustache-js`) — the
    `0`/`""`-falsy truthiness mode, a different feature entirely.
 
-   Verification at landing: `npm test` green (incl. `check:bundle` + `check:lab-cachebust`);
+   Verification at landing: `npm test` green (incl. `check:bundle` + `check:lab-hashes`);
    Rust `cargo test --workspace` 370/0; `trussbars-vm` 13/0. The scattered `--vm-compat`
    axis mentions in docs/12·14·16·17·18·19 are **historical** (point-in-time gate lists) and
    superseded by this record.

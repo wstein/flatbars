@@ -260,15 +260,16 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   the formatter reshapes the compiled output, so a bundle made before `npm run
   format` is stale — `gen:bundle` rebuilds first, removing that footgun. Note a
   bare `spago bundle --outfile …` resolves the path *relative to the package dir*,
-  writing to `packages/js/…`, not here.) The bundle URL is imported with a `?v=N`
-  cache-buster (in `lab/index.html`, `lab/renderer.mjs`,
-  `lab/helpers-worker.mjs`) — **bump that `N` whenever you regenerate the bundle**,
-  or browsers serve a cached old copy (the cause of "the Lab runs an old engine"
-  even though `check:bundle` is green). This is now enforced: `check:lab-cachebust`
-  (in `npm test`) records each cache-busted module's `(version, sha)` in
-  `lab/cachebust.lock.json` and fails if a module's content changed without its
-  `?v=` being bumped — after bumping, run `npm run gen:cachebust` to re-record the
-  lock. It guards `playground_utils.mjs` (the Lab analyses) the same way.
+  writing to `packages/js/…`, not here.) Every local Lab module is imported with a
+  `?v=<sha8>` **content hash**, not a hand-bumped number: `scripts/hash-lab.mjs`
+  walks the module graph from `lab/index.html` leaf-first and rewrites each local
+  `?v=` (imports, the worker string ref, `<script src>`) to the sha256-prefix of the
+  imported module's *already-rewritten* content — so a leaf change (e.g. the engine
+  bundle, `dom.mjs`) propagates its new hash up through every importer automatically,
+  and a stale cache is structurally impossible. After any change under `lab/` run
+  **`npm run gen:lab-hashes`** to re-stamp the hashes; `check:lab-hashes` (in `npm
+  test`) fails if any `?v=` is stale. This replaced the old hand-bumped `?v=N` +
+  `lab/cachebust.lock.json` scheme — there is no version number to forget anymore.
 - **`cli`** (`flatbars-cli`) — render templates, and the `examples verify`
   conformance gate.
 - **`linter`** — cross-dialect lowering (MaxBars → RawBars source).

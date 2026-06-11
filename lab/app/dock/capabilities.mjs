@@ -14,8 +14,8 @@
 //   engineMeta      — { version, builtins, bcVersion }
 //   escapeMode, standalone, allowList — the current render policy
 
-import { makeEl } from "../dom.mjs";
-import { TRANSFORMER_RISK } from "../transformer-risk.mjs";
+import { makeEl } from "../dom.mjs?v=24f57cfe";
+import { TRANSFORMER_RISK } from "../transformer-risk.mjs?v=c55054b4";
 
 export function renderCapabilities(body, { escapeRuns, usedTransformers, stemAllowList, engineMeta, escapeMode, standalone, allowList }) {
   const section = makeEl("div", { class: "cp-section" });
