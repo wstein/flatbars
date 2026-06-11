@@ -205,6 +205,47 @@ v1 ships **L1 + L2**, **PureScript-first then ported to Rust** (decision §1):
    under the ratified **(C)**. The PureScript L1 is the reference the Rust port is differentially
    tested against, not a throwaway.
 
+### 7.1 The Rust port — concrete slices and the differential gate (the N4 unlock)
+
+The strategy review (docs/24) flagged inference as the single gate between "research toy" and the
+typed-codegen niche (N4): every untyped codegen pipeline (Handlebars in `build.rs`, Jinja in OpenAPI
+generators) silently emits broken source on a renamed field, where a rustc-checked context turns it
+into a build error — but only if the author doesn't have to *hand-write* the context struct. That is
+exactly what L2/L3 remove. **This is a port, not research:** `Kernel.Schema` is designed, ratified
+(2026-06-10), and conformance-validated (the harness infers 72/87 cases through it), and its
+`InferResult.schema` field *already emits Rust struct source* — the algorithm and its Rust target
+both exist. What remains is a native reimplementation so it runs without `spago` (and, at L3, inside
+the proc-macro at compile time).
+
+**Crate.** A new `trussbars-schema` (no_std + alloc, like the rest), depending only on
+`trussbars-template` for the AST. It mirrors `packages/kernel/src/Kernel/Schema.purs` (≈ 909 lines)
+module-for-function, so the diff against the oracle is auditable.
+
+**Slices** (each independently landable + gated; rough cost):
+
+| # | Slice | What it ports | Cost |
+| --- | --- | --- | --- |
+| S1 | **Field collection** | walk the desugared `Node`/`Expr` tree; collect every `{{ path }}` / `{% for x in xs %}` / `{{ x.y }}` access into a raw usage map (§3 *usage* half). The AST walk already exists for emit. | S |
+| S2 | **Scalar hints + defaulting** | the `ScalarHint` lattice (`SString`/`SNumber`/`SBool`/`SUnknown`/`SConflict`) from helper-arg positions (`{{ x \| upper }}`→string, `{{ x * 2 }}`→number); §4 under-determined defaulting + the conflict count. | M |
+| S3 | **Structural unification** | nested objects (`x.y.z`), arrays-of-objects (`{% for i in xs %}{{ i.n }}`), and the §3 `==`-couple unification + §5 optionality/polymorphism (union of samples → `Option`/enum). The hard core. | L |
+| S4 | **Emit** | `InferResult → ctx.rs` (struct text) + `sample.json` + the human report. The PureScript `scalarRust`/`structName`/emit is ~1:1 portable; mostly string-building. | S |
+| S5 | **`trussbars infer` CLI + L3 macro form** | wire S1–S4 behind `trussbars infer <tmpl> [glob]` (L2), then a `truss!(name, "template")` form that auto-derives the context struct at expansion time (L3 — the N4 payoff: no hand-written `CtxType`). | M |
+
+**The gate (non-negotiable, the reason the port is safe).** A differential test asserts the Rust
+inference produces the **byte-identical `ctx.rs`** the oracle's `Kernel.Schema.inferTemplate` does,
+over the whole conformance corpus — the same shape as the existing oracle≡AOT≡interp≡VM proofs. The
+PureScript L1 is the frozen reference; the Rust port may not diverge silently. Until S1–S4 reach
+parity, the harness keeps calling the oracle (no regression); `trussbars infer` ships when the gate
+is green on the corpus.
+
+**Known inference gaps to carry over, not re-solve** (§8, oracle-documented): `maps`/`enums` hints
+inference does not derive, and the `ctxFromData` cases the harness opts out of. The Rust port
+inherits these limits verbatim — porting the *current* inference, gaps included, keeps the
+differential gate meaningful (it tests "same as the oracle", not "better than the oracle").
+
+**Status:** scoped here; S1 is the next concrete unit. Not started in code — sequenced after the N2
+honesty gates (`Limits`, the injection-law test) shipped, per the review's priority order.
+
 ---
 
 ## 8. Limits (state them, don't hide them)
