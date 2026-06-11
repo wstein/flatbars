@@ -21,8 +21,10 @@ import Data.String (Pattern(..), contains)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
+import FlatBars.Lexer as FL
 import FlatBars.Value (Value(..))
-import MaxBars (compileMaxJs, inferMax, inferMaxData, maxbarsWarnings, renderMax)
+import MaxBars (compileMaxJs, inferMax, inferMaxData, maxOptions, maxbarsWarnings, renderMax)
+import MaxBars.Lexer as ML
 import MaxBars.Rust (compileMaxRust)
 import Test.Assert (assert')
 
@@ -889,5 +891,23 @@ main = do
   hasS "infer:couple-template-a" coupleTpl "a: f64"
   hasS "infer:couple-template-b" coupleTpl "b: f64"
   hasSD "infer:couple-data" [ obj [ Tuple "a" (num 5.0) ] ] "{{ a == b }}" "b: f64"
+
+  -- ADR-041 Phase 1: the owned `MaxBars.Lexer` must be byte-identical to the shared
+  -- lexer driven with MaxBars's config — the equivalence gate that pins the fork to
+  -- the reference (catches a wrong inlined config) until the trim follow-ups (§4).
+  let
+    lexEquiv name src = assert' ("lex-equiv " <> name)
+      ( show (ML.tokenize src) ==
+          show (FL.tokenizeTemplate maxOptions.lexConfig maxOptions.lexOptions src)
+      )
+  lexEquiv "output" "Hi {{ name }}!"
+  lexEquiv "block-infix" "{{#each xs}}{{ this > 0 }}{{/each}}"
+  lexEquiv "statement-if-elif" "{% if x >= 18 %}A{% elif x < 5 %}B{% else %}C{% endif %}"
+  lexEquiv "for-range" "{% for i in 1..n %}{{ i }}{% endfor %}"
+  lexEquiv "collection" "{% for [1, 2, 3] %}{{ this }}{% endfor %}"
+  lexEquiv "triple" "{{{ raw }}}"
+  lexEquiv "raw-block" "{{{{#hl}}}}verbatim {{x}}{{{{/hl}}}}"
+  lexEquiv "standalone" "  {% if a %}\n  x\n  {% endif %}\n"
+  lexEquiv "extends-block" "{% extends \"base\" %}{% block title %}T{% endblock %}{% super %}"
 
   log "all MaxBars tests passed"

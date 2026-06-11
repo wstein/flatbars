@@ -16,11 +16,11 @@ package:
     - classicbars-compile
     - integers
     - kernel
+    - lists
     - maybe
     - ordered-collections
     - prelude
     - strings
-    - transformers
     - tuples
   test:
     main: Test.MaxBars.Main
