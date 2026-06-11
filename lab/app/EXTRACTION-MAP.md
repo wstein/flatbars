@@ -58,7 +58,9 @@ instead of re-closing over it.
 | Dock Panel #7 Coverage | `app/dock/coverage.mjs` | 1 cache + rowPosition + openProblem | ✅ (ctx form; DOM-fake tested) |
 | Dock Panel #1 Data Access | `app/dock/data-access.mjs` | 3 caches + rowPosition + openProblem + saveAsVector | ✅ (ctx form; DOM-fake + smoke covered) |
 | Dock Panel #3 Partial graph | `panels/partials.mjs` (pre-existing) | — | ✅ (already a module; only descriptor glue in index.html) |
-| Dock panels #5 Capabilities + Truthiness (the two hard ones) | `app/dock/*.mjs` | many caches + engine branch | ⛔ (last; ctx form + DOM-fake test each) |
+| `TRANSFORMER_RISK` (ADR-0013 risk taxonomy) | `app/transformer-risk.mjs` | none | ✅ (shared: Capabilities panel + dock badges) |
+| Dock Panel #5 Capabilities | `app/dock/capabilities.mjs` | 2 caches + stem-allow-list + engineMeta + 3 policy flags | ✅ (both engine branches; DOM-fake tested) |
+| Dock Panel: Truthiness (ADR-022, the last/largest) | `app/dock/truthiness.mjs` | lastAnalyse + findings/fix UI | ⛔ (last) |
 | Render Config popover (6387) | `app/config-view.mjs` | reads/writes state | ⛔ |
 | Boot (6611) | `app/boot.mjs` | entry point | ⛔ (last) |
 

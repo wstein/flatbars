@@ -1717,6 +1717,8 @@
       import { renderWhitespace } from "./app/dock/whitespace.mjs?v=1";
       import { renderCoverage } from "./app/dock/coverage.mjs?v=1";
       import { renderDataAccess } from "./app/dock/data-access.mjs?v=1";
+      import { renderCapabilities } from "./app/dock/capabilities.mjs?v=1";
+      import { TRANSFORMER_RISK } from "./app/transformer-risk.mjs?v=1";
       import { EditorState, Annotation, StateField, StateEffect, Compartment } from "https://esm.sh/@codemirror/state@6.5.2/es2022/state.mjs";
       import {
         Decoration,
@@ -3009,38 +3011,9 @@
       // in inside restorePanels(), which runs after panelState exists.
       let dockActiveTab = "problems";
       // Per-run analyses populated by run() and consumed by the dock panels.
-      // Risk taxonomy for built-in transformers (mirrors the cheat-sheet groups).
-      // Used by the Capabilities panel and the Transformers v2 panel to colour
-      // each call site. `default` is "always on" (no opt-in cost); `format` is
-      // low risk (atomic string transforms); `transform` is medium (full-
-      // collection traversals); `eval` opts into dynamic template rendering
-      // (a data-scope disclosure risk — see ADR-0013).
-      const TRANSFORMER_RISK = {
-        // default group — always on, no opt-in
-        escape_html: "default", escape_json: "default", json: "default", inspect: "default",
-        default: "default", join: "default", log: "default", at: "default", slice: "default",
-        first: "default", last: "default", take: "default", drop: "default", len: "default",
-        lookup: "default", contains: "default", starts_with: "default", ends_with: "default",
-        empty: "default", present: "default",
-        // format group — low risk
-        upcase: "format", downcase: "format", capitalize: "format", trim: "format",
-        truncate: "format", replace: "format",
-        // transform group — medium, audited
-        split: "transform", reverse: "transform", sort: "transform", sort_by: "transform",
-        map: "transform", filter: "transform", compact: "transform", uniq: "transform",
-        flatten: "transform", group_by: "transform",
-        // i18n group — low risk (delegates to host translator)
-        t: "format", translate: "format",
-        // constructors — always on (same tier as minimum)
-        list: "default", dict: "default",
-        // arithmetic · comparison · boolean logic (Stem.Transformers.Logic) —
-        // pure scalar ops, no host access; part of the always-on minimum floor.
-        add: "default", sub: "default", mul: "default", div: "default", mod: "default",
-        eq: "default", ne: "default", lt: "default", lte: "default", gt: "default", gte: "default",
-        and: "default", or: "default", not: "default",
-        // eval — dynamic, opt-in only
-        eval: "eval",
-      };
+      // TRANSFORMER_RISK (the ADR-0013 risk taxonomy) now lives in
+      // ./app/transformer-risk.mjs (imported above) — shared by the Capabilities
+      // panel and the dock badge counts.
 
       // Any built-in missing from TRANSFORMER_RISK falls back to "host" tier at
       // render time.
@@ -5133,7 +5106,13 @@
             if (lastUsedTransformers.some((n) => TRANSFORMER_RISK[n] === "transform")) return "warn";
             return "success";
           },
-          render: renderCapabilities },
+          render: (body) => renderCapabilities(body, {
+            escapeRuns: lastEscapeRuns,
+            usedTransformers: lastUsedTransformers,
+            stemAllowList: engineHas("stem-allow-list"),
+            engineMeta,
+            escapeMode, standalone, allowList,
+          }) },
         { id: "perf", label: "Performance",
           count: () => lastTimings ? Math.round(lastTimings.totalMs) : 0,
           badge: () => {
@@ -5360,109 +5339,11 @@
       // access hardening, and the global escaping model — never remapping
       // Stem's controls onto it (no false parity, no "N/A" shown as green). The
       // emit-escape mix and the iframe+CSP sandbox are the engine-agnostic floor.
-      function renderCapabilities(body) {
-        const section = makeEl("div", { class: "cp-section" });
-        const policy = makeEl("div", { class: "cp-policy" });
-        const pol = (label, value, cls) => {
-          policy.append(makeEl("div", { class: `cp-policy-row ${cls || ""}` }, [
-            makeEl("span", { class: "cp-policy-k" }, label),
-            makeEl("span", { class: "cp-policy-v" }, value),
-          ]));
-        };
-
-        // Engine-agnostic emit-escape mix, appended at the end for both engines.
-        const escapeMix = () => {
-          const er = lastEscapeRuns || { html: 0, plain: 0, raw: 0, total: 0 };
-          const emit = makeEl("div", { class: "cp-emit" }, [
-            makeEl("strong", {}, "Emit nodes by escape mode:"),
-            makeEl("span", { class: "cp-emit-row" },
-              `${er.total} emits — ${er.html} html · ${er.plain} plain · ${er.raw} raw`),
-          ]);
-          if (er.raw > 0) {
-            emit.append(makeEl("div", { class: "cp-warn" },
-              `⚠ ${er.raw} raw emit${er.raw === 1 ? "" : "s"} skip escape entirely — verify these emit pre-escaped content.`));
-          }
-          return emit;
-        };
-
-        // ── Handlebars security profile ────────────────────────────────────
-        if (!engineHas("stem-allow-list")) {
-          section.append(makeEl("div", { class: "cp-head" }, [
-            makeEl("strong", {}, "Capabilities & escape"),
-            " — Handlebars security profile",
-          ]));
-          pol("Engine", `Handlebars ${engineMeta.version} · ${engineMeta.builtins.length} helpers`, "ok");
-          pol("HTML escaping", "ON by default (global) — {{ }} escapes; {{{ }}} / SafeString emit raw", "ok");
-          pol("Per-context escaping", "not available — Handlebars escapes HTML only (no JSON/URL/XML modes)", "warn");
-          pol("Helper whitelist", "knownHelpers / knownHelpersOnly available at compile time — not enforced in this preview", "ok");
-          pol("Prototype-access hardening", "ON by default — Handlebars ≥4.6 blocks access to prototype properties/methods (allowProtoProperties/allowProtoMethods off)", "ok");
-          pol("Eval", "N/A on this engine — Handlebars has no dynamic-eval helper", "");
-          pol("Sandbox", "rendered output runs in the same-origin iframe + CSP boundary (engine-agnostic floor)", "ok");
-          section.append(policy);
-          section.append(escapeMix());
-          body.append(section);
-          return;
-        }
-
-        // ── Stem host policy (ADR-0013) ────────────────────────────────────
-        // Risk tier rollup.
-        const tierCounts = { default: 0, format: 0, transform: 0, eval: 0, host: 0 };
-        for (const name of lastUsedTransformers) {
-          tierCounts[TRANSFORMER_RISK[name] || "host"]++;
-        }
-        section.append(makeEl("div", { class: "cp-head" }, [
-          makeEl("strong", {}, "Capabilities & escape"),
-          " — host policy snapshot for this run",
-        ]));
-        pol("Engine", `${engineMeta.version} · ${engineMeta.builtins.length} built-ins · ${engineMeta.bcVersion}`, "ok");
-        pol("Escape mode", escapeMode, "ok");
-        pol("Trim whitespace", standalone ? "ON (ADR-0016 standalone-tag stripping)" : "off", "ok");
-        pol(
-          "Allow-list",
-          allowList === null
-            ? "unconstrained (every built-in callable)"
-            : allowList.length === 0
-              ? "EMPTY (every transformer refused)"
-              : `${allowList.length} name${allowList.length === 1 ? "" : "s"} callable — ${allowList.join(", ")}`,
-          allowList === null ? "ok" : (allowList.length === 0 ? "warn" : "ok")
-        );
-        pol("Eval transformer", lastUsedTransformers.includes("eval") ? "REFERENCED (data-scope disclosure risk)" : "not referenced",
-            lastUsedTransformers.includes("eval") ? "danger" : "ok");
-        section.append(policy);
-        // Risk-tier breakdown.
-        const tiers = makeEl("div", { class: "cp-tiers" });
-        const tierLabel = {
-          default: "default (always on)",
-          format: "format (low risk)",
-          transform: "transform (medium · audited)",
-          eval: "eval (dynamic · opt-in)",
-          host: "host (custom transformers)",
-        };
-        for (const [t, n] of Object.entries(tierCounts)) {
-          if (n === 0) continue;
-          tiers.append(makeEl("div", { class: `cp-tier cp-risk-${t}` }, [
-            makeEl("span", { class: "cp-tier-k" }, tierLabel[t]),
-            makeEl("span", { class: "cp-tier-v" }, String(n)),
-          ]));
-        }
-        if (!tiers.children.length) {
-          tiers.append(makeEl("div", { class: "cp-empty" }, "No transformers referenced."));
-        }
-        section.append(tiers);
-        // Emit-escape mix.
-        const er = lastEscapeRuns || { html: 0, plain: 0, raw: 0, total: 0 };
-        const emit = makeEl("div", { class: "cp-emit" }, [
-          makeEl("strong", {}, "Emit nodes by escape mode:"),
-          makeEl("span", { class: "cp-emit-row" },
-            `${er.total} emits — ${er.html} html · ${er.plain} plain · ${er.raw} raw (\`{{{…}}}\`)`),
-        ]);
-        if (er.raw > 0) {
-          emit.append(makeEl("div", { class: "cp-warn" },
-            `⚠ ${er.raw} raw emit${er.raw === 1 ? "" : "s"} skip escape entirely — verify these emit pre-escaped content.`));
-        }
-        section.append(emit);
-        body.append(section);
-      }
+      // Panel #5: Capabilities / escape provenance now lives in
+      // ./app/dock/capabilities.mjs — a pure DOM build taking the two caches
+      // (lastEscapeRuns / lastUsedTransformers), the stem-allow-list capability,
+      // engineMeta, and the render policy (escapeMode / standalone / allowList).
+      // The descriptor above passes them.
 
       // Panel #6: Performance now lives in ./app/dock/performance.mjs — the first
       // dock panel migrated to the ctx form (it takes its one cache, lastTimings,
