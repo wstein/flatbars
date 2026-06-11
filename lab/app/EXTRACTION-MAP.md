@@ -60,7 +60,8 @@ instead of re-closing over it.
 | Dock Panel #3 Partial graph | `panels/partials.mjs` (pre-existing) | — | ✅ (already a module; only descriptor glue in index.html) |
 | `TRANSFORMER_RISK` (ADR-0013 risk taxonomy) | `app/transformer-risk.mjs` | none | ✅ (shared: Capabilities panel + dock badges) |
 | Dock Panel #5 Capabilities | `app/dock/capabilities.mjs` | 2 caches + stem-allow-list + engineMeta + 3 policy flags | ✅ (both engine branches; DOM-fake tested) |
-| Dock Panel: Truthiness (ADR-022, the last/largest) | `app/dock/truthiness.mjs` | lastAnalyse + findings/fix UI | ⛔ (last) |
+| Dock Panel Truthiness (ADR-022) | `app/dock/truthiness.mjs` | lastAnalyse + suppressed + pathSchema + openProblem | ✅ (DOM-fake tested) |
+| Dock Panels Lint + Problems (still inline) | `app/dock/*.mjs` | lastLint / dockProblems | ⛔ (Transformers/Partials already modular) |
 | Render Config popover (6387) | `app/config-view.mjs` | reads/writes state | ⛔ |
 | Boot (6611) | `app/boot.mjs` | entry point | ⛔ (last) |
 
