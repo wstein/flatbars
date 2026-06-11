@@ -1713,6 +1713,7 @@
       import { createConfigYaml } from "./app/config-yaml.mjs?v=1";
       import { mdFence, makeZip } from "./app/export-utils.mjs?v=1";
       import { snapshotState as snapshotStateFor, buildVector } from "./app/share-state.mjs?v=1";
+      import { TWEAK_OPTS, normalizeTweaks } from "./app/tweaks.mjs?v=1";
       import { byId, qs, makeEl } from "./app/dom.mjs?v=2";
       import { showBootError, bootFail } from "./app/boot-error.mjs?v=1";
       import { toast, openShareMenu, closeShareMenu } from "./app/ui-chrome.mjs?v=1";
@@ -3645,29 +3646,13 @@
       }
 
       // ── Tweaks panel ──────────────────────────────────────────────────
-      const TWEAK_OPTS = {
-        // Monospace families only — code reads best fixed-width. Each is a stack
-        // that degrades gracefully when the preferred face isn't installed.
-        font: [
-          { value: "plex",    label: "Plex Mono", stack: '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace' },
-          { value: "system",  label: "System",    stack: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace' },
-          { value: "courier", label: "Courier",   stack: '"Courier New", Courier, monospace' },
-        ],
-        fontSize: [12, 13, 14, 16],
-      };
+      // TWEAK_OPTS + normalizeTweaks now live in ./app/tweaks.mjs.
 
       // Theme is no longer a tweak: it's owned by the umbrella anti-flash seed +
       // the shared <flatbars-topbar> (single `flatbars-theme` key, html[data-theme],
       // mirrored to body by the bridge near the topbar). The Appearance panel keeps
       // the editor-only tweaks (layout, line numbers, font).
-      let tweaks = { layout: "split", lineNumbers: true, font: "plex", fontSize: 13, compactToolbar: false };
-      try { const r = localStorage.getItem(LS_TWEAKS); if (r) tweaks = { ...tweaks, ...JSON.parse(r) }; } catch {}
-      delete tweaks.theme; // retired (was light|dark|system) — now the shared topbar owns it
-      tweaks.lineNumbers = tweaks.lineNumbers !== false; // default on
-      if (!TWEAK_OPTS.font.some((o) => o.value === tweaks.font)) tweaks.font = "plex";
-      if (!TWEAK_OPTS.fontSize.includes(tweaks.fontSize)) tweaks.fontSize = 13;
-      delete tweaks.mood;
-      delete tweaks.chipstyle; // retired (was tint|outline|solid) — tags now use the fixed tint look
+      let tweaks = normalizeTweaks((() => { try { return JSON.parse(localStorage.getItem(LS_TWEAKS)); } catch { return null; } })());
 
       // Follow a live OS theme flip only while no explicit preference is stored
       // (matches the umbrella seed's first-visit fallback); keep html + body synced.
