@@ -58,13 +58,13 @@ byte-identical for en/de/fr/pl.
 == {{t catalog locale "title"}} ==
 {{t catalog locale "greeting"}}, {{customer}}!
 {{t catalog locale "placed"}}: {{date placed "%d %B %Y" locale}}
-{{#each items}}
+{% for items %}
   {{name}}: {{number price 2 root.locale}}
-{{/each}}{{t catalog locale "total"}}: {{number total 2 locale}}  ({{count}} {{plural catalog locale "item" count}})
+{% endfor %}{{t catalog locale "total"}}: {{number total 2 locale}}  ({{count}} {{plural catalog locale "item" count}})
 ```
 
 (`number` takes the locale too, so the total localizes — `root.locale` reaches it from
-inside the `{{#each}}` loop, where `this` is the item.)
+inside the `{% for %}` loop, where `this` is the item.)
 
 The format primitives come from [`trussbars-i18n`](../../crates/trussbars-i18n)
 (`number`/`date`/`selectPlural`, incl. CLDR plural categories, localized month names, and

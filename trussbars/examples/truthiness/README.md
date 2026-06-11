@@ -12,9 +12,9 @@ cargo test   # asserts each policy's divergence
 
 It shows the policy at all three layers it lives at:
 
-1. **AOT — `truss!(…, truthiness = Mode)`.** The same `{{#if items}}` template compiled
+1. **AOT — `truss!(…, truthiness = Mode)`.** The same `{% if items %}` template compiled
    under `NonEmpty` and `Liquid`: an empty list is *falsy* under the default, *truthy*
-   under Liquid. A bare-number condition (`{{#if count}}`) does not compile under
+   under Liquid. A bare-number condition (`{% if count %}`) does not compile under
    `NonEmpty` (§5.3) — it appears only under `Handlebars` (`0` falsy) and `Liquid`
    (`0` truthy).
 2. **VM — `Template::with_truthiness(mode)`.** The dynamic backend selects a policy at

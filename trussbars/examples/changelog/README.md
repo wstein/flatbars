@@ -38,9 +38,9 @@ name-static helpers, so the template — not a pile of Rust — does the shaping
 ## New findings (beyond the blog)
 
 - **F7 — piped/applied condition (now in the freeze).** A changelog naturally wants
-  `{{#if subject | startsWith "feat"}}`; it's rejected ("options argument"). Bare
-  `{{#if startsWith subject "feat"}}` fails too. **Workaround:** parenthesise —
-  `{{#if (startsWith subject "feat")}}`. We sidestepped it by precomputing
+  `{% if subject | startsWith "feat" %}`; it's rejected ("options argument"). Bare
+  `{% if startsWith subject "feat" %}` fails too. **Workaround:** parenthesise —
+  `{% if (startsWith subject "feat") %}`. We sidestepped it by precomputing
   `category`, which is itself the point: the gap pushed logic out of the template.
 - **F8 — escaping is HTML-only.** The default `{{ }}` HTML-escapes, so a commit
   subject like `"new surface"` renders as `&quot;new surface&quot;` and `{{> name}}`
@@ -48,7 +48,7 @@ name-static helpers, so the template — not a pile of Rust — does the shaping
   (GitHub: the entities display as `"` / `>`), but shows literally in a plain-text
   view. Trussbars has **no per-output-target escaping policy** — fine for HTML, a
   consideration for markdown/JSON/CSV targets. (We kept the safe default rather than
-  raw `{{{ }}}`, which would risk XSS if the markdown is HTML-rendered.)
+  a `| safe` pipe, which would risk XSS if the markdown is HTML-rendered.)
 - **G1 — `groupBy` key order is ascending-string.** Sections come out `docs, feat,
   perf, test`; a changelog usually wants *Features* first. There's no custom group
   order — a host would precompute an ordered key (`"1-feat"`) or post-sort. Worth a
@@ -56,7 +56,7 @@ name-static helpers, so the template — not a pile of Rust — does the shaping
 
 ## What worked (no friction)
 
-Two-level grouping (`{{#each (groupBy commits "category")}}` → `{{#each this}}`) —
-the blog only did one level; `{{#if c.scope}}` on a non-empty `String`; `loop.key`
+Two-level grouping (`{% for (groupBy commits "category") %}` → `{% for this %}`) —
+the blog only did one level; `{% if c.scope %}` on a non-empty `String`; `loop.key`
 as the section header; `slice` for the short hash. Output is byte-pinned in
 `tests/golden/CHANGELOG.md`. No correctness gaps.

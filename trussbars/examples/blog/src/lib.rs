@@ -5,7 +5,7 @@
 //! `truss!` proc-macro (loaded from each file with `path = …`); this crate supplies
 //! the typed context, sample data, and the host helpers the templates call (F3): a
 //! `date` formatter from `trussbars-i18n`, and a local `markdown` that returns
-//! `Safe` markup (so `{{post.body | markdown}}` emits raw without `{{{ }}}`).
+//! `Safe` markup (so `{{post.body | markdown}}` emits unescaped without a `| safe` pipe).
 
 pub mod context;
 pub mod templates;

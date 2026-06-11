@@ -29,7 +29,7 @@ fl! title = Twój koszyk
 | `i18n/<lang>/i18n_fluent_example.ftl` | the Fluent catalogs (the file is named after the crate — that's the `fl!` convention). |
 | `src/lib.rs` | a `RustEmbed` over `i18n/`, a process-wide `FluentLanguageLoader`, `set_language`, and the `t` helper. |
 | `src/templates.rs` | `truss!(render_cart, Cart, path = "…", helpers = [t])` — declares `t` for the template. |
-| `templates/cart.truss` | `{{t "cart-title"}}: {{#if item_count > 0}}{{item_count}}{{else}}{{t "cart-empty"}}{{/if}}` |
+| `templates/cart.truss` | `{{t "cart-title"}}: {% if item_count > 0 %}{{item_count}}{% else %}{{t "cart-empty"}}{% endif %}` |
 
 ## The one thing worth understanding: `get` vs `fl!`
 
