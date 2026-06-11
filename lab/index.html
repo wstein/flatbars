@@ -1712,7 +1712,7 @@
       import { createExplorer } from "./app/explorer.mjs?v=1";
       import { createConfigYaml } from "./app/config-yaml.mjs?v=1";
       import { mdFence, makeZip } from "./app/export-utils.mjs?v=1";
-      import { snapshotState as snapshotStateFor } from "./app/share-state.mjs?v=1";
+      import { snapshotState as snapshotStateFor, buildVector } from "./app/share-state.mjs?v=1";
       import { byId, qs, makeEl } from "./app/dom.mjs?v=2";
       import { showBootError, bootFail } from "./app/boot-error.mjs?v=1";
       import { toast, openShareMenu, closeShareMenu } from "./app/ui-chrome.mjs?v=1";
@@ -4457,23 +4457,11 @@
       // The vector documents *what the engine did* for a given input — useful
       // both for capturing a confirmed bug fix (vector matches future fix) and
       // for pinning current behaviour when a refactor is imminent.
+      // buildVector (the conformance-vector shape) now lives in ./app/share-state.mjs.
       function saveAsVector(row) {
-        const tmpl = ctx.state.tabs[0].source;
-        const partials = {};
-        for (const t of ctx.state.tabs.slice(1)) partials[t.name] = t.source;
-        const name = row ? `data access: ${row.status} ${row.path}` : "playground capture";
-        const vector = {
-          name,
-          template: tmpl,
-          partials,
-          data: ctx.caches.lastData == null ? {} : ctx.caches.lastData,
-          escape: ctx.state.escapeMode,
-          expected: ctx.caches.lastOutput,
-          transformers: ctx.caches.lastUsedTransformers,
-        };
-        const json = JSON.stringify(vector);
-        navigator.clipboard?.writeText(json).then(
-          () => toast(`Vector "${name}" copied to clipboard`),
+        const vector = buildVector(ctx, row);
+        navigator.clipboard?.writeText(JSON.stringify(vector)).then(
+          () => toast(`Vector "${vector.name}" copied to clipboard`),
           () => toast("Couldn't copy (permission?)"),
         );
       }

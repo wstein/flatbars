@@ -4,7 +4,29 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { snapshotState } from "./share-state.mjs";
+import { snapshotState, buildVector } from "./share-state.mjs";
+
+test("buildVector captures the workspace + actual output as a conformance vector", () => {
+  const ctx = {
+    state: { tabs: [{ name: "main", source: "{{x}}" }, { name: "row", source: "r" }], escapeMode: "html" },
+    caches: { lastData: { x: 1 }, lastOutput: "1", lastUsedTransformers: ["upcase"] },
+  };
+  assert.deepEqual(buildVector(ctx, { status: "miss", path: "y" }), {
+    name: "data access: miss y",
+    template: "{{x}}",
+    partials: { row: "r" },
+    data: { x: 1 },
+    escape: "html",
+    expected: "1",
+    transformers: ["upcase"],
+  });
+  // no row → generic name; null data → {}
+  const ctx2 = { state: { tabs: [{ name: "main", source: "" }], escapeMode: "" }, caches: { lastData: null, lastOutput: "", lastUsedTransformers: [] } };
+  const v = buildVector(ctx2, null);
+  assert.equal(v.name, "playground capture");
+  assert.deepEqual(v.data, {});
+  assert.deepEqual(v.partials, {});
+});
 
 const baseState = () => ({
   tabs: [{ name: "main", source: "{{x}}" }, { name: "row", source: "r" }],

@@ -34,3 +34,21 @@ export function snapshotState(ctx, templateMode) {
     x: st.loadedExampleIdx, // which example (or -1 for an edited "custom" state)
   };
 }
+
+// Build a conformance vector capturing the current workspace + the actual rendered
+// output — the shape the Data Access panel's "Save vector" copies (a one-click
+// bug → regression test). Pure; `row` (optional) is a data-access row that names
+// the vector after the failing path. The caller handles the clipboard/toast.
+export function buildVector(ctx, row) {
+  const partials = {};
+  for (const t of ctx.state.tabs.slice(1)) partials[t.name] = t.source;
+  return {
+    name: row ? `data access: ${row.status} ${row.path}` : "playground capture",
+    template: ctx.state.tabs[0].source,
+    partials,
+    data: ctx.caches.lastData == null ? {} : ctx.caches.lastData,
+    escape: ctx.state.escapeMode,
+    expected: ctx.caches.lastOutput,
+    transformers: ctx.caches.lastUsedTransformers,
+  };
+}
