@@ -359,13 +359,9 @@ parseSeq toks = go Nil []
     Just t -> case t of
       RContent sp s -> go (Content sp s : acc) errs (i + 1)
       RComment _ _ _ -> go acc errs (i + 1) -- filtered upstream; skip defensively
-      RLongComment _ -> go acc errs (i + 1) -- highlight-only token (keepLongComments); never reaches the parser
       -- An unterminated construct from the recovering lexer (ADR-023): record its
       -- structural error in source order and drop a `NodeError` marker in place.
       RError sp e -> recover acc errs sp e (i + 1)
-      ROutput span _ _ int -> case outputExpr parseMaxExpr span int of
-        Left e -> recover acc errs span e (i + 1)
-        Right e -> go (Output span e : acc) errs (i + 1)
       -- `{{&x}}` is Handlebars unescaped output — not a MaxBars shape, rejected.
       RAmp span _ _ _ -> recover acc errs span
         (DisallowedShape "{{& }} (unescaped output)" span.start)

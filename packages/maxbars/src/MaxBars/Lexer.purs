@@ -5,19 +5,22 @@
 -- |
 -- | `tokenize` scans MaxBars source into the flat `RawTok` stream with the MaxBars
 -- | config **baked in** — no `LexConfig`/`LexOptions` knobs at the boundary:
--- | `{{ }}`/`{{{ }}}` output, `{% … %}` statement tags, `{{#…}}…{{/…}}` blocks, the
--- | `{{{{#…}}}}` raw region, the infix-operator / `..` range / `[…]`·`{k:v}`
--- | collection interior lexing, standalone-line trimming, and the recovering scan
--- | (ADR-023). It is structural only — it never interprets a tag's contents, just
--- | delimits them — so each tag token carries its interior text and offset for the
--- | MaxBars expression grammar (`MaxBars.Expr`).
+-- | `{{ … }}` output (output-only — ADR-039), `{% … %}` statement tags, `{# … #}`
+-- | comments, `{{#…}}…{{/…}}` blocks, the `{{{{#…}}}}` raw region, the infix-operator
+-- | / `..` range / `[…]`·`{k:v}` collection interior lexing, standalone-line
+-- | trimming, and the recovering scan (ADR-023). It is structural only — it never
+-- | interprets a tag's contents, just delimits them — so each tag token carries its
+-- | interior text and offset for the MaxBars expression grammar (`MaxBars.Expr`).
 -- |
--- | The Mustache set-delimiter machinery (`mustacheDelims`/`{{=A B=}}`) is gone —
--- | MaxBars never switches delimiters, so `open`/`close` are the constant `{{`/`}}`
--- | (ADR-041 §3). The Handlebars `{{&}}`/`{{^}}` and the `{{<`/`{{$` inheritance
--- | sigils MaxBars rejects are still produced here (their trim is parser-coupled —
--- | ADR-041 §4 Phase 2); the equivalence gate (`Test.MaxBars` — the lexer ≡ the
--- | shared lexer over valid MaxBars input) pins this fork to the reference meanwhile.
+-- | Two grammars MaxBars does not have are baked **out**, not gated: the Mustache
+-- | set-delimiter machinery (`{{=A B=}}`) — so `open`/`close` are the constant
+-- | `{{`/`}}` — and the Handlebars output-only holdovers (`{{{ … }}}` raw output is
+-- | a lex error, `{{! … }}`/`{{!-- --}}` are not comments; ADR-039 `bracesOutputOnly`).
+-- | The Handlebars `{{&}}`/`{{^}}` and the `{{<`/`{{$` inheritance sigils MaxBars
+-- | rejects are still *produced* here (their trim is parser-coupled — the parser
+-- | rejects them with a located `DisallowedShape`). The equivalence gate
+-- | (`Test.MaxBars` — the lexer ≡ the shared lexer driven with MaxBars's config over
+-- | valid MaxBars input) pins this fork to the reference until the Phase 4 freeze.
 module MaxBars.Lexer
   ( RawTok(..)
   , tokenize
@@ -48,7 +51,6 @@ import FlatBars.Token (Interior, LexOptions, infixOperatorChars, tokenizeInterio
 -- | standalone-whitespace head-words, and raw-block close-matching.
 data RawTok
   = RContent Span String -- span of the source run, text
-  | ROutput Span Int String Interior -- {{{ <interior> }}}
   | RAmp Span Int String Interior -- {{& <interior> }} — unescaped output (Handlebars `&`)
   | ROpen Span Sigil Int String Interior -- {{# / {{^ / {{< / {{$ <interior> }} — sigil distinguishes them
   | RClose Span Int String Interior -- {{/ <interior> }}
@@ -57,18 +59,11 @@ data RawTok
   -- bare `{{{{ }}}}` Handlebars spelling — gated separately per dialect), base,
   -- head, the head's `Interior`, body. `{{{{# <interior> }}}} <body> {{{{/ name }}}}`.
   | RRaw Span Boolean Int String Interior String
-  -- {{! <interior> }} — a *short* comment, kept for directive lifting (the parser
-  -- scans its interior for `@key` heads). Long `{{!-- … --}}` comments are never
-  -- emitted (inert prose).
+  -- {# <interior> #} — a Django/Jinja inline comment (the MaxBars comment form),
+  -- kept for directive lifting (the parser scans its interior for `@key` heads). It
+  -- renders nothing — the parser drops it after directive extraction.
   | RComment Span Int String
-  -- {{!-- … --}} (and {{~!--) — a *long* comment, inert prose. It is normally
-  -- dropped (it carries no directives and produces no output), but is emitted as
-  -- this span-only token when `LexConfig.keepLongComments` is on, so the
-  -- highlighter can colour it (the parser/compiler never set that flag, so they
-  -- still never see it). Standalone-whitespace and `~` trimming are unchanged —
-  -- handled by the surrounding flush regardless of whether the token is emitted.
-  | RLongComment Span
-  -- An unterminated construct: a `{{` / `{{!` / `{{!--` / `{{{{` opener with no
+  -- An unterminated construct: a `{{` / `{#` / `{{{{` opener with no
   -- closer. The *recovering* scanner (ADR-023, extended to the lexer) emits this
   -- instead of bailing — it spans the orphan opener up to the next opener (or
   -- EOF), carries the structural `ParseError`, and resyncs there so the rest of
@@ -82,14 +77,12 @@ derive instance eqRawTok :: Eq RawTok
 instance showRawTok :: Show RawTok where
   show = case _ of
     RContent _ s -> "RContent " <> show s
-    ROutput _ _ s _ -> "ROutput " <> show s
     RAmp _ _ s _ -> "RAmp " <> show s
     ROpen _ sig _ s _ -> "ROpen " <> show sig <> " " <> show s
     RClose _ _ s _ -> "RClose " <> show s
     RSep _ _ s _ -> "RSep " <> show s
     RRaw _ hash _ s _ b -> "RRaw " <> show hash <> " " <> show s <> " " <> show b
     RComment _ _ s -> "RComment " <> show s
-    RLongComment _ -> "RLongComment"
     RError _ e -> "RError " <> show e
 
 --------------------------------------------------------------------------------
@@ -282,29 +275,23 @@ dropTrailingIndent s = case nlIndex false s of
 -- | tokenizer). `open`/`close` are the delimiter pair — always `{{`/`}}` for
 -- | MaxBars, which never switches delimiters (ADR-041 dropped the Mustache
 -- | set-delimiter machinery), so the pair is threaded as a constant.
--- | `keepLongComments` makes the scanner emit `{{!-- … --}}` long comments as
--- | span-only `RLongComment` tokens instead of dropping them; only the syntax
--- | highlighter sets it (rendering/compilation leave it off, so their token
--- | stream — and output — is unchanged).
 -- | `statementTags` enables the Django-style `{% … %}` statement surface (docs-19):
 -- | a `{% … %}` tag lexes into the *same* structural tokens its `{{ … }}` counterpart
 -- | would — `{% if %}`/`{% each %}`/… → `ROpen Section`, `{% endX %}` → `RClose X`,
 -- | `{% else %}`/`{% elif %}`/`{% when %}` → `RSep` — so the parser, engine, and every
--- | backend are unchanged (docs-19 §3). MaxBars keeps it on.
+-- | backend are unchanged (docs-19 §3). MaxBars keeps it on (it selects the `-`
+-- | whitespace-control marker over `~`).
 type LexConfig =
   { open :: String
   , close :: String
-  , keepLongComments :: Boolean
   , statementTags :: Boolean
   }
 
--- | Default template-lexer config: `{{`/`}}`, long comments dropped (the
--- | render/compile default), no `{% %}` statement tags.
+-- | Default template-lexer config: `{{`/`}}`, no `{% %}` statement tags.
 defaultLexConfig :: LexConfig
 defaultLexConfig =
   { open: "{{"
   , close: "}}"
-  , keepLongComments: false
   , statementTags: false
   }
 
@@ -411,6 +398,20 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
           -- opener probe; it re-delimits the same structural tokens (`ROpen`/`RClose`/
           -- `RSep`) so the parser is unchanged.
           | matchAt cs i "{%" -> case readStatementTag i of
+              Left e -> recoverFrom i e segStart frags acc pend open close
+              Right res ->
+                let
+                  acc2 = consTok res.mtok
+                    ( flush { start: segStart, end: i } (contentTo segStart frags i) acc pend
+                        res.trimL
+                    )
+                in
+                  go res.next open close res.next [] acc2 res.trimR
+          -- A Django/Jinja inline comment `{# … #}` (ADR-039 item 1; the MaxBars
+          -- comment form, replacing the Handlebars `{{! … }}`). It renders nothing —
+          -- emitted as an `RComment` the parser drops. Checked before the `{{` opener
+          -- probe so a leading `{#` is never read as a dict literal.
+          | matchAt cs i "{#" -> case readInlineComment i of
               Left e -> recoverFrom i e segStart frags acc pend open close
               Right res ->
                 let
@@ -548,15 +549,21 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
 
   readTag :: Int -> Either ParseError TagResult
   readTag i
-    | matchAt cs i "{{{{#" = readRaw i 5 -- `{{{{#name}}}}` (FlatBars/back-compat)
-    | matchAt cs i "{{{{" = readRaw i 4 -- `{{{{name}}}}` (Handlebars raw block)
-    | matchAt cs i "{{~!--" = readLongComment i "{{~!--"
-    | matchAt cs i "{{!--" = readLongComment i "{{!--"
-    | matchAt cs i "{{{^" = readBlockOpen i "{{{^" Inverse "}}}"
-    | matchAt cs i "{{{/" = readClose i "{{{/" "}}}"
-    | matchAt cs i "{{{" = readOutput i
-    | matchAt cs i "{{~!" = readShortComment i "{{~!"
-    | matchAt cs i "{{!" = readShortComment i "{{!"
+    | matchAt cs i "{{{{#" = readRaw i 5 -- `{{{{#name}}}}` (FlatBars raw block)
+    | matchAt cs i "{{{{" = readRaw i 4 -- `{{{{name}}}}` (Handlebars raw block; parser rejects)
+    -- `{{ … }}` is OUTPUT-ONLY in MaxBars (ADR-039, `bracesOutputOnly` baked in): a
+    -- glued `{{{` is not a tag (unescaped output is `{{ x | safe }}`, a verbatim
+    -- region is `{% raw %}`), and the Handlebars comments `{{! }}` / `{{!-- --}}`
+    -- are not recognized — they fall through to `{{` output (`{{! x}}` ⇒ `not x`).
+    -- The comment form is `{# … #}` (`readInlineComment`, in the `go` scan). This
+    -- `{{{` guard also covers the triple-brace `{{{^`/`{{{/` variants (they start
+    -- `{{{`), so those Handlebars shapes are rejected here too.
+    | matchAt cs i "{{{" =
+        Left
+          ( LexError
+              "`{{{ … }}}` is not a tag here — unescaped output is `{{ x | safe }}`, a verbatim region is `{% raw %}`"
+              i
+          )
     -- `{{#*name}}` (inline-partial decorator) and `{{#>name}}` (partial block) are
     -- distinct openers — matched before bare `{{#}}` so the `*`/`>` is consumed as
     -- part of the opener, not folded into the head.
@@ -606,23 +613,25 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
     in
       { trimL, trimR, core }
 
-  readOutput :: Int -> Either ParseError TagResult
-  readOutput i =
+  -- A Django/Jinja inline comment `{# [~] … [~] #}` (the MaxBars comment form).
+  -- Kept as an `RComment` carrying its interior and offset (so the parser can lift
+  -- any `@key` directives); it renders nothing — the parser drops it after
+  -- directive extraction. Comments are prose: the close is the plain first-match
+  -- `#}` (never brace-aware).
+  readInlineComment :: Int -> Either ParseError TagResult
+  readInlineComment i =
     let
-      start = i + 3
+      start = i + 2
     in
-      case closeFrom start "}}}" of
-        Nothing -> Left (UnterminatedTag i)
+      case findFrom cs start "#}" of
+        Nothing -> Left (UnterminatedComment i)
         Just q ->
-          let
-            t = splitTrims (slice cs start q)
-          in
-            Right
-              { mtok: Just (ROutput { start: i, end: q + 3 } start t.core (interiorAt start t.core))
-              , next: q + 3
-              , trimL: t.trimL
-              , trimR: t.trimR
-              }
+          Right
+            { mtok: Just (RComment { start: i, end: q + 2 } start (slice cs start q))
+            , next: q + 2
+            , trimL: false
+            , trimR: false
+            }
 
   -- A block opener `{{# / {{^ [~] name args [~] close`, carrying its `sigil`
   -- (Section/Inverse). `close` is `}}` for double-brace openers, `}}}` for the
@@ -807,45 +816,6 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
             | otherwise -> scan (q + 2)
           Nothing -> scan (j + 1)
       | otherwise = scan (j + 1)
-
-  -- A short comment `{{! [~] … [~] }}` is *kept* as an `RComment` carrying its
-  -- interior (trailing `~` stripped) and offset, so the parser can lift any
-  -- `@key` directives from it. It still produces no output — the parser drops it
-  -- after directive extraction — and its `~` trims as before.
-  readShortComment :: Int -> String -> Either ParseError TagResult
-  readShortComment i opener =
-    let
-      start = i + SCU.length opener
-    in
-      -- comments are prose: never brace-aware (a stray `{` must not swallow the
-      -- close), so the plain first-match `}}` regardless of dialect.
-      case findFrom cs start "}}" of
-        Nothing -> Left (UnterminatedComment i)
-        Just q ->
-          let
-            trimR = matchAt cs (q - 1) "~"
-            interior = slice cs start (if trimR then q - 1 else q)
-          in
-            Right
-              { mtok: Just (RComment { start: i, end: q + 2 } start interior)
-              , next: q + 2
-              , trimL: leadTrimAt i
-              , trimR
-              }
-
-  -- A long comment `{{!-- … --}}` renders nothing and carries no directive, so
-  -- it is dropped (`mtok: Nothing`) — except under `keepLongComments`, where it
-  -- is emitted as a span-only `RLongComment` for the highlighter. Either way the
-  -- `~`/standalone trims are the same, so render output never depends on this.
-  readLongComment :: Int -> String -> Either ParseError TagResult
-  readLongComment i opener = case findFrom cs (i + SCU.length opener) "--}}" of
-    Nothing -> Left (UnterminatedComment i)
-    Just q -> Right
-      { mtok: if cfg.keepLongComments then Just (RLongComment { start: i, end: q + 4 }) else Nothing
-      , next: q + 4
-      , trimL: leadTrimAt i
-      , trimR: matchAt cs (q - 1) "~"
-      }
 
   -- `sigil` is the opener length: 5 for `{{{{#`, 4 for the bare `{{{{`. Both
   -- close with the name-matched `{{{{/name}}}}`; the head is read from `start`.

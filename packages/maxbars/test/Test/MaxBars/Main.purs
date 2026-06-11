@@ -907,7 +907,10 @@ main = do
   lexEquiv "statement-if-elif" "{% if x >= 18 %}A{% elif x < 5 %}B{% else %}C{% endif %}"
   lexEquiv "for-range" "{% for i in 1..n %}{{ i }}{% endfor %}"
   lexEquiv "collection" "{% for [1, 2, 3] %}{{ this }}{% endfor %}"
-  lexEquiv "triple" "{{{ raw }}}"
+  lexEquiv "triple-rejected" "{{{ raw }}}" -- `{{{` is output-only-rejected (bracesOutputOnly)
+  lexEquiv "bang-not-comment" "{{! x }}" -- `{{!` is NOT a comment here — `not x` output
+  lexEquiv "inline-comment" "a {# a note #} b" -- the MaxBars comment form `{# … #}`
+  lexEquiv "inline-comment-trim" "x\n  {#- drop -#}\ny"
   lexEquiv "raw-block" "{{{{#hl}}}}verbatim {{x}}{{{{/hl}}}}"
   lexEquiv "standalone" "  {% if a %}\n  x\n  {% endif %}\n"
   lexEquiv "extends-block" "{% extends \"base\" %}{% block title %}T{% endblock %}{% super %}"
@@ -926,10 +929,11 @@ main = do
   parseEquiv "statement-if-elif" "{% if x >= 18 %}A{% elif x < 5 %}B{% else %}C{% endif %}"
   parseEquiv "for-range" "{% for i in 1..n %}{{ i }}{% endfor %}"
   parseEquiv "collection" "{% for [1, 2, 3] %}{{ this }}{% endfor %}"
-  parseEquiv "triple" "{{{ raw }}}"
+  parseEquiv "triple-rejected" "{{{ raw }}}"
   parseEquiv "raw-block" "{{{{#hl}}}}verbatim {{x}}{{{{/hl}}}}"
   parseEquiv "standalone" "  {% if a %}\n  x\n  {% endif %}\n"
-  parseEquiv "directive" "{{! @trim: none }}\n{% if a %}x{% endif %}\n"
+  parseEquiv "directive" "{# @trim: none #}\n{% if a %}x{% endif %}\n"
+  parseEquiv "inline-comment" "a {# note #} b"
   parseEquiv "literal-output" "{{42}} {{\"x\"}}"
   parseEquiv "reject-amp" "{{&a}}"
   parseEquiv "reject-inverse" "{{^a}}x{% enda %}"
