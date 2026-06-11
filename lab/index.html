@@ -1871,7 +1871,6 @@
         },
         state: createAppState(ENGINE),
       };
-      let tabs        = [{ name: "main", source: "" }];
       // What the bottom (data) pane currently DISPLAYS: "data" | "config" |
       // "catalog". The pane is shared, so focusing it must restore ctx.state.activeView to
       // what's shown — not assume "data" — or config/catalog edits route into
@@ -1944,11 +1943,11 @@
         typeof id === "string" && id !== "data" && id !== "transform" &&
         !isInspectTab(id) && !!overlayByName(id);
 
-      const activeTab = () => tabs[ctx.state.activeTabIdx];
+      const activeTab = () => ctx.state.tabs[ctx.state.activeTabIdx];
 
       function partialsMap() {
         const map = {};
-        for (let i = 1; i < tabs.length; i++) map[tabs[i].name] = tabs[i].source;
+        for (let i = 1; i < ctx.state.tabs.length; i++) map[ctx.state.tabs[i].name] = ctx.state.tabs[i].source;
         return map;
       }
 
@@ -2134,7 +2133,7 @@
                   ctx.state.helpersDirty = true;
                 } else {
                   activeTab().source = text;
-                  tabs[ctx.state.activeTabIdx].dirty = true;
+                  ctx.state.tabs[ctx.state.activeTabIdx].dirty = true;
                 }
                 renderTabs();
                 scheduleRun();
@@ -2290,7 +2289,7 @@
 
       // ── Virtual file explorer ───────────────────────────────────────────
       // A type-grouped navigator over every editable file. It does not own any
-      // state — it reflects tabs[] / ctx.state.dataOverlays[] / transform / config and
+      // state — it reflects ctx.state.tabs[] / ctx.state.dataOverlays[] / transform / config and
       // drives the existing select* functions + render-config popover, so the
       // tab strips stay authoritative (rename / add / inspectors live there).
       // Re-rendered from renderTabs() + renderDataTabs() (every structural and
@@ -2361,10 +2360,10 @@
         const groups = [
           { key: "template", label: "TEMPLATE", files: [
             { icon: "stem", name: "main." + TEMPLATE_EXT, active: tmplActive && ctx.state.activeTabIdx === 0,
-              dirty: !!(tabs[0] && tabs[0].dirty), title: "entry template", on: () => selectTemplateTab(0) },
+              dirty: !!(ctx.state.tabs[0] && ctx.state.tabs[0].dirty), title: "entry template", on: () => selectTemplateTab(0) },
           ]},
           { key: "partials", label: "PARTIALS", add: addPartial, addTitle: "New partial",
-            files: tabs.slice(1).map((t, idx) => {
+            files: ctx.state.tabs.slice(1).map((t, idx) => {
               const i = idx + 1;
               return { icon: "stem", name: (t.name || "(unnamed)") + "." + TEMPLATE_EXT,
                 active: tmplActive && ctx.state.activeTabIdx === i, dirty: !!t.dirty,
@@ -2373,7 +2372,7 @@
                 renameValue: t.name, onDelete: () => removeTab(i),
                 onRename: (v) => {
                   v = v.trim();
-                  if (!v || tabs.some((o, j) => j !== i && o.name === v)) return false;
+                  if (!v || ctx.state.tabs.some((o, j) => j !== i && o.name === v)) return false;
                   const prev = t.name; t.name = v;
                   const k = ctx.state.openEditors.indexOf(prev); if (k >= 0) ctx.state.openEditors[k] = v;
                   markCustom(); renderTabs(); scheduleRun(); return true;
@@ -2616,9 +2615,9 @@
             continue;
           }
           if (key === "config" || key === "catalog" || key === "data" || overlayByName(key)) continue; // bottom strip
-          const i = key === "main" ? 0 : tabs.findIndex((t) => t.name === key);
+          const i = key === "main" ? 0 : ctx.state.tabs.findIndex((t) => t.name === key);
           if (i < 0) continue; // a partial that no longer exists
-          const tab = tabs[i];
+          const tab = ctx.state.tabs[i];
           const isActive = ctx.state.activeView === "tmpl" && templateMode === "tmpl" && i === ctx.state.activeTabIdx;
           const t = document.createElement("div");
           t.className = "tab" + (isActive ? " active" : "") + (i === 0 ? " is-main" : "");
@@ -2679,8 +2678,8 @@
       // Diagnostics dock (see `dockTabs`); `renderDataInspect` re-renders the
       // dock so the active inspector follows the file / latest render.
 
-      // ── Template open-editor helpers (VS Code-style tabs) ───────────────
-      const tmplKeyForIndex = (i) => (i === 0 ? "main" : tabs[i].name);
+      // ── Template open-editor helpers (VS Code-style ctx.state.tabs) ───────────────
+      const tmplKeyForIndex = (i) => (i === 0 ? "main" : ctx.state.tabs[i].name);
       function ensureOpen(key) { if (!ctx.state.openEditors.includes(key)) ctx.state.openEditors.push(key); }
 
       // Auto-open every example file that carries content — "open all the files,
@@ -2694,7 +2693,7 @@
       function autoOpenEditors() {
         const has = (s) => typeof s === "string" && s.trim() !== "";
         const open = ["main", "data"];
-        tabs.forEach((t, i) => { if (i > 0 && has(t.source)) open.push(t.name); });
+        ctx.state.tabs.forEach((t, i) => { if (i > 0 && has(t.source)) open.push(t.name); });
         if (has(ctx.state.transformSrc)) open.push("transform");
         if (has(ctx.state.helpersSrc)) open.push("helpers");
         for (const o of ctx.state.dataOverlays) if (has(o.source)) open.push(o.name);
@@ -2712,7 +2711,7 @@
         if (key === "main")      return ctx.state.activeView === "tmpl" && templateMode === "tmpl" && ctx.state.activeTabIdx === 0;
         // partial or overlay name
         if (overlayByName(key))  return ctx.state.activeView === "data" && ctx.state.dataTab === "edit" && ctx.state.dataFile === key;
-        return ctx.state.activeView === "tmpl" && templateMode === "tmpl" && tabs[ctx.state.activeTabIdx] && tabs[ctx.state.activeTabIdx].name === key;
+        return ctx.state.activeView === "tmpl" && templateMode === "tmpl" && ctx.state.tabs[ctx.state.activeTabIdx] && ctx.state.tabs[ctx.state.activeTabIdx].name === key;
       }
 
       // Activate an editor by key (used when closing the active one).
@@ -2724,7 +2723,7 @@
         if (key === "main") return selectTemplateTab(0);
         if (key === "data") return selectDataTab("data");
         if (overlayByName(key)) return selectDataTab(key);
-        const i = tabs.findIndex((t) => t.name === key);
+        const i = ctx.state.tabs.findIndex((t) => t.name === key);
         selectTemplateTab(i > 0 ? i : 0);
       }
 
@@ -2823,7 +2822,7 @@
       // name). "transform" routes to the template pane (kept for older callers).
       function selectDataTab(name = "data") {
         if (name === "transform") { selectTransformTab(); return; }
-        if (name === "context" || name === "ast") { // inspectors are dock tabs now
+        if (name === "context" || name === "ast") { // inspectors are dock ctx.state.tabs now
           dockActiveTab = name; if (byId("dock").hidden) setDockVisible(true); else renderDock();
           return;
         }
@@ -2886,9 +2885,9 @@
       function renderDataInspect() { renderDock(); }
       function addPartial() {
         let n = 1, name;
-        do { name = "partial" + n++; } while (tabs.some((t) => t.name === name));
-        tabs.push({ name, source: "" });
-        ctx.state.activeView = "tmpl"; ctx.state.activeTabIdx = tabs.length - 1;
+        do { name = "partial" + n++; } while (ctx.state.tabs.some((t) => t.name === name));
+        ctx.state.tabs.push({ name, source: "" });
+        ctx.state.activeView = "tmpl"; ctx.state.activeTabIdx = ctx.state.tabs.length - 1;
         ensureOpen(name);
         markCustom();
         // Set before `showActiveTab` so the renderExplorer it triggers picks
@@ -2899,12 +2898,12 @@
       // Open an existing partial tab by name, or create a new one if absent.
       // Used by the double-click handler on {{> name}} tags in the template editor.
       function openOrCreatePartial(name) {
-        const idx = tabs.findIndex((t, i) => i > 0 && t.name === name);
+        const idx = ctx.state.tabs.findIndex((t, i) => i > 0 && t.name === name);
         if (idx >= 0) {
           selectTemplateTab(idx);
         } else {
-          tabs.push({ name, source: "", dirty: false });
-          ctx.state.activeView = "tmpl"; ctx.state.activeTabIdx = tabs.length - 1;
+          ctx.state.tabs.push({ name, source: "", dirty: false });
+          ctx.state.activeView = "tmpl"; ctx.state.activeTabIdx = ctx.state.tabs.length - 1;
           ensureOpen(name);
           markCustom();
           showActiveTab(); run();
@@ -2912,12 +2911,12 @@
       }
       function removeTab(i) {
         if (i === 0) return;
-        if (!confirm(`Delete the "${tabs[i].name}" partial? This can't be undone.`)) return;
-        const name = tabs[i].name;
+        if (!confirm(`Delete the "${ctx.state.tabs[i].name}" partial? This can't be undone.`)) return;
+        const name = ctx.state.tabs[i].name;
         const wasActive = ctx.state.activeView === "tmpl" && templateMode === "tmpl" && ctx.state.activeTabIdx === i;
         const k = ctx.state.openEditors.indexOf(name); if (k >= 0) ctx.state.openEditors.splice(k, 1);
         if (ctx.state.activeTabIdx > i) ctx.state.activeTabIdx -= 1;
-        tabs.splice(i, 1);
+        ctx.state.tabs.splice(i, 1);
         markCustom();
         // Closing the active file falls back to the pinned entry template.
         if (wasActive) { ctx.state.activeTabIdx = 0; templateMode = "tmpl"; ctx.state.activeView = "tmpl"; }
@@ -2961,7 +2960,7 @@
       }
 
       // Activate the transform tab in the template pane. Symmetric with
-      // selectTemplateTab(i) for normal template tabs.
+      // selectTemplateTab(i) for normal template ctx.state.tabs.
       function selectTransformTab() {
         templateMode = "transform";
         ctx.state.activeView = "tmpl";
@@ -3088,7 +3087,7 @@
           `[Open in the Stem playground](${location.href})`,
           "",
         ];
-        for (const t of tabs) {
+        for (const t of ctx.state.tabs) {
           out.push(`## ${t.name === "main" ? "Template — main" : "Partial — " + t.name}`, "");
           out.push(mdFence(t.source, TEMPLATE_FENCE), "");
         }
@@ -3103,7 +3102,7 @@
       // The workspace as separate files for the zip: each template, the data, the
       // transform (if any), the output, and the Markdown doc as a README.
       async function buildFiles() {
-        const files = tabs.map((t) => ({
+        const files = ctx.state.tabs.map((t) => ({
           name: t.name === "main" ? `main.${TEMPLATE_EXT}` : `partials/${t.name}.${TEMPLATE_EXT}`,
           content: t.source,
         }));
@@ -3269,11 +3268,11 @@
 
       // The file behind a segment ("main" is tab 0; partials are the rest).
       function tabIndexByFile(file) {
-        return file === "main" ? 0 : tabs.findIndex((t, i) => i > 0 && t.name === file);
+        return file === "main" ? 0 : ctx.state.tabs.findIndex((t, i) => i > 0 && t.name === file);
       }
       function fileSource(file) {
         const i = tabIndexByFile(file);
-        return i >= 0 ? tabs[i].source : "";
+        return i >= 0 ? ctx.state.tabs[i].source : "";
       }
 
       // True between a source edit and the debounced render that follows it: in
@@ -3286,7 +3285,7 @@
       // instances). renderPending is set via the injected setter; caretLinkKey via
       // resetCaretLink (the caret subsystem owns it).
       const { run, scheduleRun } = createRun(ctx, {
-        getYamlSrc: () => ctx.state.yamlSrc, getTabs: () => tabs, getActiveTabIdx: () => ctx.state.activeTabIdx,
+        getYamlSrc: () => ctx.state.yamlSrc, getTabs: () => ctx.state.tabs, getActiveTabIdx: () => ctx.state.activeTabIdx,
         getStandalone: () => standalone, getTransformSrc: () => ctx.state.transformSrc,
         getHelpersSrc: () => ctx.state.helpersSrc, getCatalogSource: () => ctx.state.catalogSource,
         getAllowList: () => ctx.state.allowList, getEscapeMode: () => ctx.state.escapeMode,
@@ -3348,13 +3347,13 @@
       // `bytecode-wire`) — falls back to the always-present iframe Preview.
       const validView = (v) => ovValidView(v, engineFeatures);
 
-      // The output view tabs + the visible/valid decisions live in
+      // The output view ctx.state.tabs + the visible/valid decisions live in
       // lab/output-view.mjs (extracted for testability). These thin wrappers bind
       // the engine's advertised features so existing call sites stay arg-free.
       const visibleViews = () => ovVisibleViews(engineFeatures);
 
       function templateSourceFor(file) {
-        if (file === "main") return tabs[0]?.source || "";
+        if (file === "main") return ctx.state.tabs[0]?.source || "";
         return partialsMap()[file] || "";
       }
 
@@ -3523,7 +3522,7 @@
         if (linkedTabEl) { linkedTabEl.classList.remove("tab-linked"); linkedTabEl = null; }
 
         if (active) {
-          const [from, to] = spanRange(tabs[idx].source, start, end);
+          const [from, to] = spanRange(ctx.state.tabs[idx].source, start, end);
           templateView.dispatch({ effects: setLinkHighlight.of({ from, to }) });
         } else {
           templateView.dispatch({ effects: setLinkHighlight.of(null) });
@@ -3584,7 +3583,7 @@
         selectTemplateTab(idx);
         templateView.focus();
         if (start !== null) {
-          const [from, to] = spanRange(tabs[idx].source, start, end);
+          const [from, to] = spanRange(ctx.state.tabs[idx].source, start, end);
           templateView.dispatch({ selection: { anchor: from, head: to }, scrollIntoView: true });
         }
         hideSegTip();
@@ -3830,8 +3829,8 @@
           ...ex.partials.map((name) =>
             files.readText(`${dir}${name}.${ex.main.split(".").pop()}`)),
         ]);
-        tabs = [{ name: "main", source: mainSrc }];
-        ex.partials.forEach((name, i) => tabs.push({ name, source: partialSrcs[i] }));
+        ctx.state.tabs = [{ name: "main", source: mainSrc }];
+        ex.partials.forEach((name, i) => ctx.state.tabs.push({ name, source: partialSrcs[i] }));
         ctx.state.activeTabIdx = 0; ctx.state.activeView = "tmpl";
         // Examples ship their data as YAML; an optional transform is the Controller.
         ctx.state.yamlSrc = dataText;
@@ -3869,7 +3868,7 @@
         { const s = byId("vendored-source"); if (s) s.hidden = true; } // catalog example: no vendored source
         ctx.state.loadedExampleIdx = idx;
         ctx.state.exampleModified = false;
-        tabs.forEach(t => { t.dirty = false; });
+        ctx.state.tabs.forEach(t => { t.dirty = false; });
         ctx.state.yamlDirty = false; ctx.state.transformDirty = false;
         outLangChoice = "Auto";
         persistOutLang();
@@ -3911,8 +3910,8 @@
       // Mirrors loadExample's state setup, but from the fixture (no per-file fetch).
       function loadVendored(fx) {
         const ws = vendoredWorkspace(fx);
-        tabs = [{ name: "main", source: ws.template, dirty: false }];
-        ws.partials.forEach((p) => tabs.push({ name: p.name, source: p.source, dirty: false }));
+        ctx.state.tabs = [{ name: "main", source: ws.template, dirty: false }];
+        ws.partials.forEach((p) => ctx.state.tabs.push({ name: p.name, source: p.source, dirty: false }));
         ctx.state.activeTabIdx = 0; ctx.state.activeView = "tmpl";
         ctx.state.yamlSrc = ws.dataText;
         ctx.state.transformSrc = "";
@@ -3968,7 +3967,7 @@
       // ── URL state ─────────────────────────────────────────────────────
       function snapshotState() {
         return {
-          tabs: tabs.map((t) => ({ n: t.name, s: t.source })),
+          tabs: ctx.state.tabs.map((t) => ({ n: t.name, s: t.source })),
           d: ctx.state.yamlSrc,
           t: ctx.state.transformSrc,
           // Custom-helper source (ADR-018), a separate field from the transform.
@@ -4020,10 +4019,10 @@
             return true;
           }
           // Otherwise it is a genuine custom edit (x === -1): restore verbatim.
-          tabs = Array.isArray(s.tabs) && s.tabs.length
-            ? s.tabs.map((t, i) => ({ name: i === 0 ? "main" : (t.n ?? "partial"), source: t.s ?? "", dirty: false }))
+          ctx.state.tabs = Array.isArray(s.ctx.state.tabs) && s.ctx.state.tabs.length
+            ? s.ctx.state.tabs.map((t, i) => ({ name: i === 0 ? "main" : (t.n ?? "partial"), source: t.s ?? "", dirty: false }))
             : [{ name: "main", source: "", dirty: false }];
-          ctx.state.activeTabIdx = Math.max(0, Math.min(tabs.length - 1, s.ai ?? 0));
+          ctx.state.activeTabIdx = Math.max(0, Math.min(ctx.state.tabs.length - 1, s.ai ?? 0));
           ctx.state.activeView = s.av === "data" ? "data" : "tmpl";
           ctx.state.yamlSrc = s.d ?? "";
           ctx.state.transformSrc = s.t ?? "";
@@ -4310,11 +4309,11 @@
       let searchMount = null;
       let searchRefresh = null;
 
-      // Every searchable source: the template tabs (main + partials), the YAML
+      // Every searchable source: the template ctx.state.tabs (main + partials), the YAML
       // data, and the JSONata transform (when present). The rendered output is
       // generated, not a source, so it's excluded.
       function searchSources() {
-        const out = tabs.map((t) => ({ file: t.name, kind: "tmpl", source: t.source }));
+        const out = ctx.state.tabs.map((t) => ({ file: t.name, kind: "tmpl", source: t.source }));
         out.push({ file: "data.yaml", kind: "data", source: ctx.state.yamlSrc });
         if (ctx.state.transformSrc.trim()) out.push({ file: "transform", kind: "transform", source: ctx.state.transformSrc });
         return out;
@@ -4375,7 +4374,7 @@
         if (kind === "transform") return ctx.state.transformSrc;
         if (kind === "helpers") return ctx.state.helpersSrc;
         const i = tabIndexByFile(file);
-        return i >= 0 ? tabs[i].source : "";
+        return i >= 0 ? ctx.state.tabs[i].source : "";
       }
 
       // Write a source back and keep the visible editor in sync.
@@ -4393,7 +4392,7 @@
         } else {
           const i = tabIndexByFile(file);
           if (i < 0) return;
-          tabs[i].source = next;
+          ctx.state.tabs[i].source = next;
           if (i === ctx.state.activeTabIdx && ctx.state.activeView === "tmpl") setEditorText(templateView, next);
         }
       }
@@ -4658,7 +4657,7 @@
       // Parse main + every partial to its pre-expansion AST, then derive the DAG.
       function currentDependencyGraph() {
         const asts = {};
-        const parsed = renderer.parseAst(tabs[0].source);
+        const parsed = renderer.parseAst(ctx.state.tabs[0].source);
         asts.main = parsed.ast ? parsed.ast.nodes : [];
         for (const [name, src] of Object.entries(partialsMap())) {
           const p = renderer.parseAst(src);
@@ -4796,7 +4795,7 @@
 
       function dockTabById(id) { return dockTabs.find((t) => t.id === id); }
 
-      // Dock tabs the loaded engine actually exposes (ADR-0020 gate applied).
+      // Dock ctx.state.tabs the loaded engine actually exposes (ADR-0020 gate applied).
       // `problems`/`perf`/`coverage` declare no `requires`, so they are always
       // present; the analysis panels appear only when their backing capability
       // is advertised. Under the Stem adapter every tab is visible.
@@ -4834,7 +4833,7 @@
       };
 
       // MinBars is a logic-less engine without the lowered-AST / source-map seams the
-      // FlatBars panels read. Rather than silently showing fewer tabs, surface a
+      // FlatBars panels read. Rather than silently showing fewer ctx.state.tabs, surface a
       // "Why fewer panels?" popover listing each absent panel and its reason.
       function paintWhyFewerPanels(strip) {
         if (ENGINE !== "minbars") return;
@@ -4911,9 +4910,9 @@
       // both for capturing a confirmed bug fix (vector matches future fix) and
       // for pinning current behaviour when a refactor is imminent.
       function saveAsVector(row) {
-        const tmpl = tabs[0].source;
+        const tmpl = ctx.state.tabs[0].source;
         const partials = {};
-        for (const t of tabs.slice(1)) partials[t.name] = t.source;
+        for (const t of ctx.state.tabs.slice(1)) partials[t.name] = t.source;
         const name = row ? `data access: ${row.status} ${row.path}` : "playground capture";
         const vector = {
           name,
@@ -5244,7 +5243,7 @@
           g.append(text);
           g.style.cursor = "pointer";
           g.addEventListener("click", () => {
-            const idx = tabs.findIndex((t) => t.name === n.id);
+            const idx = ctx.state.tabs.findIndex((t) => t.name === n.id);
             if (idx >= 0) selectTemplateTab(idx);
           });
           svg.append(g);
