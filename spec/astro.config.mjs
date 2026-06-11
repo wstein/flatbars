@@ -17,6 +17,7 @@ import mermaid from "astro-mermaid";
 import remarkGfm from "remark-gfm";
 import starlightLinksValidator from "starlight-links-validator";
 import { readdir, readFile, writeFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 import { sidebar } from "./src/sidebar.ts";
@@ -24,6 +25,34 @@ import { FONT_CSS_HREF, FONT_PRECONNECT } from "../shared/fonts.mjs";
 
 const BASE = process.env.PUBLIC_SPEC_BASE || undefined;
 const SITE = process.env.PUBLIC_SITE || undefined;
+
+// Register the FlatBars TextMate grammar (editors/flatbars.tmLanguage.json, the
+// ADR-017 fallback) as an Expressive Code / Shiki language, so the spec's
+// ```maxbars / ```truss / ```django fences highlight instead of falling back to
+// plain text. The grammar already covers the whole `{% %}` / `{{ }}` family (its
+// fileTypes list maxbars/truss); Django's statement-tag syntax fits the same
+// shape. handlebars/mustache are built-in Shiki langs, so they are not aliased
+// here (aliasing would collide). The grammar's one external include
+// (`source.yaml`, for embedded data blocks) is stripped: the spec's
+// maxbars/truss/django fences are template fragments with no embedded YAML, and a
+// dependency on a lang the custom highlighter doesn't carry is a hard build error.
+const flatbarsGrammar = JSON.parse(
+  readFileSync(new URL("../editors/flatbars.tmLanguage.json", import.meta.url), "utf8"),
+);
+const stripYamlInclude = (node) => {
+  if (Array.isArray(node)) return node.filter((n) => !(n && n.include === "source.yaml")).map(stripYamlInclude);
+  if (node && typeof node === "object") {
+    const out = {};
+    for (const [k, v] of Object.entries(node)) out[k] = stripYamlInclude(v);
+    return out;
+  }
+  return node;
+};
+const flatbarsLang = {
+  ...stripYamlInclude(flatbarsGrammar),
+  name: "flatbars",
+  aliases: ["maxbars", "truss", "django", "rawbars", "classicbars", "minbars"],
+};
 
 // Prefix the hand-authored root-absolute links (`/concepts/`, `/adr/…`) in the
 // built HTML with the deploy base — Astro only rewrites its own route/asset
@@ -72,6 +101,9 @@ export default defineConfig({
       description: "The normative specification for FlatBars — a template-engine construction kit.",
       // The umbrella brand mark (public/favicon.svg, copied from shared/).
       favicon: "/favicon.svg",
+      // Register the FlatBars-family fence languages (maxbars/truss/django/…) so
+      // their code blocks highlight instead of falling back to plain text.
+      expressiveCode: { shiki: { langs: [flatbarsLang] } },
       // The design system: the generated chrome tokens (what the shared topbar
       // reads) + the syntax palette, plus spec-local chrome. The two token files
       // are generated copies of the shared sources (`npm run gen:tokens`).
