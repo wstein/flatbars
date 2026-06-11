@@ -367,6 +367,14 @@ export const cases = [
     template: '{% inline "card" %}[{{title}}]{% endinline %}{% include "card" section %}',
     data: { section: { title: "Intro" } },
   },
+  {
+    // ADR-042 §8 follow-up: a hash-argument include WITHOUT a signature — the body's
+    // `{{who}}` is a `lookup this "who"`, shadowed by the hash key (so AOT-typed from
+    // the call value `name`, no phantom `who` context field).
+    id: "include-hash-no-sig",
+    template: '{% inline "g" %}hi {{who}}!{% endinline %}{% include "g" who=name %}',
+    data: { name: "Ada" },
+  },
 
   // ── typed inline signatures (ADR-042 §8): `{% inline "n" (p, q=default) %}` ────
   {

@@ -17551,7 +17551,7 @@ var structName = function(field) {
       return s;
     }
     ;
-    throw new Error("Failed pattern match at Kernel.Schema (line 642, column 11 - line 644, column 17): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at Kernel.Schema (line 649, column 11 - line 651, column 17): " + [v.constructor.name]);
   };
   var base = (function() {
     var $222 = length3(field) > 1 && takeRight(1)(field) === "s";
@@ -17592,7 +17592,7 @@ var scalarRust = function(v) {
     return "String";
   }
   ;
-  throw new Error("Failed pattern match at Kernel.Schema (line 625, column 14 - line 630, column 24): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Kernel.Schema (line 632, column 14 - line 637, column 24): " + [v.constructor.name]);
 };
 var scaffoldJson = function(v) {
   if (v instanceof TyScalar) {
@@ -17636,7 +17636,7 @@ var scaffoldJson = function(v) {
     return '""';
   }
   ;
-  throw new Error("Failed pattern match at Kernel.Schema (line 717, column 16 - line 734, column 22): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Kernel.Schema (line 724, column 16 - line 741, column 22): " + [v.constructor.name]);
 };
 var rootScope = {
   current: [],
@@ -17744,7 +17744,7 @@ var observe = function(canon) {
       })(toUnfoldable10(v.value0));
     }
     ;
-    throw new Error("Failed pattern match at Kernel.Schema (line 785, column 17 - line 794, column 57): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at Kernel.Schema (line 792, column 17 - line 801, column 57): " + [v.constructor.name]);
   };
 };
 var numberPack = /* @__PURE__ */ fromFoldable13(["add", "subtract", "multiply", "divide", "modulo", "even", "odd", "divisibleBy", "abs", "ceil", "floor", "round", "toFixed", "toFloat", "toInt", "lt", "gt", "lte", "gte"]);
@@ -17781,7 +17781,7 @@ var mentionsKeyE = function(v) {
     return false;
   }
   ;
-  throw new Error("Failed pattern match at Kernel.Schema (line 520, column 16 - line 527, column 17): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Kernel.Schema (line 527, column 16 - line 534, column 17): " + [v.constructor.name]);
 };
 var $lazy_mentionsKey = /* @__PURE__ */ $runtime_lazy7("mentionsKey", "Kernel.Schema", function() {
   var nodeKey = function(v) {
@@ -17794,14 +17794,14 @@ var $lazy_mentionsKey = /* @__PURE__ */ $runtime_lazy7("mentionsKey", "Kernel.Sc
     }
     ;
     if (v instanceof Block) {
-      return any2(mentionsKeyE)(v.value3) || $lazy_mentionsKey(516)(v.value4);
+      return any2(mentionsKeyE)(v.value3) || $lazy_mentionsKey(523)(v.value4);
     }
     ;
     return false;
   };
   return any2(nodeKey);
 });
-var mentionsKey = /* @__PURE__ */ $lazy_mentionsKey(510);
+var mentionsKey = /* @__PURE__ */ $lazy_mentionsKey(517);
 var hashPairs = /* @__PURE__ */ (function() {
   var pairUp = function(ys) {
     var v = uncons(ys);
@@ -17815,7 +17815,7 @@ var hashPairs = /* @__PURE__ */ (function() {
         return [];
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Schema (line 542, column 45 - line 544, column 20): " + [v1.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Schema (line 549, column 45 - line 551, column 20): " + [v1.constructor.name]);
     }
     ;
     return [];
@@ -17860,6 +17860,10 @@ var exprCanon = function(sc) {
   return function(v) {
     if (v instanceof App2 && v.value0 === "lookup") {
       var v1 = uncons(v.value1);
+      if (v1 instanceof Just && (v1.value0.head instanceof App2 && (v1.value0.head.value0 === "this" && (v1.value0.head.value1.length === 0 && (v1.value0.tail.length === 1 && (v1["value0"]["tail"][0] instanceof Lit && (v1["value0"]["tail"][0].value0 instanceof VString && member6(v1["value0"]["tail"][0].value0.value0)(sc.shadowed)))))))) {
+        return Nothing.value;
+      }
+      ;
       if (v1 instanceof Just) {
         return bind11(recvCanon(v1.value0.head))(function(base) {
           return bind11(traverseKeys(v1.value0.tail))(function(ks) {
@@ -17872,7 +17876,7 @@ var exprCanon = function(sc) {
         return Nothing.value;
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Schema (line 187, column 24 - line 192, column 23): " + [v1.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Schema (line 187, column 24 - line 199, column 23): " + [v1.constructor.name]);
     }
     ;
     if (v instanceof App2 && v.value1.length === 0) {
@@ -18015,8 +18019,8 @@ var propagateCouples = function($copy_cs) {
     };
     var push4 = function(acc) {
       return function(v) {
-        var $358 = eq42(v.value1.value1.scalar)(SUnknown.value);
-        if ($358) {
+        var $366 = eq42(v.value1.value1.scalar)(SUnknown.value);
+        if ($366) {
           return acc;
         }
         ;
@@ -18027,8 +18031,8 @@ var propagateCouples = function($copy_cs) {
       return foldl6(push4)(m)(toUnfoldable10(m));
     };
     var cs$prime = onePass(cs);
-    var $363 = eq5(cs$prime)(cs);
-    if ($363) {
+    var $371 = eq5(cs$prime)(cs);
+    if ($371) {
       $tco_done = true;
       return cs;
     }
@@ -18140,7 +18144,7 @@ var emitSchema = function(root) {
       return s;
     }
     ;
-    throw new Error("Failed pattern match at Kernel.Schema (line 711, column 12 - line 713, column 17): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at Kernel.Schema (line 718, column 12 - line 720, column 17): " + [v.constructor.name]);
   };
   var enumDecl = function(nm) {
     return function(tag) {
@@ -18183,7 +18187,7 @@ var emitSchema = function(root) {
         return "String";
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Schema (line 700, column 17 - line 708, column 26): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Schema (line 707, column 17 - line 715, column 26): " + [v.constructor.name]);
     };
   };
   var objBody = function(v) {
@@ -18272,7 +18276,7 @@ var countGuessed = function(v) {
     return 0;
   }
   ;
-  throw new Error("Failed pattern match at Kernel.Schema (line 750, column 16 - line 758, column 17): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Kernel.Schema (line 757, column 16 - line 765, column 17): " + [v.constructor.name]);
 };
 var countConflicts = function(v) {
   if (v instanceof TyScalar && v.value0 instanceof SConflict) {
@@ -18307,21 +18311,21 @@ var countConflicts = function(v) {
     return 0;
   }
   ;
-  throw new Error("Failed pattern match at Kernel.Schema (line 738, column 18 - line 746, column 17): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Kernel.Schema (line 745, column 18 - line 753, column 17): " + [v.constructor.name]);
 };
 var emitReport = function(root) {
   var guessed = countGuessed(root);
   var conflicts = countConflicts(root);
   return joinWith("\n")(["# Schema inference (template-symbolic)", show15(guessed) + (" field(s) defaulted to `String` (bare output \u2014 provide --data to refine), " + (show15(conflicts) + " conflict(s).")), (function() {
-    var $438 = conflicts > 0;
-    if ($438) {
+    var $446 = conflicts > 0;
+    if ($446) {
       return "\u26A0 conflicts present \u2014 a path is used at two incompatible types; rerun with --strict to fail.";
     }
     ;
     return "";
   })(), (function() {
-    var $439 = guessed > 0;
-    if ($439) {
+    var $447 = guessed > 0;
+    if ($447) {
       return "Defaulted fields are a guess, not a deduction \u2014 confirm or narrow them.";
     }
     ;
@@ -18333,7 +18337,7 @@ var $lazy_collectInlines = /* @__PURE__ */ $runtime_lazy7("collectInlines", "Ker
   var go = function(m) {
     return function(v) {
       if (v instanceof Block && v.value2 === "inline") {
-        var m$prime = union1($lazy_collectInlines(896)(v.value4))(m);
+        var m$prime = union1($lazy_collectInlines(903)(v.value4))(m);
         var v1 = head(splitBlockArgs(v.value3).positional);
         if (v1 instanceof Just && (v1.value0 instanceof Lit && v1.value0.value0 instanceof VString)) {
           return insert9(v1.value0.value0.value0)(v.value4)(m$prime);
@@ -18343,7 +18347,7 @@ var $lazy_collectInlines = /* @__PURE__ */ $runtime_lazy7("collectInlines", "Ker
       }
       ;
       if (v instanceof Block) {
-        return union1($lazy_collectInlines(901)(v.value4))(m);
+        return union1($lazy_collectInlines(908)(v.value4))(m);
       }
       ;
       return m;
@@ -18351,7 +18355,7 @@ var $lazy_collectInlines = /* @__PURE__ */ $runtime_lazy7("collectInlines", "Ker
   };
   return foldl6(go)(empty2);
 });
-var collectInlines = /* @__PURE__ */ $lazy_collectInlines(890);
+var collectInlines = /* @__PURE__ */ $lazy_collectInlines(897);
 var canonKey = /* @__PURE__ */ (function() {
   var segKey2 = function(v) {
     if (v instanceof SKey) {
@@ -18364,10 +18368,10 @@ var canonKey = /* @__PURE__ */ (function() {
     ;
     throw new Error("Failed pattern match at Kernel.Schema (line 54, column 12 - line 56, column 18): " + [v.constructor.name]);
   };
-  var $611 = joinWith("");
-  var $612 = map28(segKey2);
-  return function($613) {
-    return $611($612($613));
+  var $619 = joinWith("");
+  var $620 = map28(segKey2);
+  return function($621) {
+    return $619($620($621));
   };
 })();
 var observeScalars = /* @__PURE__ */ (function() {
@@ -18426,7 +18430,7 @@ var refineEnums = function(obs) {
         return new Tuple(v.value0, new Tuple(v.value1.value0, v.value1.value1));
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Schema (line 827, column 37 - line 833, column 41): " + [v.value1.value1.enumTag.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Schema (line 834, column 37 - line 840, column 41): " + [v.value1.value1.enumTag.constructor.name]);
     };
     return fromFoldable22(map28(ref)(toUnfoldable10(cs)));
   };
@@ -18442,8 +18446,8 @@ var buildTy = function(obs) {
     var childrenOf = function(prefix) {
       var n = length(prefix);
       var nextSeg = function(v) {
-        var $482 = eq33(take(n)(v.value0))(prefix) && length(v.value0) > n;
-        if ($482) {
+        var $490 = eq33(take(n)(v.value0))(prefix) && length(v.value0) > n;
+        if ($490) {
           return index(v.value0)(n);
         }
         ;
@@ -18465,21 +18469,21 @@ var buildTy = function(obs) {
           return new TyMap(atPrefix(append18(prefix)([SElem.value])));
         }
         ;
-        var $488 = c.isArray || hasElem;
-        if ($488) {
+        var $496 = c.isArray || hasElem;
+        if ($496) {
           return new TyArray(atPrefix(append18(prefix)([SElem.value])));
         }
         ;
-        var $489 = !$$null(keyKids) || !isEmpty2(c.fields);
-        if ($489) {
+        var $497 = !$$null(keyKids) || !isEmpty2(c.fields);
+        if ($497) {
           return new TyObject(fromFoldable22(map28(function(k) {
             return new Tuple(k, atPrefix(append18(prefix)([new SKey(k)])));
           })(keyKids)));
         }
         ;
         var s = (function() {
-          var $490 = eq42(c.scalar)(SUnknown.value);
-          if ($490) {
+          var $498 = eq42(c.scalar)(SUnknown.value);
+          if ($498) {
             return fromMaybe(SUnknown.value)(lookup11(canonKey(prefix))(obs));
           }
           ;
@@ -18488,7 +18492,7 @@ var buildTy = function(obs) {
         return new TyScalar(s, c.optional);
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Schema (line 593, column 7 - line 611, column 36): " + [c.enumTag.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Schema (line 600, column 7 - line 618, column 36): " + [c.enumTag.constructor.name]);
     };
     return atPrefix([]);
   };
@@ -18513,7 +18517,7 @@ var useExpr = function(sc) {
                 return acc;
               }
               ;
-              throw new Error("Failed pattern match at Kernel.Schema (line 326, column 29 - line 328, column 19): " + [v1.constructor.name]);
+              throw new Error("Failed pattern match at Kernel.Schema (line 333, column 29 - line 335, column 19): " + [v1.constructor.name]);
             };
           };
         };
@@ -18542,7 +18546,7 @@ var useExpr = function(sc) {
                   return useExpr(sc$prime)(acc)(v2.value0.head);
                 }
                 ;
-                throw new Error("Failed pattern match at Kernel.Schema (line 332, column 16 - line 334, column 43): " + [v1.constructor.name]);
+                throw new Error("Failed pattern match at Kernel.Schema (line 339, column 16 - line 341, column 43): " + [v1.constructor.name]);
               })();
               return foldl6(useExpr(sc$prime))(acc1)(v2.value0.tail);
             }
@@ -18551,7 +18555,7 @@ var useExpr = function(sc) {
               return acc;
             }
             ;
-            throw new Error("Failed pattern match at Kernel.Schema (line 329, column 32 - line 337, column 19): " + [v2.constructor.name]);
+            throw new Error("Failed pattern match at Kernel.Schema (line 336, column 32 - line 344, column 19): " + [v2.constructor.name]);
           };
         };
       };
@@ -18633,10 +18637,10 @@ var useExpr = function(sc) {
             return foldl6(useExpr(sc))(acc)(args);
           };
           if (v2 instanceof Just && (v2.value0.head instanceof Lit && v2.value0.head.value0 instanceof VString)) {
-            var $524 = lookup11(v2.value0.head.value0.value0)(sc.partials);
-            if ($524 instanceof Just) {
-              var $525 = !member6(v2.value0.head.value0.value0)(sc.visiting);
-              if ($525) {
+            var $532 = lookup11(v2.value0.head.value0.value0)(sc.partials);
+            if ($532 instanceof Just) {
+              var $533 = !member6(v2.value0.head.value0.value0)(sc.visiting);
+              if ($533) {
                 var ctxCanon = bind11(head(v2.value0.tail))(exprCanon(sc));
                 var sc$prime = {
                   partials: sc.partials,
@@ -18647,7 +18651,7 @@ var useExpr = function(sc) {
                   visiting: insert1(v2.value0.head.value0.value0)(sc.visiting)
                 };
                 var acc1 = foldl6(useExpr(sc))(acc)(v2.value0.tail);
-                return walk(sc$prime)(acc1)($524.value0);
+                return walk(sc$prime)(acc1)($532.value0);
               }
               ;
               return v1(true);
@@ -18677,7 +18681,7 @@ var useExpr = function(sc) {
             return acc;
           }
           ;
-          throw new Error("Failed pattern match at Kernel.Schema (line 339, column 24 - line 347, column 19): " + [v2.constructor.name]);
+          throw new Error("Failed pattern match at Kernel.Schema (line 346, column 24 - line 354, column 19): " + [v2.constructor.name]);
         };
       };
       var coupleAll = function(canons) {
@@ -18695,7 +18699,7 @@ var useExpr = function(sc) {
             return acc;
           }
           ;
-          throw new Error("Failed pattern match at Kernel.Schema (line 320, column 26 - line 322, column 19): " + [v2.constructor.name]);
+          throw new Error("Failed pattern match at Kernel.Schema (line 327, column 26 - line 329, column 19): " + [v2.constructor.name]);
         };
       };
       var compareUse = function(args) {
@@ -18714,7 +18718,7 @@ var useExpr = function(sc) {
             return coupleAll(mapMaybe(exprCanon(sc))(args))(acc1);
           }
           ;
-          throw new Error("Failed pattern match at Kernel.Schema (line 307, column 25 - line 313, column 60): " + [v2.constructor.name]);
+          throw new Error("Failed pattern match at Kernel.Schema (line 314, column 25 - line 320, column 60): " + [v2.constructor.name]);
         };
       };
       if (expr instanceof Lit) {
@@ -18740,7 +18744,7 @@ var useExpr = function(sc) {
           return cs;
         }
         ;
-        throw new Error("Failed pattern match at Kernel.Schema (line 285, column 21 - line 287, column 18): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at Kernel.Schema (line 292, column 21 - line 294, column 18): " + [v.constructor.name]);
       }
       ;
       if (expr instanceof App2 && expr.value1.length === 0) {
@@ -18762,7 +18766,7 @@ var useExpr = function(sc) {
           return cs;
         }
         ;
-        throw new Error("Failed pattern match at Kernel.Schema (line 288, column 15 - line 290, column 18): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at Kernel.Schema (line 295, column 15 - line 297, column 18): " + [v.constructor.name]);
       }
       ;
       if (expr instanceof App2 && expr.value0 === "partial") {
@@ -18804,7 +18808,7 @@ var useExpr = function(sc) {
         ;
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Schema (line 283, column 22 - line 302, column 46): " + [expr.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Schema (line 290, column 22 - line 309, column 46): " + [expr.constructor.name]);
     };
   };
 };
@@ -18830,7 +18834,7 @@ var pinScalar = function(sc) {
           return useExpr(sc)(cs)(e);
         }
         ;
-        throw new Error("Failed pattern match at Kernel.Schema (line 270, column 26 - line 272, column 29): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at Kernel.Schema (line 277, column 26 - line 279, column 29): " + [v.constructor.name]);
       };
     };
   };
@@ -18856,7 +18860,7 @@ var pinArray = function(sc) {
         return useExpr(sc)(cs)(e);
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Schema (line 276, column 20 - line 278, column 29): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Schema (line 283, column 20 - line 285, column 29): " + [v.constructor.name]);
     };
   };
 };
@@ -18887,7 +18891,7 @@ var node = function(sc) {
         return block(sc)(cs)(v.value2)(v.value3)(v.value4);
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Schema (line 391, column 14 - line 397, column 57): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Schema (line 398, column 14 - line 404, column 57): " + [v.constructor.name]);
     };
   };
 };
@@ -18916,7 +18920,7 @@ var markCond = function(sc) {
               return useExpr(sc)(acc)(e);
             }
             ;
-            throw new Error("Failed pattern match at Kernel.Schema (line 486, column 16 - line 488, column 32): " + [v.constructor.name]);
+            throw new Error("Failed pattern match at Kernel.Schema (line 493, column 16 - line 495, column 32): " + [v.constructor.name]);
           };
         };
         return foldl6(step2)(cs)(conds);
@@ -18949,7 +18953,7 @@ var block = function(sc) {
               return walk(sc)(cs)(body);
             }
             ;
-            throw new Error("Failed pattern match at Kernel.Schema (line 439, column 5 - line 447, column 33): " + [v.constructor.name]);
+            throw new Error("Failed pattern match at Kernel.Schema (line 446, column 5 - line 454, column 33): " + [v.constructor.name]);
           };
           var letBlock2 = function(split3) {
             var pairs = hashPairs(split3.hash);
@@ -18993,7 +18997,7 @@ var block = function(sc) {
                   return useExpr(sc)(cs)(v.value0);
                 }
                 ;
-                throw new Error("Failed pattern match at Kernel.Schema (line 424, column 17 - line 426, column 46): " + [collCanon.constructor.name]);
+                throw new Error("Failed pattern match at Kernel.Schema (line 431, column 17 - line 433, column 46): " + [collCanon.constructor.name]);
               })();
               var elemCanon = map112(function(v1) {
                 return append18(v1)([SElem.value]);
@@ -19021,7 +19025,7 @@ var block = function(sc) {
               return walk(sc)(cs)(body);
             }
             ;
-            throw new Error("Failed pattern match at Kernel.Schema (line 419, column 5 - line 437, column 33): " + [v.constructor.name]);
+            throw new Error("Failed pattern match at Kernel.Schema (line 426, column 5 - line 444, column 33): " + [v.constructor.name]);
           };
           var caseBlock2 = function(split3) {
             var variants = whenLiterals(body);
@@ -19044,20 +19048,20 @@ var block = function(sc) {
               return cs1;
             };
             if (subjCanon instanceof Just) {
-              var $601 = unsnoc(subjCanon.value0);
-              if ($601 instanceof Just && $601.value0.last instanceof SKey) {
-                var $602 = last($601.value0.init);
-                if ($602 instanceof Just && $602.value0 instanceof SElem) {
-                  var $603 = !isEmpty2(variants);
-                  if ($603) {
-                    return record($601.value0.init)({
+              var $609 = unsnoc(subjCanon.value0);
+              if ($609 instanceof Just && $609.value0.last instanceof SKey) {
+                var $610 = last($609.value0.init);
+                if ($610 instanceof Just && $610.value0 instanceof SElem) {
+                  var $611 = !isEmpty2(variants);
+                  if ($611) {
+                    return record($609.value0.init)({
                       isArray: emptyC.isArray,
                       isMap: emptyC.isMap,
                       fields: emptyC.fields,
                       scalar: emptyC.scalar,
                       optional: emptyC.optional,
                       coupled: emptyC.coupled,
-                      enumTag: new Just($601.value0.last.value0),
+                      enumTag: new Just($609.value0.last.value0),
                       enumVariants: variants
                     })(cs1);
                   }

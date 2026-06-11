@@ -185,6 +185,13 @@ resolveHead sc name
 exprCanon :: Scope -> Expr -> Maybe Canon
 exprCanon sc = case _ of
   App "lookup" args -> case Array.uncons args of
+    -- a single `this`-rooted key that is shadowed — a `let`/`local` binding or an
+    -- include hash key (ADR-042) — is a binding, not a data field, exactly like the
+    -- bare `{{key}}` head form. So a hash-argument include (`{% include "x" k=v %}`,
+    -- whose body's `{{k}}` desugars to `lookup this "k"`) adds no phantom context
+    -- field, and is AOT-typed from its call-site value alone.
+    Just { head: App "this" [], tail: [ Lit (VString k) ] }
+      | Set.member k sc.shadowed -> Nothing
     Just { head: recv, tail: keys } -> do
       base <- recvCanon recv
       ks <- traverseKeys keys

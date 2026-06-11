@@ -59,6 +59,7 @@
   "partial-simple": "Hello World!",
   "partial-in-each": "<li>a</li><li>b</li>",
   "partial-context": "[Intro]",
+  "include-hash-no-sig": "hi Ada!",
   "inline-sig-default-omitted": "<h3>Hi</h3>",
   "inline-sig-default-provided": "<h3>Hi</h3><b>new</b>",
   "inline-sig-reused": "[a/-][x/y]",

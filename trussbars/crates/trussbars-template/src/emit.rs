@@ -1083,6 +1083,18 @@ fn path(env: &Env, args: &[Expr]) -> Result<String, String> {
         })?;
         return Ok(format!("{pvar}{}", segs(keys)?));
     }
+    // ADR-042 §8: a `this`-rooted lookup of a bound parameter (an include's hash key)
+    // resolves to the bound value, shadowing the context — the AOT mirror of the
+    // oracle's `mergeHash`, so a plain hash-include's body `{{p}}` (a `lookup this "p"`)
+    // emits the argument, not a (now non-existent) `ctx.p` field.
+    if let Expr::App(n, hargs) = head
+        && hargs.is_empty()
+        && n == "this"
+        && let Some((Expr::Lit(Value::Str(k)), rest)) = keys.split_first()
+        && let Some(code) = env.params.get(k)
+    {
+        return Ok(format!("{code}{}", segs(rest)?));
+    }
     let base = emit_expr(env, head)?;
     Ok(format!("{base}{}", segs(keys)?))
 }

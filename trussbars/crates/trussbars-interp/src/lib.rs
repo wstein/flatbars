@@ -748,7 +748,11 @@ fn expand_partial(
     let mut expanding = env.expanding.clone();
     expanding.push(name.to_string());
     let child = Env {
-        this: scope,
+        // ADR-042 §8: an include's hash binds two ways — as scoped `params` (a typed
+        // signature's body `{{p}}` is a scoped reference) AND merged onto the context
+        // (a plain hash-include's body `{{p}}` is a `lookup this "p"`); a hash key
+        // overrides a same-named context field.
+        this: merge_hash(scope, &params),
         root: env.root.clone(),
         params,
         parents: None,
@@ -761,6 +765,24 @@ fn expand_partial(
         helpers: Rc::clone(&env.helpers),
     };
     eval_nodes(&child, body, out)
+}
+
+/// Merge an include's hash onto the partial's context (ADR-042 §8) — a hash key
+/// overrides a same-named context field. With a non-object context the hash *is* the
+/// context (so a plain `{% include "nav" title=… %}` works at top level). Mirrors the
+/// PureScript `partialH`/`mergeHash`.
+fn merge_hash(scope: Value, params: &BTreeMap<String, Value>) -> Value {
+    if params.is_empty() {
+        return scope;
+    }
+    let mut m = match scope {
+        Value::Object(o) => (*o).clone(),
+        _ => BTreeMap::new(),
+    };
+    for (k, v) in params {
+        m.insert(k.clone(), v.clone());
+    }
+    Value::Object(Rc::new(m))
 }
 
 /// Truthiness at a boolean-decision site, under the render's policy (docs/16).
