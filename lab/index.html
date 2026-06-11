@@ -1719,6 +1719,7 @@
       import { renderDataAccess } from "./app/dock/data-access.mjs?v=1";
       import { renderCapabilities } from "./app/dock/capabilities.mjs?v=1";
       import { renderTruthiness } from "./app/dock/truthiness.mjs?v=1";
+      import { renderLint } from "./app/dock/lint.mjs?v=1";
       import { TRANSFORMER_RISK } from "./app/transformer-risk.mjs?v=1";
       import { EditorState, Annotation, StateField, StateEffect, Compartment } from "https://esm.sh/@codemirror/state@6.5.2/es2022/state.mjs";
       import {
@@ -5158,7 +5159,7 @@
             if (!lastLint.ok) return "";
             return lastLint.findings.length ? "warn" : "success";
           },
-          render: renderLint },
+          render: (body) => renderLint(body, lastLint, { openProblem }) },
         // The read-only inspectors (moved here from the Sources pane). They are
         // not analyses with a count — `noBadge` suppresses the badge — and follow
         // the active file / last render (re-rendered by renderDock after each run).
@@ -5360,47 +5361,8 @@
       // takes the analyse cache (lastAnalyse), the suppressed count, and the host
       // pathSchema, plus openProblem (the descriptor above passes them).
 
-      // Lint panel (ADR-019): the deprecated-alias + non-canonical scoped-variable
-      // findings for the active dialect — the same canonicalization the editor
-      // quick-fix and `flatbars lint` surface. Each row is severity + the message
-      // that names the canonical spelling; a clean template is positive evidence.
-      function renderLint(body) {
-        const a = lastLint;
-        const section = makeEl("div", { class: "cv-section" });
-        const plain = (s) => String(s).replace(/`/g, "");
-        if (!a.ok) {
-          section.append(makeEl("div", { class: "cv-empty" },
-            "Lint unavailable: " + (a.error || "the template did not parse.")));
-          body.append(section);
-          return;
-        }
-        const rows = a.findings;
-        section.append(makeEl("div", { class: "cv-head" }, [
-          makeEl("strong", {}, "Lint"),
-          " — ", String(rows.length), " canonicalization finding", rows.length === 1 ? "" : "s",
-        ]));
-        if (rows.length === 0) {
-          section.append(makeEl("div", { class: "cv-empty" },
-            "Every name is canonical — no deprecated aliases or legacy scoped variables."));
-          body.append(section);
-          return;
-        }
-        section.append(makeEl("div", { class: "cv-hint" },
-          "Each finding renders identically today, but a canonical spelling keeps the template portable. The editor quick-fix and flatbars lint steer to it."));
-        const list = makeEl("div", { class: "cv-rows" });
-        for (const f of rows) {
-          const row = makeEl("div", { class: "cv-row" }, [
-            makeEl("span", { class: "cv-kind" }, f.name || f.severity),
-            makeEl("span", { class: "cv-label" }, plain(f.message)),
-            makeEl("span", { class: "cv-where" }, `main:${f.line}:${f.column}`),
-          ]);
-          row.title = "jump to source";
-          row.addEventListener("click", () => openProblem({ file: "main", line: f.line, col: f.column }));
-          list.append(row);
-        }
-        section.append(list);
-        body.append(section);
-      }
+      // Lint panel (ADR-019) now lives in ./app/dock/lint.mjs — it takes the lint
+      // cache (lastLint) and openProblem (the descriptor above passes them).
 
       // Context Inspector: snapshots of the render context at the last-clicked
       // output span, from the engine's `inspect_at` — one card per execution

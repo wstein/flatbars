@@ -61,7 +61,8 @@ instead of re-closing over it.
 | `TRANSFORMER_RISK` (ADR-0013 risk taxonomy) | `app/transformer-risk.mjs` | none | ✅ (shared: Capabilities panel + dock badges) |
 | Dock Panel #5 Capabilities | `app/dock/capabilities.mjs` | 2 caches + stem-allow-list + engineMeta + 3 policy flags | ✅ (both engine branches; DOM-fake tested) |
 | Dock Panel Truthiness (ADR-022) | `app/dock/truthiness.mjs` | lastAnalyse + suppressed + pathSchema + openProblem | ✅ (DOM-fake tested) |
-| Dock Panels Lint + Problems (still inline) | `app/dock/*.mjs` | lastLint / dockProblems | ⛔ (Transformers/Partials already modular) |
+| Dock Panel Lint (ADR-019) | `app/dock/lint.mjs` | lastLint + openProblem | ✅ (DOM-fake tested) |
+| Dock Panel Problems (last inline dock tab) | `app/dock/problems.mjs` | dockProblems + openProblem | ⛔ |
 | Render Config popover (6387) | `app/config-view.mjs` | reads/writes state | ⛔ |
 | Boot (6611) | `app/boot.mjs` | entry point | ⛔ (last) |
 
