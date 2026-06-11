@@ -350,7 +350,12 @@ fn estimate_node(n: &Node) -> usize {
         Node::With(w) => estimate_bytes(&w.body) + estimate_bytes(&w.otherwise),
         Node::Let { body, .. } | Node::PartialBlock { body, .. } => estimate_bytes(body),
         Node::HelperBlock(b) => estimate_bytes(&b.body),
-        Node::Partial { .. } | Node::Inline { .. } => 0,
+        // ADR-040 inheritance nodes are flattened away before emit (`crate::inherit`).
+        Node::Partial { .. }
+        | Node::Inline { .. }
+        | Node::Extends { .. }
+        | Node::Block { .. }
+        | Node::Super { .. } => 0,
     }
 }
 
@@ -422,6 +427,11 @@ fn emit_node_inner(env: &Env, src: &str, n: &Node, out: &mut String) -> Result<(
         Node::With(w) => return with_block(env, src, w, out),
         Node::Let { bindings, body, .. } => return let_block(env, src, bindings, body, out),
         Node::HelperBlock(b) => return helper_block(env, src, b, out),
+        // ADR-040 inheritance nodes are flattened away by `crate::inherit` before emit;
+        // reaching one here would be an internal error (a stray `{% super %}`, say).
+        Node::Extends { .. } | Node::Block { .. } | Node::Super { .. } => {
+            return Err("internal: unresolved inheritance node reached the emitter".to_string());
+        }
     }
     Ok(())
 }

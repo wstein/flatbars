@@ -20005,7 +20005,9 @@ var inferMaxData = function(samples) {
     return bind14(lmap4(function($11) {
       return show16(head2($11));
     })(parseWith(maxOptions)(src)))(function(parsed) {
-      return pure13(inferTemplateData(samples)(desugarSurfaceWith(maxLoopVars)(renameSurfaceHeads(parsed.nodes))));
+      return bind14(lmap4(show16)(resolveInheritance(parsed.nodes)))(function(inherited) {
+        return pure13(inferTemplateData(samples)(desugarSurfaceWith(maxLoopVars)(renameSurfaceHeads(inherited))));
+      });
     });
   };
 };
@@ -20013,7 +20015,9 @@ var inferMax = function(src) {
   return bind14(lmap4(function($12) {
     return show16(head2($12));
   })(parseWith(maxOptions)(src)))(function(parsed) {
-    return pure13(inferTemplate(desugarSurfaceWith(maxLoopVars)(renameSurfaceHeads(parsed.nodes))));
+    return bind14(lmap4(show16)(resolveInheritance(parsed.nodes)))(function(inherited) {
+      return pure13(inferTemplate(desugarSurfaceWith(maxLoopVars)(renameSurfaceHeads(inherited))));
+    });
   });
 };
 var compileMaxJsWith = function(partials) {

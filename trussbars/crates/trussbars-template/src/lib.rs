@@ -31,6 +31,7 @@ extern crate alloc;
 pub mod ast;
 #[cfg(feature = "std")]
 pub mod emit;
+pub mod inherit;
 pub mod lex;
 pub mod parse;
 pub mod parse_expr;

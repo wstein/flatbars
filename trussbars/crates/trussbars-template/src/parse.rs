@@ -35,7 +35,9 @@ pub fn parse(src: &str) -> Result<Vec<Node>, ParseError> {
     let scope = Scope::new();
     let (nodes, stop) = p.parse_until(&scope)?;
     match stop {
-        Stop::Eof => Ok(nodes),
+        // ADR-040: flatten `{% extends %}`/`{% block %}`/`{% super %}` into a plain tree
+        // before the emitter/VM ever see it (`crate::inherit`).
+        Stop::Eof => crate::inherit::resolve_inheritance(nodes),
         Stop::Close(name) => err(format!("unexpected `{{% end{name} %}}` (no open block)"), 0),
         Stop::Else | Stop::ElseIf(_) => {
             err("unexpected `{% else %}` outside a block".to_string(), 0)
@@ -57,7 +59,8 @@ fn err<T>(message: impl Into<String>, at: usize) -> Result<T, ParseError> {
 /// The built-in block heads `open_block` dispatches — reserved, so a host cannot declare a
 /// block helper with one of these names (docs/12 §5.2). Keep in sync with `open_block`.
 pub const RESERVED_BLOCK_HEADS: &[&str] = &[
-    "if", "unless", "for", "scope", "local", "case", "inline", "partial", "yield",
+    "if", "unless", "for", "scope", "local", "case", "inline", "partial", "yield", "block",
+    "extends", "super",
 ];
 
 /// What stopped a body scan.
@@ -223,6 +226,17 @@ impl Blocks<'_> {
                     return err("`{% yield %}` takes no arguments", span.start);
                 }
                 Ok(Node::Yield { span })
+            }
+            // ADR-040 inheritance, all consumed by the `inherit` flatten pass:
+            // `{% block name %}…{% endblock %}` (a named slot), `{% extends "base" %}`
+            // (a block-less directive), and `{% super %}` (a block-less parent splice).
+            "block" => self.block_def(span, rest, scope),
+            "extends" => self.extends_directive(span, rest),
+            "super" => {
+                if !rest.trim().is_empty() {
+                    return err("`{% super %}` takes no arguments", span.start);
+                }
+                Ok(Node::Super { span })
             }
             // Any other head is a *host block helper* (docs/09): parse it meaning-free
             // into a generic node; the emitter/VM resolve it against the allow-list.
@@ -477,6 +491,38 @@ impl Blocks<'_> {
         let (body, stop) = self.parse_until(scope)?;
         expect_close(&stop, "inline", span.start)?;
         Ok(Node::Inline { span, name, body })
+    }
+
+    /// `{% block name %}…{% endblock %}` (ADR-040) — a named inheritance slot. The name is
+    /// a bare identifier; the body is the default (base) or override (child).
+    fn block_def(
+        &mut self,
+        span: crate::span::Span,
+        rest: &str,
+        scope: &Scope,
+    ) -> Result<Node, ParseError> {
+        let (name, _) = split_head(rest);
+        if name.is_empty() {
+            return err("`{% block %}` needs a name", span.start);
+        }
+        let name = name.to_string();
+        let (body, stop) = self.parse_until(scope)?;
+        expect_close(&stop, "block", span.start)?;
+        Ok(Node::Block { span, name, body })
+    }
+
+    /// `{% extends "base" %}` (ADR-040) — a block-less inheritance directive (a quoted base
+    /// name). No body: it is the first node of a child template.
+    fn extends_directive(
+        &mut self,
+        span: crate::span::Span,
+        rest: &str,
+    ) -> Result<Node, ParseError> {
+        let (name, _) = read_string_literal(rest.trim_start()).ok_or_else(|| ParseError {
+            message: "`{% extends %}` needs a quoted base name".into(),
+            at: span.start,
+        })?;
+        Ok(Node::Extends { span, name })
     }
 
     fn partial_block(
@@ -1151,6 +1197,43 @@ mod tests {
     fn two_word_else_if_is_rejected() {
         // The two-word `else if` sugar is gone — only `{% elif %}` chains (PURE grammar).
         assert!(parse("{% if a %}A{% else if b %}B{% endif %}").is_err());
+    }
+
+    // ADR-040 template inheritance: `parse` flattens `{% extends %}`/`{% block %}`/
+    // `{% super %}` into a plain tree (`crate::inherit`). These assert the rendered text.
+    fn top_text(nodes: &[Node]) -> String {
+        nodes
+            .iter()
+            .filter_map(|n| match n {
+                Node::Text(s) => Some(s.as_str()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn inheritance_single_level_fills_blocks() {
+        let t = "{% inline \"base\" %}<h>{% block t %}D{% endblock %}</h><b>{% block c %}{% endblock %}</b>{% endinline %}{% extends \"base\" %}{% block c %}Hi{% endblock %}";
+        // override `c`, inherit the `t` default → the inline def is kept (hoisted later).
+        assert_eq!(top_text(&parse(t).unwrap()), "<h>D</h><b>Hi</b>");
+    }
+
+    #[test]
+    fn inheritance_super_splices_parent() {
+        let t = "{% inline \"b\" %}{% block t %}Base{% endblock %}{% endinline %}{% extends \"b\" %}{% block t %}[{% super %}]{% endblock %}";
+        assert_eq!(top_text(&parse(t).unwrap()), "[Base]");
+    }
+
+    #[test]
+    fn inheritance_multilevel_leaf_wins() {
+        let t = "{% inline \"base\" %}<b>{% block c %}base{% endblock %}</b>{% endinline %}{% inline \"mid\" %}{% extends \"base\" %}{% block c %}mid{% endblock %}{% endinline %}{% extends \"mid\" %}{% block c %}leaf{% endblock %}";
+        assert_eq!(top_text(&parse(t).unwrap()), "<b>leaf</b>");
+    }
+
+    #[test]
+    fn inheritance_rejects_stray_child_content_and_unknown_base() {
+        assert!(parse("{% extends \"b\" %}oops{% block t %}x{% endblock %}").is_err());
+        assert!(parse("{% extends \"ghost\" %}{% block t %}x{% endblock %}").is_err());
     }
 
     #[test]

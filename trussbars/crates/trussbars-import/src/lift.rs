@@ -405,6 +405,26 @@ fn print_node(n: &Node, notes: &Notes, out: &mut String) {
             out.push_str("{{{{/raw}}}}");
         }
         Node::HelperBlock(b) => print_helper_block(b, notes, out),
+        // ADR-040 inheritance nodes are flattened away by `parse`, so they never reach the
+        // importer in practice; print them faithfully for round-trip safety.
+        Node::Extends { span, name } => {
+            emit_notes(*span, notes, out);
+            out.push_str("{% extends ");
+            quote(name, out);
+            out.push_str(" %}");
+        }
+        Node::Block { span, name, body } => {
+            emit_notes(*span, notes, out);
+            out.push_str("{% block ");
+            out.push_str(name);
+            out.push_str(" %}");
+            print_nodes(body, notes, out);
+            out.push_str("{% endblock %}");
+        }
+        Node::Super { span } => {
+            emit_notes(*span, notes, out);
+            out.push_str("{% super %}");
+        }
     }
 }
 

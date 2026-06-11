@@ -179,6 +179,30 @@ pub enum Node {
         /// The verbatim body text.
         body: String,
     },
+    /// `{% extends "base" %}` — ADR-040 inheritance directive. Consumed (and removed) by
+    /// the `inherit` flatten pass; never reaches the emitter or VM.
+    Extends {
+        /// The tag span.
+        span: Span,
+        /// The base template name (a string literal).
+        name: String,
+    },
+    /// `{% block name %}…{% endblock %}` — ADR-040 named inheritance slot (a default body
+    /// in a base, an override body in a child). Flattened away by the `inherit` pass.
+    Block {
+        /// The tag span.
+        span: Span,
+        /// The block name (a bare identifier).
+        name: String,
+        /// The default (base) / override (child) body.
+        body: Vec<Node>,
+    },
+    /// `{% super %}` — ADR-040 parent-block-body splice inside an override. Flattened away
+    /// by the `inherit` pass.
+    Super {
+        /// The tag span.
+        span: Span,
+    },
     /// `{% name args… %}body{% endname %}` — a host **block** helper (docs/09). The parser is
     /// meaning-free: any block head that is not a built-in becomes this, and the emitter /
     /// VM resolve `head` against the declared allow-list (an undeclared head is a located
@@ -212,7 +236,10 @@ impl Node {
             | Node::Inline { span, .. }
             | Node::PartialBlock { span, .. }
             | Node::Yield { span }
-            | Node::RawBlock { span, .. } => *span,
+            | Node::RawBlock { span, .. }
+            | Node::Extends { span, .. }
+            | Node::Block { span, .. }
+            | Node::Super { span } => *span,
             Node::For(e) => e.span,
             Node::Cond(c) => c.span,
             Node::Case(c) => c.span,

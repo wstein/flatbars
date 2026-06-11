@@ -25,7 +25,7 @@ module MaxBars
 
 import Prelude
 
-import ClassicBars (LoopVars, desugarSurfaceWith, inspectSurfaceDiagWith, nonEmpty, renameSurfaceHeads, renderSurfaceDiagWith, renderSurfaceMappedDiagWith, renderSurfaceWithHelpersWith)
+import ClassicBars (LoopVars, desugarSurfaceWith, inspectSurfaceDiagWith, nonEmpty, renameSurfaceHeads, renderSurfaceDiagWith, renderSurfaceMappedDiagWith, renderSurfaceWithHelpersWith, resolveInheritance)
 import ClassicBars.Compile (compileSurfaceWith, compileSurfaceWithPartials)
 import ClassicBars.Surface (noLoopVars, reservedScope)
 import Data.Array.NonEmpty as NEA
@@ -108,7 +108,9 @@ renderMax = renderSurfaceDiagWith false maxLoopVars maxOptions nonEmpty
 inferMax :: String -> Either String InferResult
 inferMax src = do
   parsed <- lmap (show <<< NEA.head) (parseWith maxOptions src)
-  pure (inferTemplate (desugarSurfaceWith maxLoopVars (renameSurfaceHeads parsed.nodes)))
+  -- ADR-040: infer over the flattened template, so block bodies' fields are seen.
+  inherited <- lmap show (resolveInheritance parsed.nodes)
+  pure (inferTemplate (desugarSurfaceWith maxLoopVars (renameSurfaceHeads inherited)))
 
 -- | `inferMax` refined by sample data (docs/03 §2): under-determined scalars
 -- | (a bare `{{x}}` defaulted to `String`) are pinned to the type the samples
@@ -116,8 +118,9 @@ inferMax src = do
 inferMaxData :: Array Value -> String -> Either String InferResult
 inferMaxData samples src = do
   parsed <- lmap (show <<< NEA.head) (parseWith maxOptions src)
+  inherited <- lmap show (resolveInheritance parsed.nodes)
   pure
-    (inferTemplateData samples (desugarSurfaceWith maxLoopVars (renameSurfaceHeads parsed.nodes)))
+    (inferTemplateData samples (desugarSurfaceWith maxLoopVars (renameSurfaceHeads inherited)))
 
 -- | Render MaxBars source with a set of named *external* (host-threaded) partials,
 -- | each given as MaxBars surface source — the MaxBars twin of

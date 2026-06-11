@@ -600,6 +600,11 @@ fn eval_node(env: &Env, n: &Node, out: &mut String) -> Result<(), String> {
                 }
             }
         }
+        // ADR-040 inheritance nodes are flattened away by `trussbars_template::inherit`
+        // before the VM runs; reaching one here would be an internal error.
+        Node::Extends { .. } | Node::Block { .. } | Node::Super { .. } => {
+            return Err("internal: unresolved inheritance node reached the VM".into());
+        }
     }
     Ok(())
 }

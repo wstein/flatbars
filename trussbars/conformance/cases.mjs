@@ -322,6 +322,27 @@ export const cases = [
     data: { section: { title: "Intro" } },
   },
 
+  // ── template inheritance (ADR-040: {% extends %}/{% block %}/{% super %}) ─────
+  // Statically flattened in both the interpreter and the emitter/VM, so byte-identical.
+  {
+    id: "inherit-override-default",
+    template:
+      '{% inline "base" %}<h>{% block t %}Site{% endblock %}</h><b>{% block c %}{% endblock %}</b>{% endinline %}{% extends "base" %}{% block c %}Hi {{name}}{% endblock %}',
+    data: { name: "Ada" },
+  },
+  {
+    id: "inherit-super",
+    template:
+      '{% inline "base" %}{% block t %}Base{% endblock %}{% endinline %}{% extends "base" %}{% block t %}[{% super %}]{% endblock %}',
+    data: {},
+  },
+  {
+    id: "inherit-multilevel",
+    template:
+      '{% inline "base" %}<b>{% block c %}base{% endblock %}</b>{% endinline %}{% inline "mid" %}{% extends "base" %}{% block c %}mid{% endblock %}{% endinline %}{% extends "mid" %}{% block c %}leaf{% endblock %}',
+    data: {},
+  },
+
   // ── labelled loop (outer) + the pluck key-path helper ────────────────────────
   {
     id: "outer-label",
