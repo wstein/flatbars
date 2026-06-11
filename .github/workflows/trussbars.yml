@@ -184,6 +184,9 @@ jobs:
   # the recipe can't rot (cargo fetches its crates.io deps; cached by its Cargo.lock).
   # `truthiness` = the selectable-policy reference (docs/16): AOT `truss!(truthiness=…)`,
   # the VM `with_truthiness`, and a host-defined policy over a foreign type — all asserted.
+  # `vm-hotreload` = the VM hot-reload northstar (docs/24): `Program::compile_with_partials`
+  # re-reads + recompiles cross-file `.truss` templates from disk in a running process, so an
+  # edit changes the output with no Rust rebuild (the runtime-template capability the AOT lacks).
   examples:
     runs-on: ubuntu-latest
     strategy:
@@ -191,7 +194,7 @@ jobs:
       # cancel the others — report every example's status in a single run.
       fail-fast: false
       matrix:
-        example: [blog, changelog, lab, i18n-data, i18n-fluent, truthiness]
+        example: [blog, changelog, lab, i18n-data, i18n-fluent, truthiness, vm-hotreload]
     defaults:
       run:
         working-directory: trussbars/examples/${{ matrix.example }}

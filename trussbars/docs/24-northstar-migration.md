@@ -129,6 +129,12 @@ single templates. This is the enabling piece for the VM hot-reload / user-editab
 northstar — a live site renders many files dynamically, which only the compile-time path could do
 before.
 
+`trussbars/examples/vm-hotreload/` is the runnable proof: a `Reloader` re-reads + recompiles a
+`layout.truss` base + a `page.truss` that `{% extends %}` it on every render via
+`Program::compile_with_partials`, and the demo (`cargo run`) edits the page, then the shared base,
+in a *running* process — the output gains a tagline, then a footer, with no Rust rebuild. CI-gated
+in the `examples` matrix.
+
 ## Non-goals (for the proof)
 
 - Full Zola/Tera feature parity (every filter, `get_url`, shortcodes) — port what the theme

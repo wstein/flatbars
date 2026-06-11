@@ -1,0 +1,22 @@
+[package]
+name = "vm-hotreload-example"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Own workspace, independent of the trussbars/ workspace (like the other examples).
+[workspace]
+
+[lib]
+name = "trussbars_vm_hotreload"
+
+[[bin]]
+name = "vm-hotreload"
+path = "src/main.rs"
+
+[dependencies]
+# The bytecode VM — this demo recompiles templates from disk in a *running* process
+# (`Program::compile_with_partials`), which the compile-time AOT path structurally can't.
+trussbars-vm = { path = "../../crates/trussbars-vm" }
+# The dynamic data `Value` the VM renders against.
+trussbars-interp = { path = "../../crates/trussbars-interp" }

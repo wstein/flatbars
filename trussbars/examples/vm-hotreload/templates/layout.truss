@@ -1,0 +1,8 @@
+<!DOCTYPE html>
+<html>
+<head><title>{% block title %}{{ site }}{% endblock %}</title></head>
+<body>
+<header>{{ site }}</header>
+{% block body %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,8 @@
+{% extends "layout" %}
+{% block title %}{{ title }} · {{ site }}{% endblock %}
+{% block body %}
+<h1>{{ title }}</h1>
+<ul>
+{% for post in posts %}<li>{{ post.name }}</li>
+{% endfor %}</ul>
+{% endblock %}
