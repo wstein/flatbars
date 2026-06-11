@@ -363,6 +363,18 @@ impl Env {
     pub fn bind(&mut self, name: &str, value: Value) {
         self.params.insert(name.to_string(), value);
     }
+
+    /// The current `this` — borrowed, for the VM's zero-clone path fast-op (docs/11 §4.3).
+    #[must_use]
+    pub fn this(&self) -> &Value {
+        &self.this
+    }
+
+    /// The render's top-level `root` data — borrowed (the VM path fast-op).
+    #[must_use]
+    pub fn root_value(&self) -> &Value {
+        &self.root
+    }
 }
 
 type HostHelper = Box<dyn Fn(&[Value]) -> Result<Value, String>>;

@@ -40,13 +40,26 @@ use alloc::vec::Vec;
 use core::cell::Cell;
 
 use trussbars_interp::{Env, Helpers, TruthMode, Value, eval_expr, eval_nodes, hoist, write_escaped};
-use trussbars_template::{Expr, Node, parse};
+use trussbars_template::{Expr, Node, Value as Lit, parse};
+
+/// Where a fast-path resolves from: the current `this`, or the render `root`. Fixed at
+/// **compile** time (a name, never data) — the injection boundary the project rests on.
+#[derive(Clone, Copy)]
+enum Base {
+    /// The current iteration's `this` (or `root` outside any loop).
+    This,
+    /// The render's top-level data.
+    Root,
+}
 
 /// A VM instruction. Jump targets are absolute instruction indices. The straight-line
 /// structure (text, output, the `if`/`each` jump skeleton) is bytecode; expression values
 /// come from the shared `trussbars_interp::eval_expr` against the live [`Env`], and the
 /// less-common blocks delegate to `eval_nodes` — so the operator / helper / collection-op
-/// catalog stays single-sourced (docs/11 §4.3).
+/// catalog stays single-sourced (docs/11 §4.3). The `*Path` ops are the perf
+/// specialization: a `this`/`root`-rooted field path resolves to a borrowed `&Value` and
+/// writes it straight to the buffer — **zero clones, no shared-eval dispatch** — for the
+/// dominant `{{this}}` / `{{this.field}}` hot case.
 enum Op {
     /// `out.push_str(literal)`.
     Text(Rc<str>),
@@ -54,6 +67,16 @@ enum Op {
     Out {
         /// The output expression (evaluated against the current `Env`).
         expr: Expr,
+        /// Write raw instead of HTML-escaped.
+        raw: bool,
+    },
+    /// Fast output: borrow-resolve `base`.`keys` (a `this`/`root` field path) and write the
+    /// leaf directly — no `Value` clone, no `eval_expr` dispatch.
+    OutPath {
+        /// Where the path starts.
+        base: Base,
+        /// The string field keys from `base` (empty → `base` itself).
+        keys: Box<[Rc<str>]>,
         /// Write raw instead of HTML-escaped.
         raw: bool,
     },
@@ -65,6 +88,16 @@ enum Op {
         /// Negate the truthiness test (`{% unless %}`).
         negate: bool,
         /// Jump here when the (negated) test is false.
+        target: usize,
+    },
+    /// Fast condition: borrow-resolve `base`.`keys`; if falsy (or missing), jump to
+    /// `target`. The zero-clone form of a non-negated `{% if path %}`.
+    JumpUnlessPath {
+        /// Where the path starts.
+        base: Base,
+        /// The string field keys.
+        keys: Box<[Rc<str>]>,
+        /// Jump here when the value is falsy / missing.
         target: usize,
     },
     /// Unconditional jump — skips the remaining arms of a conditional / the `{% else %}` of
@@ -213,6 +246,23 @@ impl Program {
                         write_escaped(&v, &mut out);
                     }
                 }
+                Op::OutPath { base, keys, raw } => {
+                    if let Some(v) = resolve_path(envs.last().unwrap(), *base, keys) {
+                        if *raw {
+                            v.raw_text(&mut out);
+                        } else {
+                            write_escaped(v, &mut out);
+                        }
+                    }
+                }
+                Op::JumpUnlessPath { base, keys, target } => {
+                    let falsy = resolve_path(envs.last().unwrap(), *base, keys)
+                        .is_none_or(|v| !v.truthy_in(mode));
+                    if falsy {
+                        pc = *target;
+                        continue;
+                    }
+                }
                 Op::JumpUnless {
                     cond,
                     negate,
@@ -293,6 +343,23 @@ impl Program {
     }
 }
 
+/// Borrow-resolve a `this`/`root` field path to a leaf `&Value` — the perf fast-op. Lenient
+/// (a missing key / non-object segment → `None`, written as empty / treated as falsy,
+/// matching the interpreter's `navigate_ref`). **Zero clones.**
+fn resolve_path<'a>(env: &'a Env, base: Base, keys: &[Rc<str>]) -> Option<&'a Value> {
+    let mut v = match base {
+        Base::This => env.this(),
+        Base::Root => env.root_value(),
+    };
+    for k in keys {
+        match v {
+            Value::Object(o) => v = o.get(&**k)?,
+            _ => return None,
+        }
+    }
+    Some(v)
+}
+
 // ── compiler (AST → bytecode) ─────────────────────────────────────────────────
 
 fn compile_nodes(nodes: &[Node], ops: &mut Vec<Op>) {
@@ -304,42 +371,94 @@ fn compile_nodes(nodes: &[Node], ops: &mut Vec<Op>) {
 /// Patch a jump op's target to `to`.
 fn patch(ops: &mut [Op], at: usize, to: usize) {
     match &mut ops[at] {
-        Op::JumpUnless { target, .. } | Op::Jump(target) | Op::EachStart { empty: target, .. } => {
+        Op::JumpUnless { target, .. }
+        | Op::JumpUnlessPath { target, .. }
+        | Op::Jump(target)
+        | Op::EachStart { empty: target, .. } => {
             *target = to;
         }
         _ => unreachable!("patching a non-jump op"),
     }
 }
 
+/// Classify an expression as a fast `this`/`root` field path (all-string keys), or `None`
+/// for anything that needs the shared `eval_expr` (operators, helpers, literals, scope
+/// params, `loop.*`, parent chains, numeric/computed indices). Mirrors `resolve_path`.
+fn classify_path(e: &Expr) -> Option<(Base, Box<[Rc<str>]>)> {
+    let Expr::App(name, args) = e else {
+        return None;
+    };
+    let head_base = |h: &Expr| match h {
+        Expr::App(n, a) if a.is_empty() && n == "this" => Some(Base::This),
+        Expr::App(n, a) if a.is_empty() && n == "root" => Some(Base::Root),
+        _ => None,
+    };
+    match (name.as_str(), args.as_slice()) {
+        ("this", []) => Some((Base::This, Box::new([]))),
+        ("root", []) => Some((Base::Root, Box::new([]))),
+        ("lookup", [head, rest @ ..]) => {
+            let base = head_base(head)?;
+            let mut keys: Vec<Rc<str>> = Vec::with_capacity(rest.len());
+            for k in rest {
+                match k {
+                    Expr::Lit(Lit::Str(s)) => keys.push(Rc::from(s.as_str())),
+                    _ => return None, // a computed / numeric key → the general path
+                }
+            }
+            Some((base, keys.into_boxed_slice()))
+        }
+        _ => None,
+    }
+}
+
+/// Push a conditional jump for `cond`, preferring the borrow-based `JumpUnlessPath` fast-op
+/// for a non-negated `this`/`root` path; returns the op's index (to patch its target).
+fn push_jump_unless(ops: &mut Vec<Op>, cond: &Expr, negate: bool) -> usize {
+    let at = ops.len();
+    if !negate
+        && let Some((base, keys)) = classify_path(cond)
+    {
+        ops.push(Op::JumpUnlessPath {
+            base,
+            keys,
+            target: 0,
+        });
+    } else {
+        ops.push(Op::JumpUnless {
+            cond: cond.clone(),
+            negate,
+            target: 0,
+        });
+    }
+    at
+}
+
 fn compile_node(n: &Node, ops: &mut Vec<Op>) {
     match n {
         Node::Text(s) => ops.push(Op::Text(Rc::from(s.as_str()))),
-        Node::Output { expr, raw, .. } => ops.push(Op::Out {
-            expr: expr.clone(),
-            raw: *raw,
-        }),
+        Node::Output { expr, raw, .. } => match classify_path(expr) {
+            Some((base, keys)) => ops.push(Op::OutPath {
+                base,
+                keys,
+                raw: *raw,
+            }),
+            None => ops.push(Op::Out {
+                expr: expr.clone(),
+                raw: *raw,
+            }),
+        },
         // `if`/`unless` cond body, `{% elif %}` arms, `{% else %}`. Each arm jumps to the
         // end after its body; a failed test falls to the next arm.
         Node::Cond(c) => {
             let mut to_end: Vec<usize> = Vec::new();
-            let j = ops.len();
-            ops.push(Op::JumpUnless {
-                cond: c.cond.clone(),
-                negate: c.negated,
-                target: 0,
-            });
+            let j = push_jump_unless(ops, &c.cond, c.negated);
             compile_nodes(&c.body, ops);
             to_end.push(ops.len());
             ops.push(Op::Jump(0));
             let next = ops.len();
             patch(ops, j, next);
             for (econd, ebody) in &c.elifs {
-                let je = ops.len();
-                ops.push(Op::JumpUnless {
-                    cond: econd.clone(),
-                    negate: false,
-                    target: 0,
-                });
+                let je = push_jump_unless(ops, econd, false);
                 compile_nodes(ebody, ops);
                 to_end.push(ops.len());
                 ops.push(Op::Jump(0));
