@@ -1,0 +1,33 @@
+[package]
+name = "trussbars-interp"
+description = "The Trussbars interpreter backend: a dynamic-Value tree-walk interpreter for MaxBars, reusing the trussbars-template front-end. Serves dynamic/runtime templates; docs/11. no_std-capable (alloc) so it can ship to embedded/WASM."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+keywords = ["template", "maxbars", "interpreter", "dynamic"]
+categories = ["template-engine"]
+
+[dependencies]
+# Front-end + runtime, no_std-capable (their `std` is turned on by ours below).
+trussbars-template = { path = "../trussbars-template", default-features = false }
+trussbars-core = { path = "../trussbars-core", default-features = false }
+# `no_std` f64 floor (identical to `f64::floor`; used by the `round` helper).
+libm = "0.2"
+# Used only by the `truss-interp` dev CLI (JSON data → Value); the library is JSON-agnostic.
+serde_json = { version = "1", optional = true }
+
+[features]
+default = ["std"]
+# `std` pulls the dev-CLI JSON dep and turns on the dependencies' std + the ECMA-f64
+# `perf` formatter (so the std interpreter is byte-identical to the oracle).
+# `--no-default-features` is the `no_std` + `alloc` build (f64 falls back to `Display`,
+# the documented divergence).
+std = ["serde_json", "trussbars-core/std", "trussbars-core/perf", "trussbars-template/std"]
+
+[[bin]]
+name = "truss-interp"
+required-features = ["std"]
+
+[lints]
+workspace = true

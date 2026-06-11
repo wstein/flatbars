@@ -1,32 +1,28 @@
 [package]
 name = "trussbars-vm"
-description = "The Trussbars VM backend (spike): a dynamic-Value tree-walk interpreter for MaxBars, reusing the trussbars-template front-end. Serves dynamic/runtime templates; docs/11. no_std-capable (alloc) so the VM can ship to embedded/WASM."
+description = "The Trussbars bytecode VM: compiles the dynamic MaxBars subset to a flat instruction array run by a borrow-based machine — the optimization path of docs/11 §4, ~2× the tree-walk interpreter (trussbars-interp) where it covers. Shares trussbars-interp's Value and render helpers so output stays byte-identical."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-keywords = ["template", "maxbars", "interpreter", "vm"]
+keywords = ["template", "maxbars", "vm", "bytecode"]
 categories = ["template-engine"]
 
 [dependencies]
-# Front-end + runtime, no_std-capable (their `std` is turned on by ours below).
+# Reuses the interpreter's dynamic `Value` and render helpers (so the two dynamic
+# backends are byte-identical), and the shared front-end. Both no_std-capable.
+trussbars-interp = { path = "../trussbars-interp", default-features = false }
 trussbars-template = { path = "../trussbars-template", default-features = false }
-trussbars-core = { path = "../trussbars-core", default-features = false }
-# `no_std` f64 floor (identical to `f64::floor`; used by the `round` helper).
-libm = "0.2"
-# Used only by the `truss-vm` dev CLI (JSON data → Value); the library is JSON-agnostic.
-serde_json = { version = "1", optional = true }
 
 [features]
 default = ["std"]
-# `std` pulls the dev-CLI JSON dep and turns on the dependencies' std + the ECMA-f64
-# `perf` formatter (so the std VM is byte-identical to the oracle). `--no-default-features`
-# is the `no_std` + `alloc` build (f64 falls back to `Display`, the documented divergence).
-std = ["serde_json", "trussbars-core/std", "trussbars-core/perf", "trussbars-template/std"]
+# `std` turns on the dependencies' std (incl. the ECMA-f64 `perf` formatter), so the std
+# VM is byte-identical to the oracle. `--no-default-features` is the `no_std` + `alloc`
+# build (f64 falls back to `Display`, the documented divergence carried from the interp).
+std = ["trussbars-interp/std", "trussbars-template/std"]
 
-[[bin]]
-name = "truss-vm"
-required-features = ["std"]
+[dev-dependencies]
+trussbars-interp = { path = "../trussbars-interp" }
 
 [lints]
 workspace = true

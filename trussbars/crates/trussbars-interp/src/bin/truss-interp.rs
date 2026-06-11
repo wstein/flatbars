@@ -1,4 +1,4 @@
-//! `truss-vm` — a thin dev/test CLI over [`trussbars_vm::render`].
+//! `truss-interp` — a thin dev/test CLI over [`trussbars_interp::render`].
 //!
 //! Reads a JSON object `{ "template": "<src>", "data": <json> }` from stdin and prints
 //! the rendered output to stdout. On a parse error or an unimplemented construct it
@@ -14,7 +14,7 @@ use std::process::exit;
 use std::rc::Rc;
 
 use serde_json::Value as Json;
-use trussbars_vm::{Template, TruthMode, Value};
+use trussbars_interp::{Template, TruthMode, Value};
 
 fn main() {
     let mut input = String::new();
@@ -64,8 +64,8 @@ fn truthiness_arg() -> Result<TruthMode, String> {
     }
 }
 
-/// `serde_json::Value` → the VM's dynamic [`Value`] (numbers collapse to f64, like the
-/// rest of the engine).
+/// `serde_json::Value` → the interpreter's dynamic [`Value`] (numbers collapse to f64,
+/// like the rest of the engine).
 fn from_json(j: &Json) -> Value {
     match j {
         Json::Null => Value::Null,

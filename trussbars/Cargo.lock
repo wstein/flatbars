@@ -604,6 +604,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "trussbars-interp"
+version = "0.1.0"
+dependencies = [
+ "libm",
+ "serde_json",
+ "trussbars-core",
+ "trussbars-template",
+]
+
+[[package]]
 name = "trussbars-macros"
 version = "0.1.0"
 dependencies = [
@@ -628,9 +638,7 @@ version = "0.1.0"
 name = "trussbars-vm"
 version = "0.1.0"
 dependencies = [
- "libm",
- "serde_json",
- "trussbars-core",
+ "trussbars-interp",
  "trussbars-template",
 ]
 
