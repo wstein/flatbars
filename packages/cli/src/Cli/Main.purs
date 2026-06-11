@@ -35,7 +35,8 @@ import FlatBars.Lexer (defaultLexConfig)
 import FlatBars.Value (Value(..))
 import Kernel.Walk (Severity, validate)
 import Linter.Aliases (aliasWarnings, scopedCanonWarnings)
-import MaxBars (maxOptions, maxbarsWarnings)
+import MaxBars (maxbarsWarnings)
+import MaxBars.Parser as MaxBarsP
 import MinBars (renderMinCompat, renderMinDelimsCompatDiag, renderMinDelimsDiag, renderMinDiag, renderMinWith) as MinBars
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync (readTextFile, readdir)
@@ -457,12 +458,13 @@ runLint args
               Left err -> die ("flatbars lint: cannot read template '" <> tplPath <> "': " <> err)
               Right tpl ->
                 let
-                  popts =
-                    if a.surface then defaultParseOptions
-                    else if a.maxbars then maxOptions
-                    else coreOptions
+                  -- MaxBars owns its parser (ADR-041); the others route through the shared one.
+                  parseDialect =
+                    if a.surface then parseWith defaultParseOptions
+                    else if a.maxbars then MaxBarsP.parse
+                    else parseWith coreOptions
                 in
-                  case parseWith popts tpl of
+                  case parseDialect tpl of
                     Left pes -> die
                       ("flatbars lint: " <> tplPath <> ":" <> renderParseErrorsAt tpl pes)
                     Right { nodes } ->

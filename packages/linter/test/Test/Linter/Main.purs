@@ -30,7 +30,8 @@ import FlatBars.Value (Value(..))
 import Kernel.Lower (RNode(..), lower)
 import Linter.Lower (lowerToRawBars)
 import Linter.Migrate (migrateToMaxBars)
-import MaxBars (maxLoopVars, maxOptions, renderMax)
+import MaxBars (maxLoopVars, renderMax)
+import MaxBars.Parser as MBP
 import RawBars as RawBars
 import Test.Assert (assert')
 import Test.Linter.Aliases as Aliases
@@ -39,7 +40,7 @@ import Test.Linter.Migrate as Migrate
 
 -- | The desugared MaxBars source as the reference real AST.
 maxAst :: String -> Either String (Array RNode)
-maxAst src = case parseWith maxOptions src of
+maxAst src = case MBP.parse src of
   Left e -> Left ("MaxBars parse failed: " <> show e)
   Right { nodes } -> Right (lower (desugarSurfaceWith maxLoopVars nodes))
 

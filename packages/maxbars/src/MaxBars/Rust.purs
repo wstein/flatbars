@@ -66,12 +66,12 @@ import Data.String (Pattern(..), Replacement(..), joinWith, replaceAll, split, t
 import Data.String.CodeUnits as SCU
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import FlatBars.Parser (parseWith)
 import FlatBars.Span (Span, spanText)
 import FlatBars.Syntax (Expr(..), Ident, Node(..), Template, splitBlockArgs)
 import FlatBars.Value (Value(..))
 import Kernel.Walk (Clause, splitClauses)
-import MaxBars (maxLoopVars, maxOptions)
+import MaxBars (maxLoopVars)
+import MaxBars.Parser as Parser
 
 -- | The emit context threaded through the walk: the Rust binding holding the
 -- | current context (`this`), the current loop binding (if inside an `each`),
@@ -139,7 +139,7 @@ compileWith commented externalSrcs file ctxType src = case build of
   where
   build :: Either String String
   build = do
-    parsed <- lmap (show <<< NEA.head) (parseWith maxOptions src)
+    parsed <- lmap (show <<< NEA.head) (Parser.parse src)
     -- ADR-040: flatten `{% extends %}`/`{% block %}`/`{% super %}` before desugar, exactly
     -- as the interpreter does, so the emitted Rust matches the oracle.
     inherited <- lmap show (resolveInheritance parsed.nodes)
@@ -163,7 +163,7 @@ compileWith commented externalSrcs file ctxType src = case build of
   -- A named external partial: parse + desugar its body into the registry form.
   compilePartial :: Tuple String String -> Either String (Tuple String Template)
   compilePartial (Tuple name s) = do
-    p <- lmap (show <<< NEA.head) (parseWith maxOptions s)
+    p <- lmap (show <<< NEA.head) (Parser.parse s)
     Right (Tuple name (desugarSurfaceWith maxLoopVars (renameSurfaceHeads p.nodes)))
 
   initialEnv :: Map String Template -> Env

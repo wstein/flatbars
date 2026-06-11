@@ -1,14 +1,14 @@
 -- | **MaxBars** — the top tier of the dialect ladder (RawBars ⊂ ClassicBars ⊂
 -- | MaxBars). It is ClassicBars plus a richer *surface*: infix operators and pipes
--- | (`MaxBars.Expr`). Because that surface desugars to the same core `Expr` that
--- | ClassicBars already understands, MaxBars reuses ClassicBars wholesale by
--- | dependency — the engine, prelude, value policy, surface desugar, and the
--- | compiler — swapping only the interior expression grammar through the
--- | `ParseOptions.parseExpr` seam. (A shared semantic *kernel* is extracted
--- | lazily, only for proven overlaps; see the project notes.)
+-- | (`MaxBars.Expr`). MaxBars owns its front-end — `MaxBars.Lexer` + `MaxBars.Parser`
+-- | (ADR-041) — but its surface desugars to the same core `Expr` ClassicBars already
+-- | understands, so it reuses ClassicBars's *semantic* stack wholesale by dependency:
+-- | the engine, prelude, value policy, surface desugar, and the compiler. The render/
+-- | compile/inspect entry points pass `maxSurfaceParse` (the owned parser) into the
+-- | shared surface orchestration. (A shared semantic *kernel* is extracted lazily,
+-- | only for proven overlaps; see the project notes.)
 module MaxBars
-  ( maxOptions
-  , maxLoopVars
+  ( maxLoopVars
   , renderMax
   , renderMaxWithPartials
   , renderMaxMapped
@@ -33,9 +33,6 @@ import Data.Bifunctor (lmap)
 import Data.Either (Either)
 import Data.Tuple (Tuple)
 import FlatBars.Error (Error, ParseError)
-import FlatBars.Lexer (defaultLexConfig)
-import FlatBars.Parser (ParseOptions, defaultParseOptions)
-import FlatBars.Token (infixOperatorChars)
 import FlatBars.Value (Value)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv)
@@ -43,47 +40,8 @@ import Kernel.Inspect (Snapshot, Target)
 import Kernel.Provenance (Segment)
 import Kernel.Schema (InferResult, inferTemplate, inferTemplateData)
 import Kernel.Walk (Issue)
-import MaxBars.Expr (parseMaxExpr, parseMaxHead)
 import MaxBars.Lint (booleanInOutputWarnings, labelShadowWarnings)
 import MaxBars.Parser as Parser
-
--- | Parse options for the MaxBars dialect: the default front-end knobs
--- | (standalone trimming, …) with the interior grammar swapped for
--- | `MaxBars.Expr` (infix operators + pipes), and the Handlebars-only tag shapes
--- | (`{{{{…}}}}`, `{{^…}}`, `{{&…}}`) rejected (`extras` off) — MaxBars is not the
--- | Handlebars-compatibility dialect.
-maxOptions :: ParseOptions
-maxOptions =
-  defaultParseOptions
-    { parseExpr = parseMaxExpr
-    , parseHead = parseMaxHead
-    , extras = false
-    -- `{{when}}` is a clause separator of `{{#case}}` (like `else`/`elif` of `if`), so
-    -- its standalone lines are trimmed too (docs/12). `case` desugars to the `if`
-    -- skeleton in `ClassicBars.Surface`, before the clause split ever sees a `when`.
-    , standaloneSeps = [ "else", "elif", "when" ]
-    -- inline partials in MaxBars use the bare `{{#inline}}` form (the old model);
-    -- the `{{#*}}` decorator and `{{#>}}` partial block stay gated off.
-    , decorators = false
-    , partialBlocks = false
-    -- like RawBars, MaxBars uses the FlatBars `{{{{#name}}}}` raw-block spelling,
-    -- not the Handlebars bare `{{{{name}}}}` form.
-    , rawBlockHbs = false
-    , rawBlockHash = true
-    -- the infix-operator alphabet plus the `..` range operator (MaxBars only;
-    -- `../` parent-paths are already gone here, so `..` is free — ADR-021) and the
-    -- `[…]`/`{k: v}` collection literals.
-    , lexOptions =
-        { operatorChars: infixOperatorChars, rangeOperator: true, collectionLiterals: true }
-    -- Django-style `{% … %}` statement tags (docs-19): control flow / separators move
-    -- to `{% %}`, with `{{ }}` for output. Enabled additively here (the `{{ }}` forms
-    -- still parse); the breaking "reject the old `{{#…}}`" hardening is a follow-up.
-    , lexConfig = defaultLexConfig { statementTags = true, bracesOutputOnly = true }
-    -- Set delimiters are NOT enabled (per ADR-015 amendment): `{{=<% %>=}}` is
-    -- a Mustache feature reserved for MinBars. RawBars / MaxBars / ClassicBars all
-    -- reject it so the dialect ladder has one consistent answer to "does
-    -- delimiter switching work here?" — yes only on the Mustache surface.
-    }
 
 -- | MaxBars' surface variable resolver (ADR-021). There are *no bare loop
 -- | variables*: a bare `{{first}}`/`{{index0}}` is an ordinary data field. Loop
@@ -98,8 +56,7 @@ maxLoopVars = reservedScope noLoopVars
 -- | MaxBars' front-end for the shared surface orchestration (ADR-041 Phase 3): the
 -- | owned `MaxBars.Parser.parse` plus the two baked structural flags (statement tags
 -- | on, Handlebars partial-blocks off). The render/compile/inspect entry points pass
--- | this in place of `surfaceParseOf maxOptions`, so MaxBars no longer routes through
--- | the shared `FlatBars.Parser`.
+-- | this so MaxBars no longer routes through the shared `FlatBars.Parser` at all.
 maxSurfaceParse :: SurfaceParse
 maxSurfaceParse = { parse: Parser.parse, statementTags: true, partialBlocks: false }
 
@@ -169,7 +126,7 @@ inspectMaxWith = inspectSurfaceDiagWith false maxLoopVars maxSurfaceParse nonEmp
 
 -- | Render MaxBars source with host-registered *operations* (ADR-019 addendum) —
 -- | the same `renderSurfaceWithHelpersWith` path ClassicBars uses, over MaxBars' own
--- | surface (`maxLoopVars` / `maxOptions`). A block operation gets the full surface:
+-- | surface (`maxLoopVars` / `maxSurfaceParse`). A block operation gets the full surface:
 -- | `options.hash`, `options.fn(ctx, { data, blockParams })`, and `options.inverse`.
 -- | Block params (`as |a b|`) parse because the MaxBars head grammar omits the pipe
 -- | rung (a bar in head position is the block-param delimiter); pipe a block

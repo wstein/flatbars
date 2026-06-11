@@ -88,7 +88,7 @@ import FlatBars.Highlight (HSpan, HighlightConfig, TSpan, highlightSpans, tokeni
 import FlatBars.Json (fromJson, toJson)
 import FlatBars.Lexer (defaultLexConfig)
 import FlatBars.Span (Span, lineColumn, spanText)
-import FlatBars.Token (defaultLexOptions)
+import FlatBars.Token (defaultLexOptions, infixOperatorChars)
 import FlatBars.Value (Value(..))
 import Foreign.Object as FO
 import Kernel.Analyse (Finding, PathSchema) as Analyse
@@ -100,8 +100,9 @@ import Kernel.Schema (InferResult)
 import Kernel.Walk (Severity)
 import Linter.Aliases (aliasWarnings, scopedCanonWarnings)
 import Linter.Migrate (migrateToMaxBars)
-import MaxBars (maxLoopVars, maxOptions)
+import MaxBars (maxLoopVars)
 import MaxBars as MaxBars
+import MaxBars.Parser as MaxParser
 import MinBars as MinBars
 import MinBars.Analyse as MinAnalyse
 import MinBars.Inspect as MinInspect
@@ -209,12 +210,13 @@ lint :: Fn2 String String LintResult
 lint = mkFn2 \tpl dialect ->
   let
     surface = dialect == "classicbars"
-    opts = case dialect of
-      "maxbars" -> maxOptions
-      "classicbars" -> defaultParseOptions
-      _ -> RawBars.coreOptions
+    -- MaxBars owns its parser (ADR-041); the others route through the shared one.
+    parseDialect = case dialect of
+      "maxbars" -> MaxParser.parse
+      "classicbars" -> parseWith defaultParseOptions
+      _ -> parseWith RawBars.coreOptions
   in
-    case parseWith opts tpl of
+    case parseDialect tpl of
       Left pes -> { ok: false, findings: [], report: "", error: renderParseErrorsAt tpl pes }
       Right { nodes } ->
         let
@@ -775,13 +777,14 @@ tokenize = mkFn2 \tpl dialect -> Highlight.tokenizeSpans (highlightConfig dialec
 diagnostics :: Fn2 String String (Array ParseDiagnostic)
 diagnostics = mkFn2 \src dialect ->
   let
-    opts = case dialect of
-      "maxbars" -> maxOptions
-      "minbars" -> MinBars.minOptions
-      "rawbars" -> RawBars.coreOptions
-      _ -> defaultParseOptions -- classicbars (parsed with the default options)
+    -- MaxBars owns its recovering parser (ADR-041); the others route through the shared one.
+    recover = case dialect of
+      "maxbars" -> MaxParser.parseRecovering
+      "minbars" -> parseRecovering MinBars.minOptions
+      "rawbars" -> parseRecovering RawBars.coreOptions
+      _ -> parseRecovering defaultParseOptions -- classicbars (the default options)
   in
-    map (parseErrorAt src) (parseRecovering opts src).errors
+    map (parseErrorAt src) (recover src).errors
 
 -- | Map a dialect name to its highlight seams, mirroring each dialect's own parse
 -- | settings (the single source of truth — drift is caught by `check:highlight`):
@@ -798,9 +801,15 @@ diagnostics = mkFn2 \src dialect ->
 highlightConfig :: String -> Highlight.HighlightConfig
 highlightConfig = case _ of
   "maxbars" ->
-    { lexConfig: maxOptions.lexConfig { keepLongComments = true }
-    , clauseSeps: maxOptions.standaloneSeps
-    , lexOptions: maxOptions.lexOptions
+    -- MaxBars's baked lex config, inlined (ADR-041 — no `maxOptions` dependency): output-only
+    -- `{{ }}` (`bracesOutputOnly`), `{% %}` statement tags, the infix / `..` / `[…]`·`{k:v}`
+    -- interior lexer, and the `else`/`elif`/`when` clause markers. Highlighting still runs the
+    -- shared `tokenizeSpans`; only the parser is MaxBars-owned.
+    { lexConfig:
+        defaultLexConfig { statementTags = true, bracesOutputOnly = true, keepLongComments = true }
+    , clauseSeps: [ "else", "elif", "when" ]
+    , lexOptions:
+        { operatorChars: infixOperatorChars, rangeOperator: true, collectionLiterals: true }
     , extras: false
     , inheritance: false
     , rawBlockHbs: false
@@ -871,12 +880,13 @@ astJson = mkFn2 \dialect src ->
     -- each dialect parses with its own gates — the same mapping `diagnostics` uses
     -- (Lab vocabulary: "core" = RawBars, "surface" = ClassicBars), so the AST view and
     -- the Problems panel agree (gated by check:parse-views).
-    opts = case dialect of
-      "maxbars" -> maxOptions
-      "core" -> RawBars.coreOptions
-      "minbars" -> MinBars.minOptions
-      _ -> defaultParseOptions
-    r = parseRecovering opts src
+    -- MaxBars owns its recovering parser (ADR-041); the others route through the shared one.
+    recover = case dialect of
+      "maxbars" -> MaxParser.parseRecovering
+      "core" -> parseRecovering RawBars.coreOptions
+      "minbars" -> parseRecovering MinBars.minOptions
+      _ -> parseRecovering defaultParseOptions
+    r = recover src
     -- `core` is the austere syntax (no desugar); `surface` and `maxbars` desugar
     -- (MaxBars adds bare loop variables via `maxLoopVars`). MinBars lowers Mustache
     -- sections/partials to its own operation calls (`section`/`inverted`/`mlookup`/

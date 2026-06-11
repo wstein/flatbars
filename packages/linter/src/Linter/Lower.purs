@@ -27,10 +27,10 @@ import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import FlatBars.Error (ParseError(..))
-import FlatBars.Parser (parseWith)
 import FlatBars.Syntax (Node(..), Sigil(..), Template)
 import Linter.Print (printDirectives, printRawBars)
-import MaxBars (maxLoopVars, maxOptions)
+import MaxBars (maxLoopVars)
+import MaxBars.Parser as MBP
 
 -- | Lower MaxBars source to RawBars (core) source. Header `@`-directives are
 -- | carried forward verbatim (source fidelity); truthiness no longer needs
@@ -39,7 +39,7 @@ import MaxBars (maxLoopVars, maxOptions)
 -- | is reported as a located internal error.
 lowerToRawBars :: String -> Either ParseError String
 lowerToRawBars src = do
-  { directives, nodes } <- lmap NEA.head (parseWith maxOptions src)
+  { directives, nodes } <- lmap NEA.head (MBP.parse src)
   -- `renameSurfaceHeads`: the MaxBars surface keywords `for`/`scope` → their canonical
   -- operation heads `each`/`with` (ADR-039) — RawBars (the lowering target) uses the
   -- op-name heads, so a `{% for %}` must print as `{% each %}`.
