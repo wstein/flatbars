@@ -25,7 +25,7 @@ module MaxBars
 
 import Prelude
 
-import ClassicBars (LoopVars, desugarSurfaceWith, inspectSurfaceDiagWith, nonEmpty, renameSurfaceHeads, renderSurfaceDiagWith, renderSurfaceMappedDiagWith, renderSurfaceWithHelpersWith, resolveInheritance)
+import ClassicBars (LoopVars, SurfaceParse, desugarSurfaceWith, inspectSurfaceDiagWith, nonEmpty, renameSurfaceHeads, renderSurfaceDiagWith, renderSurfaceMappedDiagWith, renderSurfaceWithHelpersWith, resolveInheritance)
 import ClassicBars.Compile (compileSurfaceWith, compileSurfaceWithPartials)
 import ClassicBars.Surface (noLoopVars, reservedScope)
 import Data.Array.NonEmpty as NEA
@@ -95,11 +95,19 @@ maxOptions =
 maxLoopVars :: LoopVars
 maxLoopVars = reservedScope noLoopVars
 
+-- | MaxBars' front-end for the shared surface orchestration (ADR-041 Phase 3): the
+-- | owned `MaxBars.Parser.parse` plus the two baked structural flags (statement tags
+-- | on, Handlebars partial-blocks off). The render/compile/inspect entry points pass
+-- | this in place of `surfaceParseOf maxOptions`, so MaxBars no longer routes through
+-- | the shared `FlatBars.Parser`.
+maxSurfaceParse :: SurfaceParse
+maxSurfaceParse = { parse: Parser.parse, statementTags: true, partialBlocks: false }
+
 -- | Render MaxBars surface source against data, reusing ClassicBars' surface
 -- | pipeline (desugar → hoist → engine) with located errors and MaxBars' bare
 -- | loop variables.
 renderMax :: String -> Value -> Either String String
-renderMax = renderSurfaceDiagWith false maxLoopVars maxOptions nonEmpty
+renderMax = renderSurfaceDiagWith false maxLoopVars maxSurfaceParse nonEmpty
 
 -- | Infer a candidate Rust context type from a MaxBars template (Trussbars
 -- | docs/03, L1 template-symbolic). Parses + desugars to the core AST, then runs
@@ -143,7 +151,7 @@ renderMaxMappedWith
   -> String
   -> Value
   -> Either String { output :: String, segments :: Array Segment }
-renderMaxMappedWith = renderSurfaceMappedDiagWith false maxLoopVars maxOptions nonEmpty
+renderMaxMappedWith = renderSurfaceMappedDiagWith false maxLoopVars maxSurfaceParse nonEmpty
 
 -- | Context Inspector for MaxBars (ADR-035) — the MaxBars twin of
 -- | `inspectSurfaceWith`, snapshotting the render context at a source span.
@@ -157,7 +165,7 @@ inspectMaxWith
   -> String
   -> Value
   -> Either String (Array Snapshot)
-inspectMaxWith = inspectSurfaceDiagWith false maxLoopVars maxOptions nonEmpty
+inspectMaxWith = inspectSurfaceDiagWith false maxLoopVars maxSurfaceParse nonEmpty
 
 -- | Render MaxBars source with host-registered *operations* (ADR-019 addendum) —
 -- | the same `renderSurfaceWithHelpersWith` path ClassicBars uses, over MaxBars' own
@@ -173,13 +181,13 @@ renderWithOperations
   -> String
   -> Value
   -> Either String String
-renderWithOperations = renderSurfaceWithHelpersWith false maxLoopVars maxOptions nonEmpty
+renderWithOperations = renderSurfaceWithHelpersWith false maxLoopVars maxSurfaceParse nonEmpty
 
 -- | Compile MaxBars surface source to a JS ES module, reusing the ClassicBars
 -- | compiler (`FlatBars.Compile`) — infix/pipe and loop vars desugar to the same
 -- | core helpers the emit rules already handle.
 compileMaxJs :: String -> Either ParseError String
-compileMaxJs = compileSurfaceWith false maxLoopVars maxOptions "rt.truthyNonEmpty"
+compileMaxJs = compileSurfaceWith false maxLoopVars maxSurfaceParse "rt.truthyNonEmpty"
 
 -- | `compileMaxJs` with a set of named *external* partials (each MaxBars surface
 -- | source), folded into the compiled module's partial registry alongside the
@@ -188,7 +196,7 @@ compileMaxJs = compileSurfaceWith false maxLoopVars maxOptions "rt.truthyNonEmpt
 -- | `{{> name}}` (gated by `test:compile`).
 compileMaxJsWith :: Array (Tuple String String) -> String -> Either ParseError String
 compileMaxJsWith partials =
-  compileSurfaceWithPartials false maxLoopVars maxOptions "rt.truthyNonEmpty" partials
+  compileSurfaceWithPartials false maxLoopVars maxSurfaceParse "rt.truthyNonEmpty" partials
 
 -- | The MaxBars source warnings (schema-less *warn-always* tier). Parses `src`,
 -- | desugars, then runs the dialect lints (see `MaxBars.Lint`); a parse error

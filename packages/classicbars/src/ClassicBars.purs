@@ -16,6 +16,8 @@ module ClassicBars
   , module Kernel.Inherit
   , module ClassicBars.Surface
   , surfaceClauses
+  , SurfaceParse
+  , surfaceParseOf
   , checkSurfaceStrict
   , checkBraceControl
   , desugarSurface
@@ -42,6 +44,7 @@ import Prelude
 
 import ClassicBars.Surface (LoopVars, desugar, desugarWith, eachLoopViolation, elseIfViolation, maxbarsEachAsViolation, noLoopVars, renameSurfaceHeads, retiredLetViolation, strictSurfaceViolation, withReRootViolation)
 import Data.Array as Array
+import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as NEA
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..), either)
@@ -53,7 +56,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import FlatBars.Error (Error, ParseError(..), renderParseErrorAt, renderParseErrorsAt)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parse, parseWith)
-import FlatBars.Syntax (Ident, Template)
+import FlatBars.Syntax (Directive, Ident, Template)
 import FlatBars.Value (Value)
 import Kernel.Analyse (Finding, PathSchema, allFindings, anyPath, evaluatedCount, handlebarsLabels, jsonataScaffold, reportMarkdown, runAnalysis)
 import Kernel.CaseSugar (braceControlViolation, caseLeadingViolation)
@@ -85,14 +88,37 @@ desugarSurface = desugar surfaceClauses
 desugarSurfaceWith :: LoopVars -> Template -> Template
 desugarSurfaceWith lv = desugarWith lv surfaceClauses
 
+-- | The surface orchestration's view of a dialect's front-end: how to *parse* (the
+-- | `String → Template` edge — ClassicBars passes `parseWith` over its options, MaxBars
+-- | passes its owned `MaxBars.parse`, ADR-041) plus the two structural flags the
+-- | desugar/validation read. Threading this instead of the whole `ParseOptions` lets a
+-- | dialect that owns its parser keep the shared render/compile path without routing
+-- | through `FlatBars.Parser`.
+type SurfaceParse =
+  { parse ::
+      String
+      -> Either (NonEmptyArray ParseError) { directives :: Array Directive, nodes :: Template }
+  , statementTags :: Boolean
+  , partialBlocks :: Boolean
+  }
+
+-- | The `ParseOptions`-driven `SurfaceParse` — the adapter for callers still on the
+-- | shared parser (ClassicBars's own entries, the CLI's per-dialect options).
+surfaceParseOf :: ParseOptions -> SurfaceParse
+surfaceParseOf opts =
+  { parse: parseWith opts
+  , statementTags: opts.lexConfig.statementTags
+  , partialBlocks: opts.partialBlocks
+  }
+
 -- | Desugar for the statementTags path: lift `{% set %}` to a `{% local %}` over its
--- | sibling tail (docs-17) first, then desugar. Gated on `opts.lexConfig.statementTags`
--- | so ClassicBars (off) leaves a bare `{{set}}` output untouched. The MaxBars render/
--- | compile entry points use this in place of `desugarSurfaceWith`.
-desugarStmt :: ParseOptions -> LoopVars -> Template -> Template
-desugarStmt opts lv nodes =
+-- | sibling tail (docs-17) first, then desugar. Gated on `statementTags` so ClassicBars
+-- | (off) leaves a bare `{{set}}` output untouched. The MaxBars render/compile entry
+-- | points use this in place of `desugarSurfaceWith`.
+desugarStmt :: Boolean -> LoopVars -> Template -> Template
+desugarStmt statementTags lv nodes =
   desugarSurfaceWith lv
-    (if opts.lexConfig.statementTags then renameSurfaceHeads (liftSet nodes) else nodes)
+    (if statementTags then renameSurfaceHeads (liftSet nodes) else nodes)
 
 -- | Reject each dialect's disallowed *surface* shapes (the `strict` flag is the
 -- | ClassicBars/MaxBars distinction the render paths already thread), reported as a
@@ -200,34 +226,35 @@ renderSurfaceMappedWith
   -> String
   -> Value
   -> Either String { output :: String, segments :: Array Segment }
-renderSurfaceMappedWith = renderSurfaceMappedDiagWith true noLoopVars defaultParseOptions handlebars
+renderSurfaceMappedWith =
+  renderSurfaceMappedDiagWith true noLoopVars (surfaceParseOf defaultParseOptions) handlebars
 
 -- | The mapped twin of `renderSurfaceDiagWith`, parameterised by dialect: the
--- | bare-`{{#inline}}` strictness, the `LoopVars` resolver, the parse options, and
--- | the truthiness rule. ClassicBars passes the surface defaults; MaxBars passes its
--- | own (`maxLoopVars` / `maxOptions` / `nonEmpty`). Returns the output plus a
--- | tiling source map (located parse/render errors as `Left`).
+-- | bare-`{{#inline}}` strictness, the `LoopVars` resolver, the `SurfaceParse`
+-- | front-end, and the truthiness rule. ClassicBars passes the surface defaults;
+-- | MaxBars passes its own (`maxLoopVars` / `MaxBars.parse` / `nonEmpty`). Returns the
+-- | output plus a tiling source map (located parse/render errors as `Left`).
 renderSurfaceMappedDiagWith
   :: Boolean
   -> LoopVars
-  -> ParseOptions
+  -> SurfaceParse
   -> Truthy
   -> Array (Tuple String String)
   -> String
   -> Value
   -> Either String { output :: String, segments :: Array Segment }
-renderSurfaceMappedDiagWith strict lv opts truthy partialSrcs src dat =
+renderSurfaceMappedDiagWith strict lv sp truthy partialSrcs src dat =
   case traverse compilePartial partialSrcs of
     Left e -> Left e
-    Right ps -> case parseWith opts src of
+    Right ps -> case sp.parse src of
       Left pes -> Left (renderParseErrorsAt src pes)
       Right { nodes }
         | Left e <- checkSurfaceStrict strict nodes -> Left (renderParseErrorAt src e)
-        | opts.lexConfig.statementTags, Left e <- checkBraceControl src nodes -> Left
+        | sp.statementTags, Left e <- checkBraceControl src nodes -> Left
             (renderParseErrorAt src e)
       Right { nodes } ->
         let
-          { partials: inlineP, template } = hoistInline (desugarStmt opts lv nodes)
+          { partials: inlineP, template } = hoistInline (desugarStmt sp.statementTags lv nodes)
           externalT = Map.fromFoldable (map (\p -> Tuple p.name p.template) ps)
           -- inline partials index "main" (where they are defined); externals index
           -- their own source — the file dimension of the source map (ADR-035).
@@ -236,14 +263,14 @@ renderSurfaceMappedDiagWith strict lv opts truthy partialSrcs src dat =
           setup =
             registerPartialFiles partialFiles
               <<< withTruthy truthy
-              <<< withYieldName (if opts.partialBlocks then "partial-block" else "yield")
+              <<< withYieldName (if sp.partialBlocks then "partial-block" else "yield")
               <<< registerPartials (Map.union inlineP externalT)
         in
           lmap (formatError src) (runResolvedLenientMapped setup template dat)
   where
-  compilePartial (Tuple name s) = case parseWith opts s of
+  compilePartial (Tuple name s) = case sp.parse s of
     Left pes -> Left (renderParseErrorsAt s pes)
-    Right { nodes } -> Right { name, template: desugarStmt opts lv nodes }
+    Right { nodes } -> Right { name, template: desugarStmt sp.statementTags lv nodes }
 
 -- | Context Inspector (ADR-035): snapshot the render context at the source span
 -- | `target` (an output run's provenance) — one snapshot per execution of the
@@ -255,47 +282,48 @@ inspectSurfaceWith
   -> String
   -> Value
   -> Either String (Array Snapshot)
-inspectSurfaceWith = inspectSurfaceDiagWith true noLoopVars defaultParseOptions handlebars
+inspectSurfaceWith =
+  inspectSurfaceDiagWith true noLoopVars (surfaceParseOf defaultParseOptions) handlebars
 
 -- | The dialect-parameterised Context Inspector (the inspect twin of
 -- | `renderSurfaceMappedDiagWith`): MaxBars reuses it with its own loop variables,
--- | parse options, and truthiness rule.
+-- | `SurfaceParse` front-end, and truthiness rule.
 inspectSurfaceDiagWith
   :: Boolean
   -> LoopVars
-  -> ParseOptions
+  -> SurfaceParse
   -> Truthy
   -> Target
   -> Array (Tuple String String)
   -> String
   -> Value
   -> Either String (Array Snapshot)
-inspectSurfaceDiagWith strict lv opts truthy target partialSrcs src dat =
+inspectSurfaceDiagWith strict lv sp truthy target partialSrcs src dat =
   case traverse compilePartial partialSrcs of
     Left e -> Left e
-    Right ps -> case parseWith opts src of
+    Right ps -> case sp.parse src of
       Left pes -> Left (renderParseErrorsAt src pes)
       Right { nodes }
         | Left e <- checkSurfaceStrict strict nodes -> Left (renderParseErrorAt src e)
-        | opts.lexConfig.statementTags, Left e <- checkBraceControl src nodes -> Left
+        | sp.statementTags, Left e <- checkBraceControl src nodes -> Left
             (renderParseErrorAt src e)
       Right { nodes } ->
         let
-          { partials: inlineP, template } = hoistInline (desugarStmt opts lv nodes)
+          { partials: inlineP, template } = hoistInline (desugarStmt sp.statementTags lv nodes)
           externalT = Map.fromFoldable (map (\p -> Tuple p.name p.template) ps)
           partialFiles = Map.union (map (const "main") inlineP)
             (Map.fromFoldable (map (\p -> Tuple p.name p.name) ps))
           setup =
             registerPartialFiles partialFiles
               <<< withTruthy truthy
-              <<< withYieldName (if opts.partialBlocks then "partial-block" else "yield")
+              <<< withYieldName (if sp.partialBlocks then "partial-block" else "yield")
               <<< registerPartials (Map.union inlineP externalT)
         in
           lmap (formatError src) (inspectResolvedLenient setup target template dat)
   where
-  compilePartial (Tuple name s) = case parseWith opts s of
+  compilePartial (Tuple name s) = case sp.parse s of
     Left pes -> Left (renderParseErrorsAt s pes)
-    Right { nodes } -> Right { name, template: desugarStmt opts lv nodes }
+    Right { nodes } -> Right { name, template: desugarStmt sp.statementTags lv nodes }
 
 -- | `renderSurfaceWith` plus host-registered inline helpers (ADR-018): each
 -- | `(name, helper)` is registered into the env alongside the prelude and the
@@ -309,44 +337,44 @@ renderSurfaceWithHelpers
   -> String
   -> Value
   -> Either String String
-renderSurfaceWithHelpers = renderSurfaceWithHelpersWith true noLoopVars defaultParseOptions
-  handlebars
+renderSurfaceWithHelpers =
+  renderSurfaceWithHelpersWith true noLoopVars (surfaceParseOf defaultParseOptions) handlebars
 
 -- | `renderSurfaceWithHelpers` parameterised by the dialect's `LoopVars` and
--- | `ParseOptions`, so MaxBars (`renderWithOperations`, ADR-019 addendum) registers
+-- | `SurfaceParse`, so MaxBars (`renderWithOperations`, ADR-019 addendum) registers
 -- | host operations over *its* surface (infix/pipes/loop vars). ClassicBars is the
--- | `noLoopVars` / `defaultParseOptions` specialisation above. The leading
--- | `strict` flag gates the bare-`{{#inline}}` rejection (`checkSurfaceStrict`):
--- | `true` for ClassicBars/CLI, `false` for MaxBars.
+-- | `noLoopVars` / `surfaceParseOf defaultParseOptions` specialisation above. The
+-- | leading `strict` flag gates the bare-`{{#inline}}` rejection
+-- | (`checkSurfaceStrict`): `true` for ClassicBars/CLI, `false` for MaxBars.
 renderSurfaceWithHelpersWith
   :: Boolean
   -> LoopVars
-  -> ParseOptions
+  -> SurfaceParse
   -> Truthy
   -> Array (Tuple String (Operation (Either Error) (RefEnv (Either Error))))
   -> Array (Tuple String String)
   -> String
   -> Value
   -> Either String String
-renderSurfaceWithHelpersWith strict lv opts truthy helpers partialSrcs src dat =
+renderSurfaceWithHelpersWith strict lv sp truthy helpers partialSrcs src dat =
   case traverse compilePartial partialSrcs of
     Left e -> Left e
-    Right ps -> case parseWith opts src of
+    Right ps -> case sp.parse src of
       Left pes -> Left (renderParseErrorsAt src pes)
       Right { nodes }
         | Left e <- checkSurfaceStrict strict nodes -> Left (renderParseErrorAt src e)
-        | opts.lexConfig.statementTags, Left e <- checkBraceControl src nodes -> Left
+        | sp.statementTags, Left e <- checkBraceControl src nodes -> Left
             (renderParseErrorAt src e)
       Right { directives, nodes } ->
         let
-          { partials: inlineP, template } = hoistInline (desugarStmt opts lv nodes)
+          { partials: inlineP, template } = hoistInline (desugarStmt sp.statementTags lv nodes)
           externalT = Map.fromFoldable (map (\p -> Tuple p.name p.template) ps)
           setup =
             withTruthy truthy
               -- ADR-005 amendment: the dialect that accepts Handlebars `{{#> }}`
-              -- block partials (`opts.partialBlocks` — ClassicBars) exposes the body as
+              -- block partials (`sp.partialBlocks` — ClassicBars) exposes the body as
               -- `partial-block`; the others (MaxBars, reusing this path) use `yield`.
-              <<< withYieldName (if opts.partialBlocks then "partial-block" else "yield")
+              <<< withYieldName (if sp.partialBlocks then "partial-block" else "yield")
               <<< registerAll helpers
               <<< registerPartials (Map.union inlineP externalT)
         in
@@ -355,45 +383,46 @@ renderSurfaceWithHelpersWith strict lv opts truthy helpers partialSrcs src dat =
             Right out -> Right out
   where
   -- mirrors `renderSurfaceWith.compilePartial`, but locates the error and uses the
-  -- dialect's parse options + loop-var desugar.
-  compilePartial (Tuple name s) = case parseWith opts s of
+  -- dialect's `SurfaceParse` + loop-var desugar.
+  compilePartial (Tuple name s) = case sp.parse s of
     Left es -> Left (renderParseErrorsAt s es)
-    Right { nodes } -> Right { name, template: desugarStmt opts lv nodes }
+    Right { nodes } -> Right { name, template: desugarStmt sp.statementTags lv nodes }
 
 -- | `renderSurface` with located parse-error messages (`formatError`): a parse
 -- | failure reports `line:column`, an eval failure keeps its `show` form.
 renderSurfaceDiag :: String -> Value -> Either String String
-renderSurfaceDiag = renderSurfaceDiagWith true noLoopVars defaultParseOptions handlebars
+renderSurfaceDiag =
+  renderSurfaceDiagWith true noLoopVars (surfaceParseOf defaultParseOptions) handlebars
 
--- | `renderSurfaceDiag` with explicit parse options and a dialect `LoopVars`
--- | resolver (the CLI/config + dialect path; ClassicBars passes `noLoopVars`,
--- | MaxBars its loop-variable map). The leading `strict` flag gates the
+-- | `renderSurfaceDiag` with an explicit `SurfaceParse` front-end and a dialect
+-- | `LoopVars` resolver (the CLI/config + dialect path; ClassicBars passes
+-- | `noLoopVars`, MaxBars its loop-variable map). The leading `strict` flag gates the
 -- | bare-`{{#inline}}` rejection: `true` for ClassicBars/CLI, `false` for MaxBars.
 renderSurfaceDiagWith
-  :: Boolean -> LoopVars -> ParseOptions -> Truthy -> String -> Value -> Either String String
-renderSurfaceDiagWith strict lv opts truthy src dat = case parseWith opts src of
+  :: Boolean -> LoopVars -> SurfaceParse -> Truthy -> String -> Value -> Either String String
+renderSurfaceDiagWith strict lv sp truthy src dat = case sp.parse src of
   Left pes -> Left (renderParseErrorsAt src pes)
   Right { nodes }
     | Left e <- checkSurfaceStrict strict nodes -> Left (renderParseErrorAt src e)
-    | opts.lexConfig.statementTags, Left e <- checkBraceControl src nodes -> Left
+    | sp.statementTags, Left e <- checkBraceControl src nodes -> Left
         (renderParseErrorAt src e)
     -- ADR-040: flatten `{% extends %}`/`{% block %}`/`{% super %}` before desugar. A
     -- located error (stray child content, unknown base) surfaces here; the body below
     -- re-applies the (now known-good) flatten.
-    | opts.lexConfig.statementTags, Left e <- resolveInheritance nodes -> Left
+    | sp.statementTags, Left e <- resolveInheritance nodes -> Left
         (renderParseErrorAt src e)
   Right { directives, nodes } ->
     let
       inherited =
-        if opts.lexConfig.statementTags then either (const nodes) identity
+        if sp.statementTags then either (const nodes) identity
           (resolveInheritance nodes)
         else nodes
-      { partials, template } = hoistInline (desugarStmt opts lv inherited)
+      { partials, template } = hoistInline (desugarStmt sp.statementTags lv inherited)
     in
       case
         runResolvedLenient directives
           ( withTruthy truthy
-              <<< withYieldName (if opts.partialBlocks then "partial-block" else "yield")
+              <<< withYieldName (if sp.partialBlocks then "partial-block" else "yield")
               <<< registerPartials partials
           )
           template

@@ -16,7 +16,7 @@ module Cli.Main where
 
 import Prelude
 
-import ClassicBars (analyseSurface, directiveLints, handlebars, noLoopVars, preludeSchema, renderSurfaceDiagWith)
+import ClassicBars (analyseSurface, directiveLints, handlebars, noLoopVars, preludeSchema, renderSurfaceDiagWith, surfaceParseOf)
 import ClassicBars.Compile (compileSurfaceWith) as Compile
 import Data.Array as Array
 import Data.Either (Either(..))
@@ -215,7 +215,9 @@ run opts = do
                     Left err -> die ("flatbars: " <> opts.template <> ": " <> err)
                     Right out -> writeStdout out
             | opts.surface ->
-                case renderSurfaceDiagWith true noLoopVars popts handlebars tpl value of
+                case
+                  renderSurfaceDiagWith true noLoopVars (surfaceParseOf popts) handlebars tpl value
+                  of
                   Left err -> die ("flatbars: " <> opts.template <> ": " <> err)
                   Right out -> writeStdout out
             | otherwise -> case compileWith popts tpl of
@@ -230,7 +232,8 @@ runCompile popts opts tpl =
   case
     ( if opts.surface
       -- surface = ClassicBars (Handlebars rule); core = RawBars (nonEmpty rule).
-      then Compile.compileSurfaceWith true noLoopVars popts "rt.truthyHandlebars" tpl
+      then Compile.compileSurfaceWith true noLoopVars (surfaceParseOf popts) "rt.truthyHandlebars"
+        tpl
       else compileJsWith popts tpl
     )
     of
