@@ -164,6 +164,39 @@ construction. `@root` becomes `root`, `../x` becomes `parent.x`, and an
 {% for rows %}{% for this %}{{loop.parent.index0}}.{{loop.index0}} {{parent.label}} {{root.title}}{% endfor %}{% endfor %}
 ```
 
+## Typed inline signatures (`{% inline "n" (p, q=default) %}`)
+
+A partial is defined with `{% inline "name" %}…{% endinline %}` and rendered with
+`{% include "name" %}`; arguments pass as a `key=value` **hash** that binds inside
+the body (`{% include "card" title=post.name %}` → the body's `{{title}}`). On top of
+that, an inline may declare a **typed parameter signature** — named parameters, each
+with an optional *literal* default (ADR-042 §8):
+
+```maxbars
+{% inline "card" (title, badge="") %}
+  <article><h3>{{title}}</h3>{% if badge %}<span class="tag">{{badge}}</span>{% endif %}</article>
+{% endinline %}
+
+{% include "card" title=post.name badge="new" %}   {# both bound          #}
+{% include "card" title=post.name %}               {# badge defaults to "" #}
+```
+
+- A **required** parameter (`title`) reads its value from the call's hash.
+- An **optional** parameter (`badge=""`) falls back to its declared default when the
+  call omits it — the default is a literal (string / number / bool / `null`); a bare
+  word is a located error.
+- A **required argument the call omits** is, in the typed AOT, a **compile-time
+  error** (a missing context field) — the typed-macro check Tera's untyped
+  `{% macro %}` cannot offer. The interpreter/VM render it leniently (`null`).
+
+The signature binds **at the include site**: the body references each parameter as a
+scoped name, and the call's hash (plus the filled-in defaults) supplies the value.
+Nothing is added to the engine — it desugars to the existing partial + scoped-binding
+machinery, so the interpreter, the AOT-emitted Rust, and the VM render byte-identically
+(conformance-gated). The call syntax is unchanged; the signature only adds the
+*names + defaults + types*. An inline **without** a signature is the plain, untyped
+partial — any hash key still binds in the body.
+
 ## The block-partial body (`{% yield %}`)
 
 Inside a block partial — `{% partial "name" %}…{% endpartial %}` — the caller's

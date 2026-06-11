@@ -364,6 +364,21 @@ Subtotal {{subtotal}} + tax {{tax}} = {{total}}`,
     data: { name: "Ada" },
   },
 
+  inlineSignatures: {
+    engine: "maxbars",
+    label: "Advanced — Typed inline signatures ({% inline \"n\" (p, q=default) %})",
+    // ADR-042 §8: an {% inline %} may declare a typed parameter signature — named
+    // params, each with an optional LITERAL default. {% include "card" title=… %} binds
+    // the hash; an omitted optional (badge) falls back to its default, a required one
+    // (title) reads the call. A required arg the call omits is a COMPILE-TIME error in
+    // the typed AOT (the typed-macro check Tera's untyped macros can't give); the
+    // interpreter renders it leniently. Same in interpreter / AOT / VM (conformance-gated).
+    template: `{% inline "card" (title, badge="") %}[{{title}}{% if badge %} ({{badge}}){% endif %}]{% endinline %}{% include "card" title=a badge="new" %}
+{% include "card" title=b %}`,
+    data: { a: "Intro", b: "Setup" },
+    compiles: true,
+  },
+
   helpers: {
     engine: "maxbars",
     label: "Advanced — Custom & block operations",

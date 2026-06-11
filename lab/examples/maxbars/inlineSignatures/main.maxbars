@@ -1,0 +1,2 @@
+{% inline "card" (title, badge="") %}[{{title}}{% if badge %} ({{badge}}){% endif %}]{% endinline %}{% include "card" title=a badge="new" %}
+{% include "card" title=b %}

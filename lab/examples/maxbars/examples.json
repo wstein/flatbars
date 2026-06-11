@@ -219,6 +219,15 @@
     "data": "data.yaml"
   },
   {
+    "id": "inlineSignatures",
+    "label": "Advanced — Typed inline signatures ({% inline \"n\" (p, q=default) %})",
+    "group": "Examples",
+    "view": "source",
+    "main": "main.maxbars",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
     "id": "rawRegion",
     "label": "Advanced — Verbatim region ({% raw %})",
     "group": "Examples",

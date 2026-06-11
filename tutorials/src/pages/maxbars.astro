@@ -425,6 +425,19 @@ const t = (s) => s;
       interpreter, the AOT-compiled Rust, and the VM all produce identical bytes.
     </p>
     <OpenInLab client:visible engine="maxbars" template={ex.inheritance.template} data={ex.inheritance.data} />
+    <h3>Typed inline signatures</h3>
+    <p>
+      An <code>{t("{% inline %}")}</code> may declare a <b>typed parameter signature</b> —
+      <code>{t("{% inline \"card\" (title, badge=\"\") %}")}</code> — named parameters, each with an
+      optional <em>literal</em> default (<a href={`${SPEC_BASE}adr/adr-0042-numeric-predicates-plus-concat-typed-inline/`}>ADR-042</a> §8).
+      A call passes a hash: <code>{t("{% include \"card\" title=x %}")}</code> binds <code>title</code>,
+      and an omitted optional (<code>badge</code>) falls back to its default. A <b>required</b> argument
+      the call omits is a <b>compile-time error</b> in the typed AOT — the typed-macro check Tera's
+      untyped <code>{t("{% macro %}")}</code> can't give; the interpreter renders it leniently. The
+      signature binds at the include site and desugars to the existing partial machinery, so the
+      interpreter, the AOT-compiled Rust, and the VM render identically.
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.inlineSignatures.template} data={ex.inlineSignatures.data} />
     <h3>Custom helpers</h3>
     <p>
       MaxBars reuses ClassicBars's engine, so a host registers operations with the same
