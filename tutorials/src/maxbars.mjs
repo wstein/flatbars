@@ -33,8 +33,8 @@
 //     partial itself MaxBars source — ADR/commit cfadebc) AND template-local
 //     `{% inline "x" %}…{% endinline %}` both work, plus the `{% yield %}` layout
 //     pattern via `{% partial %}` (inline wins on a name clash). Only the
-//     `{{#*inline}}` decorator stays ClassicBars-only. Raw blocks use the
-//     `{{{{#op}}}}` hash sigil.
+//     `{{#*inline}}` decorator stays ClassicBars-only. A verbatim region is
+//     `{% raw %}…{% endraw %}`; quad-stache `{{{{ }}}}` raw blocks are rejected.
 //   • Arithmetic is strictly numeric: `"x" + "y"` throws (no string concat).
 
 export const examples = {
@@ -404,26 +404,12 @@ Subtotal {{subtotal}} + tax {{tax}} = {{total}}`,
     label: "Advanced — Verbatim region ({% raw %})",
     // {% raw %} … {% endraw %} keeps its body COMPLETELY untouched — ideal for showing
     // template syntax literally. The inner {{ … }} and {% … %} are plain text, never
-    // interpreted. This is the literal verbatim REGION (ADR-039), distinct from a
-    // raw-block OPERATION ({{{{#op}}}}, below): no head operation, no body processing.
-    // The legacy {{{{#raw}}}} spelling is rejected with a fix-it pointing here.
+    // interpreted. This is the ONLY verbatim mechanism (ADR-039 + the 2026-06-11
+    // amendment): every quad-stache {{{{ … }}}} is rejected — the legacy region
+    // {{{{#raw}}}} and the raw-block helper {{{{#op}}}} alike (a helper can't consume a
+    // raw body) — each with a fix-it pointing here. Post-process in the host → {{ x | safe }}.
     template: "Format money with {% raw %}{{ price | toFixed 2 }}{% endraw %}.",
     data: {},
-  },
-
-  rawBlock: {
-    engine: "maxbars",
-    label: "Advanced — Raw blocks ({{{% op %}}})",
-    // A raw block hands its body to the head OPERATION completely UNPROCESSED: the
-    // inner {{bar}} is never interpreted — it is literal text the operation receives
-    // via options.fn(). `rawloud` upper-cases that raw body, so the verbatim {{bar}}
-    // comes out {{BAR}} (the data is never read). MaxBars uses the FlatBars
-    // {{{{#name}}}} spelling (hash sigil), like RawBars — NOT the bare ClassicBars form;
-    // the op name has no hyphen (a `-` would parse as subtraction). The head must
-    // resolve to a defined operation (an undefined head is a hard error).
-    helpers: "registerOperation('rawloud', (options) => options.fn().toUpperCase());",
-    template: "{{{{#rawloud}}}}\n  {{bar}}\n{{{{/rawloud}}}}",
-    data: { bar: "ignored" },
   },
 
   email: {

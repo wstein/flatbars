@@ -41,16 +41,16 @@ test("renders user-defined helpers via opts.helpers (ADR-018)", async () => {
 });
 
 test("opts.helpers register for the maxbars and core dialects too (operation registrars)", async () => {
-  // A raw block's head must resolve to a defined operation (the strict-raw-block
-  // rule) — so a maxbars/rawbars example with custom ops must route through the
-  // per-dialect registrar, not the helper-less render. Regression: the Lab once
-  // rendered maxbars before checking opts.helpers, so {{{{#rawloud}}}} threw
-  // UnknownHelper in the playground despite the example registering it.
+  // A custom operation must route through the per-dialect registrar, not the
+  // helper-less render. Regression: the Lab once rendered maxbars before checking
+  // opts.helpers, so {{loud bar}} threw UnknownHelper in the playground despite the
+  // example registering it. (Quad-stache raw-block helpers were dropped in the
+  // statement-tag dialects — ADR-039 amendment — so a value helper is the vehicle.)
   const r = await createRenderer("classicbars");
-  const helpers = { rawloud: (options) => options.fn().toUpperCase() };
-  const tpl = "{{{{#rawloud}}}}\n  {{bar}}\n{{{{/rawloud}}}}";
-  assert.equal(run(r, tpl, null, { dialect: "maxbars", helpers }), "\n  {{BAR}}\n");
-  assert.equal(run(r, tpl, null, { dialect: "core", helpers }), "\n  {{BAR}}\n");
+  const helpers = { loud: (s) => String(s).toUpperCase() };
+  const tpl = '{{loud "hi"}}';
+  assert.equal(run(r, tpl, null, { dialect: "maxbars", helpers }), "HI");
+  assert.equal(run(r, tpl, null, { dialect: "core", helpers }), "HI");
 });
 
 test("maxbars threads external (host) partials through render + compileToJs", async () => {

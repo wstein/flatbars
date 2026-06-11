@@ -39,6 +39,12 @@ expectM name src dat expected = case renderMax src dat of
   Right out -> assert' (name <> ": expected " <> show expected <> " got " <> show out)
     (out == expected)
 
+-- | A render that errored, whose message contains `pat` (for asserting fix-it text).
+errContains :: String -> Either String String -> Boolean
+errContains pat = case _ of
+  Left msg -> contains (Pattern pat) msg
+  Right _ -> false
+
 main :: Effect Unit
 main = do
   log "MaxBars dialect tests"
@@ -480,11 +486,25 @@ main = do
   -- whitespace-tolerant open/close, and an empty region renders nothing.
   expectM "raw-region-spaced" "{%  raw  %}{{x}}{%  endraw  %}" (obj []) "{{x}}"
   expectM "raw-region-empty" "{% raw %}{% endraw %}" (obj []) ""
-  -- the legacy quad-stache verbatim region `{{{{#raw}}}}` is rejected with a fix-it
-  -- pointing at `{% raw %}` (the no-silent-no-op bar); a raw-block *helper*
-  -- (`{{{{#op}}}}`, op ≠ raw) is unaffected — it still resolves its head strictly.
+  -- every brace-origin quad-stache is rejected (ADR-039 item 2 + 2026-06-11 amendment):
+  -- the verbatim region `{{{{#raw}}}}` points at `{% raw %}`, and a raw-block *helper*
+  -- (`{{{{#op}}}}`, op ≠ raw) is dropped — `{% raw %}` is literal-only, no helper.
   assert' "reject: {{{{#raw}}}} verbatim region (use {% raw %})"
     (isLeft (renderMax "{{{{#raw}}}}{{x}}{{{{/raw}}}}" (obj [])))
+  assert' "reject: {{{{#op}}}} raw-block helper (dropped — {% raw %} is literal-only)"
+    (isLeft (renderMax "{{{{#loud}}}}hi{{{{/loud}}}}" (obj [])))
+  -- the two fix-its are distinct (verbatim region vs the no-raw-helper message).
+  assert' "raw fix-it: {{{{#raw}}}} names {% raw %}"
+    (errContains "{% raw %}" (renderMax "{{{{#raw}}}}{{x}}{{{{/raw}}}}" (obj [])))
+  assert' "raw fix-it: {{{{#op}}}} says a helper can't consume a raw body"
+    ( errContains "a helper can't consume a raw body"
+        (renderMax "{{{{#loud}}}}hi{{{{/loud}}}}" (obj []))
+    )
+  -- regression: generic `{{#x}}` control blocks are (still) rejected — `{{ }}` is output-only.
+  assert' "reject: {{#each}} block (use {% each %})"
+    ( isLeft
+        (renderMax "{{#each xs}}{{this}}{{/each}}" (obj [ Tuple "xs" (VArray [ VString "a" ]) ]))
+    )
 
   -- partial include + block-partial slot are statements (ADR-039 item 5):
   -- `{% include "name" %}` expands a partial, `{% yield %}` renders the caller's body.

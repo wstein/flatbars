@@ -95,8 +95,19 @@ main = do
   assert' "reject: triple inverse {{{^}}}" (isLeft (render "{{{^a}}}x{% end{/a} %}" (obj [])))
   assert' "reject: unescaped {{&}}" (isLeft (render "{{&a}}" (obj [])))
   assert' "reject: raw block {{{{}}}}" (isLeft (render "{{{{r}}}}body{{{{/r}}}}" (obj [])))
+  -- ADR-039 (2026-06-11 amendment): every quad-stache is dropped — the verbatim region
+  -- moves to `{% raw %}`, and a raw-block *helper* (`{{{{#op}}}}`) is gone (parity with MaxBars).
+  assert' "reject: {{{{#raw}}}} verbatim region (use {% raw %})"
+    (isLeft (render "{{{{#raw}}}}{{x}}{{{{/raw}}}}" (obj [])))
+  assert' "reject: {{{{#op}}}} raw-block helper (dropped — {% raw %} is literal-only)"
+    (isLeft (render "{{{{#loud}}}}hi{{{{/loud}}}}" (obj [])))
+  -- regression: a generic `{{#x}}` control block is rejected — `{{ }}` is output-only.
+  assert' "reject: {{#each}} block (use {% each %})"
+    (isLeft (render "{{#each xs}}{{this}}{{/each}}" (obj [ Tuple "xs" (VArray [ VString "a" ]) ])))
   -- the same rejection in the compiled path.
   assert' "reject (compile): inverse" (isLeft (compileJs "{{^a}}x{% enda %}"))
+  assert' "reject (compile): {{{{#op}}}} raw-block helper"
+    (isLeft (compileJs "{{{{#loud}}}}hi{{{{/loud}}}}"))
 
   -- ── Set delimiters (ADR-015 amendment): MinBars-exclusive ─────────────────
   -- RawBars REJECTS set-delim. The Mustache `{{=A B=}}` inline directive is a

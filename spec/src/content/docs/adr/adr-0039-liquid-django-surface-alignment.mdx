@@ -292,3 +292,71 @@ desugars `(not x)`≡`not x`, so it coincides cleanly; but **`in` is overloaded*
 operator must be admitted only in *expression* position, never where the loop grammar owns `in`. This
 is genuinely the highest-blast-radius item (every boolean expression) and remains its own separable PR;
 the parser rework above is the agreed shape.
+
+## Amendment (2026-06-11): close the last `{{ }}` non-output exemption — drop the raw-block *helper*
+
+The docs-19 cutover and items 2 / 8 already made the RawBars/MaxBars `{{ }}` surface **output-only**
+and enforced it: the source-aware `braceControlViolation` (run on every `statementTags` render/compile,
+`Kernel.CaseSugar`) rejects a brace-origin `{{#x}} … {{/x}}` block, a brace control separator
+(`{{else}}`/`{{elif}}`/`{{when}}`), `{{> name}}`, `{{yield}}`, and the verbatim region `{{{{#raw}}}}`,
+each with an actionable *"use `{% … %}`"* fix-it; the parser unconditionally rejects `{{{ }}}`,
+`{{& }}`, bare `{{{{ }}}}`, `{{^ }}`, and the inheritance/decorator sigils. So `{{#each}}`, `{{{ }}}`,
+etc. are **already** located errors in both dialects (`check:parity`-confirmed).
+
+**One exemption remained**, and it is the inconsistency this amendment removes. `braceControlViolation`
+spares the raw-block **helper** — a quad-stache `{{{{#op}}}} … {{{{/op}}}}` with `op ≠ raw`, which runs
+helper `op` over a *verbatim* (unparsed) body — flagging only `op == raw` (the literal region). Item 2's
+note hedged this open ("the raw-block helper head semantics … is unchanged"). **That hedge is now
+withdrawn.** A helper applied to a verbatim body is a pure Handlebars artefact — no member of the
+`{% %}` family has it, and Trussbars's pure grammar (`trussbars-template/src/parse.rs`) rejects *every*
+`{{{{ … }}}}`. Keeping a quad-stache spelling alive only for `op ≠ raw` is exactly the kind of
+holdover this ADR exists to delete.
+
+**Decision: `{% raw %}` is literal-only, full stop — no head, no helper.** Every brace-origin
+quad-stache `{{{{ … }}}}` (hash or bare, `raw` or not) is a located `DisallowedShape` in RawBars and
+MaxBars: for `{{{{#raw}}}}` the existing fix-it (*"use `{% raw %}`"*) stands; for `op ≠ raw` the fix-it
+is *"a helper can't consume a raw body — use `{% raw %}` for a verbatim region, or pre-format the value
+in the host and emit it with `{{ x | safe }}`."* The strict-head rule (undefined head ⇒
+`UnknownHelper`) becomes moot for the `{{`-family because the construct is gone. ClassicBars (statement
+tags off) is untouched and keeps its Handlebars `{{{{ }}}}` raw blocks — `braceControlViolation` runs
+only when `statementTags` is on, so `check:hbs-conformance` stays inert.
+
+*Net surface (RawBars/MaxBars):* the `{{ }}` family is **output-only** — `{{ expr }}` and
+`{{ expr | safe }}`, nothing else; every block, clause, binding, comment, partial, and verbatim region
+is `{% … %}` / `{# … #}`; there is no triple-stache, no `{{& }}`, and no quad-stache in any form. This
+is the same lexical contract Trussbars enforces, so a RawBars/MaxBars template and a Trussbars template
+share one `{{ }}`/`{% %}`/`{# #}` grammar (modulo the typed subset Trussbars layers on top).
+
+*Net surface after this amendment (RawBars/MaxBars):* the `{{ }}` family is **output-only**
+(`{{ expr }}`, `{{ expr | safe }}`); every block, clause, binding, comment, partial, and verbatim
+region is `{% … %}` / `{# … #}`; there is no triple-stache, no `{{& }}`, and no quad-stache. This is
+the same lexical contract Trussbars enforces, so a `.truss`-style RawBars/MaxBars template and a
+Trussbars template now share one `{{ }}`/`{% %}`/`{# #}` grammar (modulo the typed subset Trussbars
+layers on top).
+
+### Implementation & gates (this amendment)
+
+The change is small and localised, because everything else already shipped:
+
+1. **`Kernel.CaseSugar.braceControlViolation`** stops exempting `op ≠ raw`: a brace-origin `RawBlock`
+   of *any* head is a `DisallowedShape`, with the fix-it chosen by head (`raw` → *"use `{% raw %}`"*;
+   otherwise → *"a helper can't consume a raw body — …"*). This is the whole engine change; both
+   RawBars (its direct `braceControlViolation` call) and MaxBars (via the shared `checkBraceControl`
+   on the `statementTags` render/compile path) pick it up, so **`check:parity` stays green**.
+2. **Tests.** The MaxBars/RawBars suites flip the `{{{{#op}}}}`-is-accepted case to a rejection (the
+   old "unaffected" assertion becomes a `DisallowedShape` assertion), and gain a regression that the
+   `{{{{#raw}}}}` fix-it and the new helper fix-it are distinct.
+3. **Editor tooling (ADR-017)** — *deferred polish.* The `raw-block` semantic-token kind stays (it
+   still paints `{% raw %}` and ClassicBars's `{{{{ }}}}`), because `{% raw %}` and the now-invalid
+   `{{{{ … }}}}` lex to the *same* `RRaw` token — recolouring only the brace-origin one as `error`
+   needs the painter to do the source-origin `isBrace` check `braceControlViolation` does, which the
+   highlighters don't thread today. The render/compile path already rejects `{{{{#op}}}}` with the
+   located fix-it; surfacing it as an LSP diagnostic + recolouring is a follow-up (the `dialectDiagnostics`
+   inventory, `check:dialect-diagnostics`). `check:highlight`/`check:vocab`/`check:tmgrammar` stay
+   green unchanged.
+4. **`check:hbs-conformance` / `check:mustache-conformance` inert** — ClassicBars keeps `{{{{ }}}}`
+   raw blocks (Handlebars-faithful) and MinBars its Mustache sigils; `braceControlViolation` runs only
+   under `statementTags`, so their byte-identical counts (49/50, 184/184) cannot move.
+5. **Corpus/docs.** The golden `examples/*.truss` corpus is already `{% %}`-only; migrate any remaining
+   `{{{{#op}}}}` in the tutorials and spec MDX. **Trussbars** already rejects every `{{{{ }}}}`, so its
+   conformance harness is unaffected — this brings the *oracle* to parity with the engine it specifies.

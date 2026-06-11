@@ -111,11 +111,14 @@ Hello {{name}} — emitted verbatim.
 After the `}}}}` closing the raw-block head, the lexer captures everything up to the matching
 `{{{{/IDENT}}}}` as one uninterpreted string. The closing `IDENT` must equal the opening one.
 
-The quad-stache is the core spelling. In the **statement-tag dialects** (RawBars / MaxBars /
-Trussbars — `statementTags`), the literal *verbatim region* is written `{% raw %} … {% endraw %}`
-(ADR-039) — it lexes to the same raw-block node (head `raw`), so this section's semantics are
-unchanged, and the quad-stache `{{{{#raw}}}}` is rejected there with a fix-it. The distinct
-raw-block *helper* form (`{{{{#op}}}}`, head ≠ `raw`, fed to an operation) keeps the quad-stache.
+The quad-stache is the core spelling, and **ClassicBars** keeps it (Handlebars-faithful). In the
+**statement-tag dialects** (RawBars / MaxBars / Trussbars — `statementTags`), the literal *verbatim
+region* is written `{% raw %} … {% endraw %}` (ADR-039) — it lexes to the same raw-block node (head
+`raw`), so this section's semantics are unchanged. There, **every quad-stache `{{{{ … }}}}` is
+rejected** with a fix-it (ADR-039 amendment, 2026-06-11): the legacy region `{{{{#raw}}}}` points at
+`{% raw %}`, and the raw-block *helper* form (`{{{{#op}}}}`, head ≠ `raw`) is dropped entirely —
+`{% raw %}` is literal-only, a helper cannot consume a raw body (pre-format in the host and emit with
+`{{ x | safe }}`).
 
 ## 1.8 Lexer summary (informative)
 

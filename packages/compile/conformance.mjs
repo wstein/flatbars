@@ -166,17 +166,19 @@ const helperCases = [
   { name: "op:max-params", dialect: "maxbars", helpers: { list: (xs, o) => safe(xs.map((x, i) => o.fn(x, { blockParams: [x, i] })).join("")) }, t: "{% list xs as item idx %}[{{idx}}:{{item}}]{% endlist %}", d: { xs: ["a", "b"] }, expect: "[0:a][1:b]" },
   // a parenthesised pipe in the head coexists with block params — both render paths agree.
   { name: "op:max-paren-pipe-params", dialect: "maxbars", helpers: { box: (xs, o) => safe(xs.map((x) => o.fn(x, { blockParams: [x] })).join("")) }, t: "{% box (xs | reverse) as x %}<i>{{x}}</i>{% endbox %}", d: { xs: ["a", "b", "c"] }, expect: "<i>c</i><i>b</i><i>a</i>" },
-  // ── Raw blocks {{{{name}}}} — the verbatim body is handed to the head helper via
-  //    options.fn(); the inner {{x}} is NEVER interpreted (loud upper-cases the raw
-  //    text, so `{{x}}` comes out `{{X}}`). Both render paths must agree, and the
-  //    head resolves STRICTLY — an undefined head is UnknownHelper in every dialect,
-  //    never an implicit section (the strict-raw-block rule).
+  // ── Raw blocks {{{{name}}}} — ClassicBars (the `surface` dialect) keeps them: the
+  //    verbatim body is handed to the head helper via options.fn(); the inner {{x}} is
+  //    NEVER interpreted (loud upper-cases the raw text, so `{{x}}` comes out `{{X}}`).
+  //    Both render paths must agree, and the head resolves STRICTLY — an undefined head
+  //    is UnknownHelper (the strict-raw-block rule).
   { name: "rawblock:surface", dialect: "surface", helpers: { loud: (o) => o.fn().toUpperCase() }, t: "{{{{loud}}}}hi {{x}}{{{{/loud}}}}", d: { x: "ada" }, expect: "HI {{X}}" },
-  { name: "rawblock:max", dialect: "maxbars", helpers: { loud: (o) => o.fn().toUpperCase() }, t: "{{{{#loud}}}}hi {{x}}{{{{/loud}}}}", d: { x: "ada" }, expect: "HI {{X}}" },
-  { name: "rawblock:raw", dialect: "rawbars", helpers: { loud: (o) => o.fn().toUpperCase() }, t: "{{{{#loud}}}}hi {{x}}{{{{/loud}}}}", d: { x: "ada" }, expect: "HI {{X}}" },
-  // undefined head: both the interpreter and the compiled output must REJECT.
   { name: "rawblock:undefined-surface", dialect: "surface", t: "{{{{nope}}}}body {{x}}{{{{/nope}}}}", d: { x: "a" }, expectError: "UnknownHelper" },
-  { name: "rawblock:undefined-max", dialect: "maxbars", t: "{{{{#nope}}}}body {{x}}{{{{/nope}}}}", d: { x: "a" }, expectError: "UnknownHelper" },
+  // The statement-tag dialects (MaxBars/RawBars) DROP the quad-stache entirely (ADR-039
+  // amendment, 2026-06-11): a raw-block helper `{{{{#op}}}}` is a located `DisallowedShape`
+  // in both render paths — `{% raw %}` is the literal-only verbatim region. Gates that the
+  // interpreter and the compiled output reject identically.
+  { name: "rawblock:max-rejected", dialect: "maxbars", t: "{{{{#loud}}}}hi {{x}}{{{{/loud}}}}", d: { x: "ada" }, expectError: "a helper can't consume a raw body" },
+  { name: "rawblock:raw-rejected", dialect: "rawbars", t: "{{{{#loud}}}}hi {{x}}{{{{/loud}}}}", d: { x: "ada" }, expectError: "a helper can't consume a raw body" },
   // ── MaxBars external (host-threaded) partials — {{> name}} resolves a partial
   //    given as MaxBars surface source. The interpreter (renderMaxbarsWithPartials)
   //    and the compiled module (compileMaxbarsWithPartials folds them into the

@@ -13669,7 +13669,7 @@ var nodeStart = function(v) {
     return v.value0.start;
   }
   ;
-  throw new Error("Failed pattern match at Kernel.CaseSugar (line 100, column 13 - line 106, column 29): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Kernel.CaseSugar (line 107, column 13 - line 113, column 29): " + [v.constructor.name]);
 };
 var caseLeadingViolation = function(nodes) {
   var leadingOffset = function($copy_nodes$prime) {
@@ -13742,6 +13742,14 @@ var braceControlViolation = function(clauses) {
       var sepShape = function(name2) {
         return "{{" + (name2 + (" \u2026}} (a clause separator uses a {% \u2026 %} tag in this dialect \u2014 write {% " + (name2 + " \u2026 %})")));
       };
+      var rawShape = function(name2) {
+        var $59 = name2 === "raw";
+        if ($59) {
+          return "{{{{#raw}}}} \u2026 {{{{/raw}}}} (a verbatim region uses a {% \u2026 %} tag in this dialect \u2014 write {% raw %} \u2026 {% endraw %})";
+        }
+        ;
+        return "{{{{#" + (name2 + ("}}}} \u2026 {{{{/" + (name2 + "}}}} (a helper can't consume a raw body in this dialect \u2014 {% raw %} is literal-only; use {% raw %} \u2026 {% endraw %} for a verbatim region, or pre-format the value in the host and emit it with {{ x | safe }})")));
+      };
       var isBrace = function(sp) {
         return take2(2)(drop2(sp.start)(src)) === "{{";
       };
@@ -13787,10 +13795,10 @@ var braceControlViolation = function(clauses) {
           ;
         }
         ;
-        if (v instanceof RawBlock && (isBrace(v.value0) && v.value1 === "raw")) {
+        if (v instanceof RawBlock && isBrace(v.value0)) {
           return new Just({
             off: v.value0.start,
-            shape: "{{{{#raw}}}} \u2026 {{{{/raw}}}} (a verbatim region uses a {% \u2026 %} tag in this dialect \u2014 write {% raw %} \u2026 {% endraw %})"
+            shape: rawShape(v.value1)
           });
         }
         ;
