@@ -26,7 +26,26 @@ type Registry = BTreeMap<String, Vec<Node>>;
 /// Returns a [`ParseError`] for stray non-block content in a child (the blocks-only rule)
 /// or an `{% extends %}` that names no base template.
 pub fn resolve_inheritance(nodes: Vec<Node>) -> Result<Vec<Node>, ParseError> {
-    let bases = collect_bases(&nodes);
+    resolve_inheritance_with(nodes, &Registry::new())
+}
+
+/// As [`resolve_inheritance`], but the `{% extends %}` chain also resolves against `extra_bases`
+/// — an external base registry keyed by name (the AOT cross-file partials, each stored with its
+/// `{% block %}` slots intact). The template's own `{% inline %}` definitions take precedence on a
+/// name collision. This is what lets a `partials = [name = "file"]` import serve as an
+/// `{% extends "name" %}` base: the flatten is deferred until the registry is built, then run
+/// here against it (see `crate::emit::emit_with_partials`). With an empty `extra_bases` this is
+/// exactly [`resolve_inheritance`], so the interpreter/VM and partial-free AOT are unchanged.
+///
+/// # Errors
+/// As [`resolve_inheritance`].
+pub fn resolve_inheritance_with(
+    nodes: Vec<Node>,
+    extra_bases: &BTreeMap<String, Vec<Node>>,
+) -> Result<Vec<Node>, ParseError> {
+    let mut bases: Registry = extra_bases.clone();
+    // The template's own `{% inline %}` defs overlay (and win over) the imported bases.
+    collect_bases_into(&nodes, &mut bases);
     if find_extends(&nodes).is_none() {
         // A base or plain template: fill its own slots with their defaults.
         Ok(fill_blocks(&Registry::new(), nodes))
@@ -40,14 +59,8 @@ pub fn resolve_inheritance(nodes: Vec<Node>) -> Result<Vec<Node>, ParseError> {
     }
 }
 
-/// Every `{% inline "name" %}body{% endinline %}` at any depth → `name ↦ body` (the base
-/// registry the `extends` chain resolves against; an outer definition wins).
-fn collect_bases(nodes: &[Node]) -> Registry {
-    let mut m = Registry::new();
-    collect_bases_into(nodes, &mut m);
-    m
-}
-
+/// Every `{% inline "name" %}body{% endinline %}` at any depth → `name ↦ body` (folded into the
+/// base registry the `extends` chain resolves against; an outer definition wins).
 fn collect_bases_into(nodes: &[Node], m: &mut Registry) {
     for n in nodes {
         for child in child_lists(n) {

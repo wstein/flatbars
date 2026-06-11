@@ -21,6 +21,21 @@ type PartialHash = Vec<(String, Expr)>;
 /// to a meaning-free [`Node::HelperBlock`] the emitter/VM resolve against the host
 /// allow-list (an undeclared one becomes a located "unknown helper" there).
 pub fn parse(src: &str) -> Result<Vec<Node>, ParseError> {
+    let nodes = parse_raw(src)?;
+    // ADR-040: flatten `{% extends %}`/`{% block %}`/`{% super %}` into a plain tree before the
+    // emitter/VM ever see it (`crate::inherit`). Then ADR-042 §8: fill omitted optional
+    // inline-parameter defaults into each include's hash, after inheritance flattening.
+    crate::inherit::resolve_inheritance(nodes).map(crate::sig::augment_signatures)
+}
+
+/// Parse to the raw [`Node`] tree **without** the ADR-040 inheritance flatten or the ADR-042 §8
+/// signature augmentation that [`parse`] applies. The AOT path
+/// ([`crate::emit::emit_with_partials`]) needs this so it can defer the inheritance flatten until
+/// after the cross-file-partial base registry is built — a `{% extends "name" %}` whose base is a
+/// `partials = [name = "file"]` import can only resolve once that file is known. The interpreter
+/// and VM (single-template, no cross-file partials) keep using [`parse`], so their inheritance
+/// still resolves at parse time exactly as before.
+pub(crate) fn parse_raw(src: &str) -> Result<Vec<Node>, ParseError> {
     let mut lexemes = lex(src).map_err(|e| ParseError {
         message: e.message,
         at: e.at,
@@ -38,13 +53,7 @@ pub fn parse(src: &str) -> Result<Vec<Node>, ParseError> {
     let scope = Scope::new();
     let (nodes, stop) = p.parse_until(&scope)?;
     match stop {
-        // ADR-040: flatten `{% extends %}`/`{% block %}`/`{% super %}` into a plain tree
-        // before the emitter/VM ever see it (`crate::inherit`).
-        Stop::Eof => {
-            // ADR-042 §8: fill omitted optional inline-parameter defaults into each
-            // include's hash, after inheritance flattening.
-            crate::inherit::resolve_inheritance(nodes).map(crate::sig::augment_signatures)
-        }
+        Stop::Eof => Ok(nodes),
         Stop::Close(name) => err(format!("unexpected `{{% end{name} %}}` (no open block)"), 0),
         Stop::Else | Stop::ElseIf(_) => {
             err("unexpected `{% else %}` outside a block".to_string(), 0)

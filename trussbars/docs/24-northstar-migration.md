@@ -103,13 +103,19 @@ The first theme ported is **Hyde** (`getzola/hyde`) — `trussbars/examples/ssg/
 access, the `{% for x in xs %}` loop, `get_url`/`date` host helpers, the feed conditional,
 and markdown precompute — and renders faithfully.
 
-One **engine gap** surfaced (the point of the exercise): a **cross-file partial cannot yet
-be an `{% extends %}` base** — the inheritance flatten runs at parse time, before the
-cross-file partials are merged into the registry (`emit_with_partials`). The workaround is
-to inline the base into the extending template; the fix is to defer the inherit flatten
-until after the registry is built (split `parse()` into parse + a registry-aware flatten,
-threaded to the interpreter/VM too). Worth doing — it is the difference between one shared
-base file and a duplicated one for every layout.
+One **engine gap** surfaced (the point of the exercise) and is now **closed**: a
+**cross-file partial can serve as an `{% extends %}` base**. The inheritance flatten used to
+run at parse time, before the cross-file partials were merged into the registry, so
+`{% extends "name" %}` against a `partials = [name = "file"]` import failed (`names no base
+template`) and the base had to be inlined into the extending template. The fix defers the
+flatten in the AOT path: `parse()` gained a raw variant (`parse_raw`, no inherit/augment) and
+`crate::inherit::resolve_inheritance_with` takes an external base registry, so
+`emit_with_partials` now parses the main template raw, builds the base registry from the
+imported partials (`{% block %}` slots intact), and *then* flattens against it. The
+interpreter and VM (single-template, no cross-file partials) keep parsing through `parse()`
+unchanged — conformance stays 87/87 across all four axes. Concretely, the Hyde port now shares
+**one** `templates/hyde_base.truss`: `render_index` renders it directly and `render_page`
+imports it as the `hyde` partial and `{% extends %}` it (no duplicated base).
 
 ## Non-goals (for the proof)
 

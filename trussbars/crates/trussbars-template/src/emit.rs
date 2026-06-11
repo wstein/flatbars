@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
 use crate::ast::{Case, Cond, Expr, For, HelperBlock, Node, TruthMode, TruthPolicy, Value, With};
-use crate::parse::parse;
+use crate::parse::parse_raw;
 use crate::span::Span;
 
 impl TruthPolicy {
@@ -90,7 +90,31 @@ pub fn emit_with_partials(
             "`{name}` is a reserved built-in block and cannot be declared as a host helper"
         ));
     }
-    let nodes = parse(src).map_err(|e| located(e.at, src, &e.message))?;
+    // ADR-040 cross-file `{% extends %}`: an imported `partials = [name = "file"]` may serve as an
+    // inheritance base. Parse the main template *raw* (no flatten yet) so we can defer the
+    // inheritance flatten until the base registry — the imported partials, `{% block %}` slots
+    // intact — is known, then resolve against it.
+    let main_raw = parse_raw(src).map_err(|e| located(e.at, src, &e.message))?;
+
+    // Parse each file partial once. Its raw top (blocks intact) is an `{% extends %}` base; its
+    // flattened+augmented form (own slots filled with defaults) is the include/partial/yield body.
+    let mut extra_bases: BTreeMap<String, Vec<Node>> = BTreeMap::new();
+    let mut file_flat: Vec<(&str, &str, Vec<Node>)> = Vec::with_capacity(file_partials.len());
+    for (name, psrc) in file_partials {
+        let raw = parse_raw(psrc)
+            .map_err(|e| format!("{} (in partial '{name}')", located(e.at, psrc, &e.message)))?;
+        let flat = crate::inherit::resolve_inheritance(raw.clone())
+            .map(crate::sig::augment_signatures)
+            .map_err(|e| format!("{} (in partial '{name}')", located(e.at, psrc, &e.message)))?;
+        extra_bases.insert(name.clone(), raw);
+        file_flat.push((name.as_str(), psrc.as_str(), flat));
+    }
+
+    // Now flatten the main template against the combined base registry (its own `{% inline %}`
+    // defs plus the imported partials), then fill the ADR-042 §8 signature defaults.
+    let nodes = crate::inherit::resolve_inheritance_with(main_raw, &extra_bases)
+        .map(crate::sig::augment_signatures)
+        .map_err(|e| located(e.at, src, &e.message))?;
     let (main_inlines, top) = hoist(nodes);
 
     // Build the registry: in-source `{% inline %}` defs (spans index the main template), then
@@ -107,11 +131,9 @@ pub fn emit_with_partials(
             },
         );
     }
-    for (name, psrc) in file_partials {
-        let psrc_rc: Rc<str> = Rc::from(psrc.as_str());
-        let pnodes = parse(psrc)
-            .map_err(|e| format!("{} (in partial '{name}')", located(e.at, psrc, &e.message)))?;
-        let (nested, ptop) = hoist(pnodes);
+    for (name, psrc, flat) in file_flat {
+        let psrc_rc: Rc<str> = Rc::from(psrc);
+        let (nested, ptop) = hoist(flat);
         // A file partial may itself define `{% inline %}`s (hoisted, spans into this file).
         for (iname, ibody) in nested {
             insert_partial(
@@ -119,17 +141,17 @@ pub fn emit_with_partials(
                 iname,
                 PartialDef {
                     src: psrc_rc.clone(),
-                    origin: Some(name.clone()),
+                    origin: Some(name.to_string()),
                     body: ibody,
                 },
             )?;
         }
         insert_partial(
             &mut registry,
-            name.clone(),
+            name.to_string(),
             PartialDef {
                 src: psrc_rc.clone(),
-                origin: Some(name.clone()),
+                origin: Some(name.to_string()),
                 body: ptop,
             },
         )?;
@@ -1328,6 +1350,68 @@ mod tests {
         )
         .unwrap();
         assert!(out.contains("ctx.title"), "{out}");
+    }
+
+    #[test]
+    fn cross_file_partial_serves_as_an_extends_base() {
+        // ADR-040 × docs/21: a `partials = [name = file]` import can be an `{% extends %}` base.
+        // The base keeps its `{% block %}` slots (the flatten is deferred until the registry is
+        // built); the child's override fills `content`, the un-overridden `title` keeps its default.
+        let out = emit_with_partials(
+            "render",
+            "Ctx",
+            r#"{% extends "layout" %}{% block content %}<p>{{post}}</p>{% endblock %}"#,
+            &[],
+            TruthMode::NonEmpty,
+            &[(
+                "layout".to_string(),
+                "<title>{% block title %}{{site}}{% endblock %}</title>{% block content %}default{% endblock %}".to_string(),
+            )],
+        )
+        .unwrap();
+        // base text + the un-overridden default slot + the child override (all type-checked).
+        assert!(out.contains("<title>"), "{out}");
+        assert!(out.contains("ctx.site"), "{out}"); // title default kept
+        assert!(out.contains("ctx.post"), "{out}"); // content overridden
+        assert!(!out.contains("default"), "{out}"); // content default replaced
+    }
+
+    #[test]
+    fn cross_file_extends_super_splices_the_base_block() {
+        // `{% super %}` in the override splices the imported base's default block body.
+        let out = emit_with_partials(
+            "render",
+            "Ctx",
+            r#"{% extends "layout" %}{% block body %}<main>{% super %}</main>{% endblock %}"#,
+            &[],
+            TruthMode::NonEmpty,
+            &[(
+                "layout".to_string(),
+                "{% block body %}{{base}}{% endblock %}".to_string(),
+            )],
+        )
+        .unwrap();
+        assert!(out.contains("<main>"), "{out}");
+        assert!(out.contains("ctx.base"), "{out}"); // the base block, spliced in for {% super %}
+    }
+
+    #[test]
+    fn extends_an_unknown_base_is_still_an_error() {
+        // Deferring the flatten must not lose the diagnostic: an `{% extends %}` whose base is
+        // neither an in-source `{% inline %}` nor an imported partial is still a located error.
+        let err = emit_with_partials(
+            "render",
+            "Ctx",
+            r#"{% extends "missing" %}{% block b %}x{% endblock %}"#,
+            &[],
+            TruthMode::NonEmpty,
+            &[(
+                "layout".to_string(),
+                "{% block b %}y{% endblock %}".to_string(),
+            )],
+        )
+        .unwrap_err();
+        assert!(err.contains("names no base template"), "{err}");
     }
 
     #[test]

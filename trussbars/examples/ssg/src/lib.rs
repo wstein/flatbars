@@ -115,8 +115,9 @@ pub struct PageCtx {
 // ── templates: Hyde's, ported to .truss ──────────────────────────────────────────
 //
 // `index.html` IS the base layout, so the index renders it directly. `page.html`
-// extends it — and because a cross-file partial cannot yet be an `{% extends %}` base
-// (the engine gap this port surfaced, docs/24), hyde_page.truss inlines the base.
+// `{% extends %}` it: both share the *one* `templates/hyde_base.truss` file —
+// render_page imports it as the `hyde` partial and extends it (a cross-file partial
+// may now be an `{% extends %}` base, the engine gap this port surfaced, docs/24).
 
 truss!(
     render_index,
@@ -125,13 +126,12 @@ truss!(
     helpers = [get_url, date]
 );
 
-// `render_page` inlines the base (`{% inline "hyde" %}`) in hyde_page.truss itself —
-// see the note there: a cross-file partial cannot yet be an `{% extends %}` base.
 truss!(
     render_page,
     PageCtx,
     path = "templates/hyde_page.truss",
-    helpers = [get_url, date]
+    helpers = [get_url, date],
+    partials = [hyde = "templates/hyde_base.truss"]
 );
 
 // ── the content pipeline ─────────────────────────────────────────────────────────
