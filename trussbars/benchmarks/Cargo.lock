@@ -1403,6 +1403,7 @@ dependencies = [
  "tera",
  "trussbars-core",
  "trussbars-interp",
+ "trussbars-macros",
  "trussbars-std",
  "trussbars-vm",
  "vy",
@@ -1414,6 +1415,15 @@ version = "0.1.0"
 dependencies = [
  "dragonbox_ecma",
  "itoa",
+ "trussbars-derive",
+]
+
+[[package]]
+name = "trussbars-derive"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -1423,6 +1433,13 @@ dependencies = [
  "libm",
  "serde_json",
  "trussbars-core",
+ "trussbars-template",
+]
+
+[[package]]
+name = "trussbars-macros"
+version = "0.1.0"
+dependencies = [
  "trussbars-template",
 ]
 

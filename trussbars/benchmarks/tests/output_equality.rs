@@ -5,13 +5,26 @@
 
 use trussbars_benchmarks::{
     askama_big_table, askama_teams, big_table_data, big_table_value, handlebars_big_table,
-    handlebars_big_table_registry, handlebars_teams, handlebars_teams_registry, interp_big_table,
-    interp_big_table_template, interp_teams, interp_teams_template, liquid_big_table,
-    liquid_big_table_template, liquid_teams, liquid_teams_template, sailfish_big_table,
-    sailfish_teams, teams_data, teams_value, tera_big_table, tera_engine, tera_teams,
-    trussbars_big_table, trussbars_teams, vm_big_table, vm_big_table_program, vm_teams,
-    vm_teams_program, vy_big_table, vy_teams, write_big_table, write_teams,
+    handlebars_big_table_registry, handlebars_teams, handlebars_teams_registry, hyde_data,
+    interp_big_table, interp_big_table_template, interp_teams, interp_teams_template,
+    liquid_big_table, liquid_big_table_template, liquid_teams, liquid_teams_template,
+    sailfish_big_table, sailfish_teams, teams_data, teams_value, tera_big_table, tera_engine,
+    tera_hyde, tera_teams, trussbars_big_table, trussbars_hyde, trussbars_teams, vm_big_table,
+    vm_big_table_program, vm_teams, vm_teams_program, vy_big_table, vy_teams, write_big_table,
+    write_teams,
 };
+
+#[test]
+fn hyde_trussbars_and_tera_agree() {
+    // The Hyde theme index (northstar, docs/24): the typed AOT and Tera must emit the
+    // SAME bytes — same work, different speed (measured in benches/render.rs).
+    let ctx = hyde_data();
+    assert_eq!(
+        trussbars_hyde(&ctx),
+        tera_hyde(&tera_engine(), &ctx),
+        "trussbars (AOT) vs tera — Hyde index"
+    );
+}
 
 #[test]
 fn big_table_all_engines_agree() {

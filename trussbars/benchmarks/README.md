@@ -23,6 +23,15 @@ cargo +1.96.0 bench --manifest-path trussbars/benchmarks/Cargo.toml
 - **teams** — a small fixed HTML page (4 teams) with a `{{#each}}` and a
   first-item `{{#if loop.first}}` branch: control flow + escaping + fixed
   per-render overhead.
+- **hyde** — a real theme's render hot path: the [Hyde](https://github.com/getzola/hyde)
+  Zola blog index (sidebar nav loop + a 50-post list), the northstar target (docs/24).
+  Trussbars (AOT) vs **Tera** (the engine Zola actually renders with), byte-identical
+  output. A whitespace-flat template (single source file) feeds both engines; the
+  faithful, full Hyde port (inheritance, config conditionals, markdown) lives in
+  `trussbars/examples/ssg/`. On a contributor machine: **Trussbars (AOT) ~1.85 µs vs
+  Tera ~38 µs — ≈20× faster**, reproducing the synthetic-workload headline on a real
+  theme (the AOT compiles the loop to straight-line Rust; Tera walks the parsed
+  template per render).
 
 The columns. The **three Trussbars execution strategies** for the *same* MaxBars language
 (docs/11), fastest to slowest: **Trussbars (AOT)** (verbatim `compileMaxRust` output —

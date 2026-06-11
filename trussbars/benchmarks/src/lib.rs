@@ -406,7 +406,17 @@ pub fn tera_engine() -> tera::Tera {
          </ul></body></html>",
     )
     .expect("tera teams parses");
+    // A Hyde-shaped blog index (sidebar nav loop + a post list) — the northstar theme
+    // (docs/24), whitespace-flat so Trussbars (escapes `{{ }}`) and Tera (auto-escape
+    // off for this unsuffixed name) render byte-identical over HTML-special-free data.
+    tera.add_raw_template("hyde", HYDE_TPL)
+        .expect("tera hyde parses");
     tera
+}
+
+pub fn tera_hyde(tera: &tera::Tera, ctx: &HydeIndex) -> String {
+    let c = tera::Context::from_serialize(ctx).expect("hyde → tera context");
+    tera.render("hyde", &c).expect("tera hyde renders")
 }
 
 pub fn tera_big_table(tera: &tera::Tera, ctx: &BigTable) -> String {
@@ -561,3 +571,72 @@ pub fn vy_teams(ctx: &Teams) -> String {
     )
     .into_string()
 }
+
+// ─── 5d. Hyde theme (northstar, docs/24) — a real theme: Trussbars AOT vs Tera ───
+//
+// A Hyde-shaped blog index — the sidebar nav loop + a 50-post list (the render hot
+// path). One whitespace-flat template file feeds BOTH engines (`truss! path=` and
+// `include_str!`), so the AOT (which escapes `{{ }}`) and Tera (auto-escape off for the
+// unsuffixed name) emit byte-identical bytes over HTML-special-free data — asserted in
+// `tests/output_equality.rs`. The faithful, full Hyde port (inheritance, config
+// conditionals, markdown) lives in `examples/ssg/`; this is its render-speed twin.
+
+const HYDE_TPL: &str = include_str!("../templates/hyde.truss");
+
+#[derive(Serialize, Clone, trussbars_core::Trussbars)]
+pub struct HydeLink {
+    pub url: String,
+    pub name: String,
+}
+#[derive(Serialize, Clone, trussbars_core::Trussbars)]
+pub struct HydeExtra {
+    pub hyde_theme: String,
+    pub hyde_links: Vec<HydeLink>,
+}
+#[derive(Serialize, Clone, trussbars_core::Trussbars)]
+pub struct HydeConfig {
+    pub title: String,
+    pub base_url: String,
+    pub extra: HydeExtra,
+}
+#[derive(Serialize, Clone, trussbars_core::Trussbars)]
+pub struct HydePage {
+    pub permalink: String,
+    pub title: String,
+    pub date: String,
+}
+#[derive(Serialize, Clone, trussbars_core::Trussbars)]
+pub struct HydeIndex {
+    pub lang: String,
+    pub config: HydeConfig,
+    pub pages: Vec<HydePage>,
+}
+
+/// A blog index — 5 nav links + 50 posts — the loop-bound render hot path.
+pub fn hyde_data() -> HydeIndex {
+    HydeIndex {
+        lang: "en".into(),
+        config: HydeConfig {
+            title: "Trussbars Blog".into(),
+            base_url: "https://example.com".into(),
+            extra: HydeExtra {
+                hyde_theme: "theme-base-08".into(),
+                hyde_links: (1..=5)
+                    .map(|i| HydeLink {
+                        url: format!("/nav-{i}/"),
+                        name: format!("Section {i}"),
+                    })
+                    .collect(),
+            },
+        },
+        pages: (1..=50)
+            .map(|i| HydePage {
+                permalink: format!("/post-{i}/"),
+                title: format!("Post number {i}"),
+                date: format!("2026-06-{:02}", (i % 28) + 1),
+            })
+            .collect(),
+    }
+}
+
+trussbars_macros::truss!(trussbars_hyde, HydeIndex, path = "templates/hyde.truss");
