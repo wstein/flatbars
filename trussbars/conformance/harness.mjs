@@ -118,6 +118,58 @@ if (process.argv.includes("--interp")) {
   process.exit(fails.length === 0 && oracleErrors === 0 ? 0 : 1);
 }
 
+// `--vm`: render through the **bytecode VM** (`trussbars-vm`, docs/11 §4.3) — now a
+// first-class, FULL-COVERAGE backend, so it is a true conformance axis: every case the
+// oracle renders must byte-match, and a VM *error* (not just a mismatch) is a FAILURE
+// (there is no subset to excuse it). It shares the interpreter's eval engine, so the two
+// dynamic backends are byte-identical by construction; this axis proves the structural
+// bytecode compiler dropped nothing.
+if (process.argv.includes("--vm")) {
+  console.error("building truss-vm (bytecode VM CLI)…");
+  execFileSync("cargo", ["+1.96.0", "build", "--quiet", "--bin", "truss-vm"], {
+    cwd: resolve(root, "trussbars/crates/trussbars-vm"),
+    stdio: ["ignore", "inherit", "inherit"],
+  });
+  const binPath = resolve(root, "trussbars/target/debug/truss-vm");
+  const snapPath = resolve(here, "snapshots.json");
+  const golden = existsSync(snapPath) ? JSON.parse(readFileSync(snapPath, "utf8")) : {};
+
+  let matched = 0,
+    oracleErrors = 0;
+  const fails = [];
+  for (const c of cases) {
+    const o = renderMaxbars(c.template, c.data);
+    if (!o.ok) {
+      oracleErrors++;
+      continue;
+    }
+    const expected = c.id in golden ? golden[c.id] : o.value;
+    let actual;
+    try {
+      actual = execFileSync(binPath, [], {
+        input: JSON.stringify({ template: c.template, data: c.data }),
+        encoding: "utf8",
+      });
+    } catch (e) {
+      // Full coverage: a VM error on a case the oracle renders is a real failure.
+      fails.push({ id: c.id, expected, actual: `<error> ${(e.stderr || e.message || "").toString().trim()}` });
+      continue;
+    }
+    if (actual === expected) matched++;
+    else fails.push({ id: c.id, expected, actual });
+  }
+  console.log(
+    `Trussbars bytecode VM (first-class, full coverage): ${matched}/${matched + fails.length} ` +
+      `rendered cases byte-matched, ${oracleErrors} oracle errors, of ${cases.length} total.`,
+  );
+  for (const m of fails) {
+    console.error(`  MISMATCH ${m.id}:`);
+    console.error(`    expected: ${JSON.stringify(m.expected)}`);
+    console.error(`    vm:       ${JSON.stringify(m.actual)}`);
+  }
+  process.exit(fails.length === 0 && oracleErrors === 0 ? 0 : 1);
+}
+
 // `--v2`: emit through the Rust pipeline (`trussbars-template`, docs/08) instead of
 // the PureScript v1 emitter, asserting v2 hits the SAME byte-for-byte golden. The
 // CLI (`truss-emit`) is built once; each template is then emitted by a fast spawn.

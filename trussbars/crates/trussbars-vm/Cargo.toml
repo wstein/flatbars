@@ -1,6 +1,6 @@
 [package]
 name = "trussbars-vm"
-description = "The Trussbars bytecode VM: compiles the dynamic MaxBars subset to a flat instruction array run by a borrow-based machine — the optimization path of docs/11 §4, ~2× the tree-walk interpreter (trussbars-interp) where it covers. Shares trussbars-interp's Value and render helpers so output stays byte-identical."
+description = "The Trussbars bytecode VM: a first-class, full-coverage dynamic backend (docs/11 §4.3). Compiles every valid MaxBars template to a flat instruction array; the if/each structure is bytecode while expressions and the rarer blocks run through the shared trussbars-interp engine, so the two dynamic backends are byte-identical by construction."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -13,16 +13,25 @@ categories = ["template-engine"]
 # backends are byte-identical), and the shared front-end. Both no_std-capable.
 trussbars-interp = { path = "../trussbars-interp", default-features = false }
 trussbars-template = { path = "../trussbars-template", default-features = false }
+# Dev-CLI JSON (the `truss-vm` conformance binary), std-only.
+serde_json = { version = "1", optional = true }
 
 [features]
 default = ["std"]
-# `std` turns on the dependencies' std (incl. the ECMA-f64 `perf` formatter), so the std
-# VM is byte-identical to the oracle. `--no-default-features` is the `no_std` + `alloc`
-# build (f64 falls back to `Display`, the documented divergence carried from the interp).
-std = ["trussbars-interp/std", "trussbars-template/std"]
+# `std` turns on the dependencies' std (incl. the ECMA-f64 `perf` formatter) and the
+# dev-CLI JSON dep, so the std VM is byte-identical to the oracle. `--no-default-features`
+# is the `no_std` + `alloc` build (f64 falls back to `Display`, the documented divergence
+# carried from the interp).
+std = ["serde_json", "trussbars-interp/std", "trussbars-template/std"]
 
 [dev-dependencies]
 trussbars-interp = { path = "../trussbars-interp" }
+
+# The conformance CLI: read `{template, data}` from stdin, render via the VM, print output.
+# The `--vm` axis of `conformance/harness.mjs` drives it.
+[[bin]]
+name = "truss-vm"
+required-features = ["std"]
 
 [lints]
 workspace = true

@@ -638,6 +638,7 @@ version = "0.1.0"
 name = "trussbars-vm"
 version = "0.1.0"
 dependencies = [
+ "serde_json",
  "trussbars-interp",
  "trussbars-template",
 ]
