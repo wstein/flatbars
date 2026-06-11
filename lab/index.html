@@ -1708,6 +1708,7 @@
       // App shell modules extracted from this file (Phase 0, engine-registry
       // plan). Pure leaves first — engine resolution + the DOM lookup helpers.
       import { resolveEngine, engineLabel, templateExt, templateFence } from "./app/engine-config.mjs?v=1";
+      import { createAppState } from "./app/state.mjs?v=1";
       import { byId, qs, makeEl } from "./app/dom.mjs?v=2";
       import { showBootError, bootFail } from "./app/boot-error.mjs?v=1";
       import { toast, openShareMenu, closeShareMenu } from "./app/ui-chrome.mjs?v=1";
@@ -1854,10 +1855,23 @@
       const examples = await files.readJson(EXAMPLES_BASE + "examples.json").catch(bootFail);
 
       // ── State ─────────────────────────────────────────────────────────
+      // The shared render-context object (CTX-DESIGN.md): ctx.caches holds the
+      // render/analysis caches; ctx.state holds the UI/editor state (./app/state.mjs).
+      // Declared here, ahead of all consumers — the inline `let`s migrate into
+      // ctx.state.* in batches (until swept, a var's `let` is the live copy and the
+      // matching ctx.state field is unused). The analysis caches init as ctx.caches.*
+      // assignments further below.
+      const ctx = {
+        caches: {
+          lastOutput: "",
+          lastSegments: [],
+          lastData: null,    // the post-transform data the template rendered (Render Data view)
+          lastProgram: null, // the compiled wire program, for the Bytecode view
+          lastSegViews: [],  // [{from,to,file,kind,start,end}] — segment char ranges in the output editor
+        },
+        state: createAppState(ENGINE),
+      };
       let tabs        = [{ name: "main", source: "" }];
-      let activeTabIdx = 0;
-      let loadedExampleIdx = -1;      // which example is loaded (-1 = custom/edited)
-      let exampleModified  = false;  // true when a loaded example has been edited
       let activeView   = "tmpl";      // "tmpl" | "data" | "config" | "catalog"
       // What the bottom (data) pane currently DISPLAYS: "data" | "config" |
       // "catalog". The pane is shared, so focusing it must restore activeView to
@@ -1874,22 +1888,16 @@
       // it runs in the browser, where mustache.js' 0/"" -falsy rule is what JS users
       // already expect, so it minimises surprise — see ADR-029, "The Lab's MinBars
       // truthiness default is mustacheJs, by design". Set the rule in config.yaml.
-      let minbarsCompat = true; // default mustacheJs (ADR-029); set by the config.yaml view + hash `mj`
       // Compiler & runtime options (ADR-0016).
       // `standalone`    — strip standalone-tag lines at compile time (ADR-0016, default on).
       let standalone      = true;
-      // `allowList`      — ADR-0013 positive allow-list: when an array, only
+      // `ctx.state.allowList`      — ADR-0013 positive allow-list: when an array, only
       //                    listed transformer names are callable at render
       //                    time (the production "close unused ports" lever).
       //                    `null` = unconstrained (the default; every built-in
       //                    is reachable, matching the engine's default policy).
-      let allowList       = null;
-      let focusMode    = null;
-      let templateDiagnostics = [];
-      let yamlSrc      = "";
       // The transform — a data → view-model PREPROCESS (JSONata), applied to the
       // parsed data before rendering. Engine-agnostic; empty = pass data through.
-      let transformSrc = "";
       // Custom helpers (ADR-018) — a fundamentally different thing from the
       // transform: registerHelper(...) JS that extends the engine. A SEPARATE
       // editor (helpers.js), for every FlatBars dialect (RawBars/ClassicBars/MaxBars;
@@ -1899,37 +1907,29 @@
       // needed). `run()` is synchronous, so the Worker renders OUT OF BAND: its
       // result is cached by input key and painted when fresh; a stale/absent
       // entry kicks off the async render (which re-runs once it lands).
-      let helpersSrc = "";
-      let helpersDirty = false;
       // i18n (ADR-029): catalog.yaml is the message DATA (a LOCALIZATION view,
       // edited in the data pane like config.yaml); the active locale lives in
       // config.yaml (`i18n.locale`). Both feed the t/number/… helper bag, built
       // in the Worker for RawBars/ClassicBars/MaxBars (not MinBars).
-      let catalogSource = "";
-      let catalogDirty = false;
-      let labLocale = "en";
       // ADR-030: the host PathSchema, as a list of data paths the host guarantees
       // safe (never their ambiguous value, never absent). Set in config.yaml
       // (`analyse.pathSchema`); drives `analyzeWith` so the Truthiness panel
       // suppresses those paths' potential + miss findings. Empty ⇒ plain `analyze`.
-      let labPathSchema = [];
       const helperSandbox = createHelperSandbox("./helpers-worker.mjs?v=5");
-      let helperCache = { key: null, output: "", error: "" };
-      let helperInFlight = null;
       function helperKey(tmpl, partials, data, src, catalog, locale, dialect) {
         try { return JSON.stringify([tmpl, partials, data, src, catalog, locale, dialect]); } catch { return null; }
       }
       async function requestHelperRender(key, req) {
-        if (helperInFlight === key) return; // this exact input is already rendering
-        helperInFlight = key;
+        if (ctx.state.helperInFlight === key) return; // this exact input is already rendering
+        ctx.state.helperInFlight = key;
         const res = await helperSandbox.render(req);
-        helperInFlight = null;
-        helperCache = { key, output: res.ok ? res.value : "", error: res.ok ? "" : res.error };
+        ctx.state.helperInFlight = null;
+        ctx.state.helperCache = { key, output: res.ok ? res.value : "", error: res.ok ? "" : res.error };
         run(); // re-render; the cache now matches → synchronous paint
       }
       // Active data tab — either a built-in id ("data" / "transform" /
       // "context" / "ast") or an overlay name (e.g. "users/active") that
-      // resolves to an entry in `dataOverlays`.
+      // resolves to an entry in `ctx.state.dataOverlays`.
       // The data pane's strip is now a set of VIEWS, not a file list:
       //   `dataTab`  — active view: "edit" | "context" | "ast"
       //   `dataFile` — which data file the Edit view shows: "data" | overlay name
@@ -1940,22 +1940,18 @@
       // files the user has opened (from the explorer or by navigating), not
       // every partial. Keys: "main" (entry, pinned) · partial name · "transform".
       // Closing a tab removes it here but never deletes the underlying file.
-      let openEditors = ["main", "data", "transform", ...(ENGINE !== "minbars" ? ["helpers"] : [])];
-      let yamlDirty      = false;
-      let transformDirty = false;
 
       // Additional YAML data files that overlay on top of `data.yaml` before
       // JSONata runs. Each entry is `{ name, source, dirty }`; the name is a
       // slash-path identifier (e.g. `users/active`) that mounts the parsed
       // YAML at that path in the merged data tree. See
       // `mergeDataOverlays` in playground_utils.mjs for the merge semantics.
-      let dataOverlays = [];
-      const overlayByName = (name) => dataOverlays.find((o) => o.name === name);
+      const overlayByName = (name) => ctx.state.dataOverlays.find((o) => o.name === name);
       const isOverlayTab = (id) =>
         typeof id === "string" && id !== "data" && id !== "transform" &&
         !isInspectTab(id) && !!overlayByName(id);
 
-      const activeTab = () => tabs[activeTabIdx];
+      const activeTab = () => tabs[ctx.state.activeTabIdx];
 
       function partialsMap() {
         const map = {};
@@ -2133,19 +2129,19 @@
             linkHighlightField,
             coverageField,
             lintGutter(),
-            linter(() => templateDiagnostics),
+            linter(() => ctx.state.templateDiagnostics),
             EditorView.updateListener.of((u) => {
               if (u.docChanged && !isProgrammatic(u)) {
                 const text = u.state.doc.toString();
                 if (templateMode === "transform") {
-                  transformSrc = text;
-                  transformDirty = true;
+                  ctx.state.transformSrc = text;
+                  ctx.state.transformDirty = true;
                 } else if (templateMode === "helpers") {
-                  helpersSrc = text;
-                  helpersDirty = true;
+                  ctx.state.helpersSrc = text;
+                  ctx.state.helpersDirty = true;
                 } else {
                   activeTab().source = text;
-                  tabs[activeTabIdx].dirty = true;
+                  tabs[ctx.state.activeTabIdx].dirty = true;
                 }
                 renderTabs();
                 scheduleRun();
@@ -2185,8 +2181,8 @@
                 if (dataPaneMode === "config") {
                   applyConfigText(text);
                 } else if (dataPaneMode === "catalog") {
-                  catalogSource = text;
-                  catalogDirty = true;
+                  ctx.state.catalogSource = text;
+                  ctx.state.catalogDirty = true;
                   renderTabs();
                   scheduleRun();
                   saveHash();
@@ -2196,8 +2192,8 @@
                     overlay.source = text;
                     overlay.dirty = true;
                   } else {
-                    yamlSrc = text;
-                    yamlDirty = true;
+                    ctx.state.yamlSrc = text;
+                    ctx.state.yamlDirty = true;
                   }
                   renderDataTabs();
                   scheduleRun();
@@ -2301,7 +2297,7 @@
 
       // ── Virtual file explorer ───────────────────────────────────────────
       // A type-grouped navigator over every editable file. It does not own any
-      // state — it reflects tabs[] / dataOverlays[] / transform / config and
+      // state — it reflects tabs[] / ctx.state.dataOverlays[] / transform / config and
       // drives the existing select* functions + render-config popover, so the
       // tab strips stay authoritative (rename / add / inspectors live there).
       // Re-rendered from renderTabs() + renderDataTabs() (every structural and
@@ -2367,18 +2363,18 @@
         const tmplActive = activeView === "tmpl" && templateMode === "tmpl";
         const xfActive   = activeView === "tmpl" && templateMode === "transform";
         const hlpActive  = activeView === "tmpl" && templateMode === "helpers";
-        const cfgNonDefault = !!escapeMode || !standalone || allowList !== null;
+        const cfgNonDefault = !!escapeMode || !standalone || ctx.state.allowList !== null;
 
         const groups = [
           { key: "template", label: "TEMPLATE", files: [
-            { icon: "stem", name: "main." + TEMPLATE_EXT, active: tmplActive && activeTabIdx === 0,
+            { icon: "stem", name: "main." + TEMPLATE_EXT, active: tmplActive && ctx.state.activeTabIdx === 0,
               dirty: !!(tabs[0] && tabs[0].dirty), title: "entry template", on: () => selectTemplateTab(0) },
           ]},
           { key: "partials", label: "PARTIALS", add: addPartial, addTitle: "New partial",
             files: tabs.slice(1).map((t, idx) => {
               const i = idx + 1;
               return { icon: "stem", name: (t.name || "(unnamed)") + "." + TEMPLATE_EXT,
-                active: tmplActive && activeTabIdx === i, dirty: !!t.dirty,
+                active: tmplActive && ctx.state.activeTabIdx === i, dirty: !!t.dirty,
                 title: `partial · {{partial "${t.name}"}}`,
                 on: () => selectTemplateTab(i),
                 renameValue: t.name, onDelete: () => removeTab(i),
@@ -2386,16 +2382,16 @@
                   v = v.trim();
                   if (!v || tabs.some((o, j) => j !== i && o.name === v)) return false;
                   const prev = t.name; t.name = v;
-                  const k = openEditors.indexOf(prev); if (k >= 0) openEditors[k] = v;
+                  const k = ctx.state.openEditors.indexOf(prev); if (k >= 0) ctx.state.openEditors[k] = v;
                   markCustom(); renderTabs(); scheduleRun(); return true;
                 } };
             })},
           { key: "data", label: "DATA", files: [
             { icon: "yaml", name: "data.yaml", active: activeView === "data" && dataTab === "edit" && dataFile === "data",
-              dirty: yamlDirty, title: "root data context · @root", on: () => selectDataTab("data") },
+              dirty: ctx.state.yamlDirty, title: "root data context · @root", on: () => selectDataTab("data") },
           ]},
           { key: "overlays", label: "OVERLAYS", add: addOverlay, addTitle: "New overlay",
-            files: dataOverlays.map((ov, oi) => (
+            files: ctx.state.dataOverlays.map((ov, oi) => (
               { icon: "yaml", name: ov.name + ".yaml",
                 active: activeView === "data" && dataTab === "edit" && dataFile === ov.name, dirty: !!ov.dirty,
                 title: `overlay · mounts at ${ov.name.replace(/\//g, ".")}`, on: () => selectDataTab(ov.name),
@@ -2403,7 +2399,7 @@
                 onRename: (v) => {
                   v = v.trim();
                   const err = validateOverlayName(v);
-                  const collision = dataOverlays.some((o, j) => j !== oi && o.name === v);
+                  const collision = ctx.state.dataOverlays.some((o, j) => j !== oi && o.name === v);
                   if (err || collision) return false;
                   if (dataFile === ov.name) dataFile = v;
                   ov.name = v; ov.dirty = true; markCustom(); scheduleRun(); return true;
@@ -2415,7 +2411,7 @@
           { key: "transform", label: "TRANSFORM", files: [
             { icon: "fn",
               name: "transform.jsonata",
-              active: xfActive, dirty: transformDirty,
+              active: xfActive, dirty: ctx.state.transformDirty,
               title: "data → view-model transform (JSONata)",
               on: () => selectTransformTab() },
           ]},
@@ -2426,13 +2422,13 @@
           ...(ENGINE !== "minbars" ? [{ key: "helpers", label: "HELPERS", files: [
             { icon: "fn",
               name: "helpers.js",
-              active: hlpActive, dirty: helpersDirty,
+              active: hlpActive, dirty: ctx.state.helpersDirty,
               title: "custom helpers — registerHelper(name, fn[, arity]); runs in a sandboxed Worker (ADR-018)",
               on: () => selectHelpersTab() },
           ]}] : []),
           // i18n message catalog (ADR-029) — every surface except MinBars (no t there).
           ...(ENGINE === "minbars" ? [] : [{ key: "localization", label: "LOCALIZATION", files: [
-            { icon: "yaml", name: "catalog.yaml", active: activeView === "catalog", dirty: catalogDirty,
+            { icon: "yaml", name: "catalog.yaml", active: activeView === "catalog", dirty: ctx.state.catalogDirty,
               title: "i18n message catalog (locale → key → message); the locale is set in config.yaml",
               on: () => selectCatalogTab() },
           ]}]),
@@ -2603,7 +2599,7 @@
       function renderTmplStrip() {
         const bar = byId("tmpl-tabs");
         bar.innerHTML = "";
-        for (const key of openEditors) {
+        for (const key of ctx.state.openEditors) {
           if (key === "transform") {
             const isTfm = activeView === "tmpl" && templateMode === "transform";
             const tfm = document.createElement("div");
@@ -2630,7 +2626,7 @@
           const i = key === "main" ? 0 : tabs.findIndex((t) => t.name === key);
           if (i < 0) continue; // a partial that no longer exists
           const tab = tabs[i];
-          const isActive = activeView === "tmpl" && templateMode === "tmpl" && i === activeTabIdx;
+          const isActive = activeView === "tmpl" && templateMode === "tmpl" && i === ctx.state.activeTabIdx;
           const t = document.createElement("div");
           t.className = "tab" + (isActive ? " active" : "") + (i === 0 ? " is-main" : "");
           t.title = i === 0 ? "entry template" : `partial · {{partial "${tab.name}"}}`;
@@ -2650,7 +2646,7 @@
         const bar = byId("data-tabs");
         if (!bar) return;
         bar.innerHTML = "";
-        for (const key of openEditors) {
+        for (const key of ctx.state.openEditors) {
           if (key === "config") {
             const isActive = activeView === "config";
             const t = document.createElement("div");
@@ -2692,7 +2688,7 @@
 
       // ── Template open-editor helpers (VS Code-style tabs) ───────────────
       const tmplKeyForIndex = (i) => (i === 0 ? "main" : tabs[i].name);
-      function ensureOpen(key) { if (!openEditors.includes(key)) openEditors.push(key); }
+      function ensureOpen(key) { if (!ctx.state.openEditors.includes(key)) ctx.state.openEditors.push(key); }
 
       // Auto-open every example file that carries content — "open all the files,
       // but only if not empty". `main` + `data` always open (the entry template
@@ -2706,9 +2702,9 @@
         const has = (s) => typeof s === "string" && s.trim() !== "";
         const open = ["main", "data"];
         tabs.forEach((t, i) => { if (i > 0 && has(t.source)) open.push(t.name); });
-        if (has(transformSrc)) open.push("transform");
-        if (has(helpersSrc)) open.push("helpers");
-        for (const o of dataOverlays) if (has(o.source)) open.push(o.name);
+        if (has(ctx.state.transformSrc)) open.push("transform");
+        if (has(ctx.state.helpersSrc)) open.push("helpers");
+        for (const o of ctx.state.dataOverlays) if (has(o.source)) open.push(o.name);
         return open;
       }
 
@@ -2720,10 +2716,10 @@
         if (key === "catalog")   return activeView === "catalog";
         if (key === "data")      return activeView === "data" && dataTab === "edit" && dataFile === "data";
         if (key === "context" || key === "ast") return activeView === "data" && dataTab === key;
-        if (key === "main")      return activeView === "tmpl" && templateMode === "tmpl" && activeTabIdx === 0;
+        if (key === "main")      return activeView === "tmpl" && templateMode === "tmpl" && ctx.state.activeTabIdx === 0;
         // partial or overlay name
         if (overlayByName(key))  return activeView === "data" && dataTab === "edit" && dataFile === key;
-        return activeView === "tmpl" && templateMode === "tmpl" && tabs[activeTabIdx] && tabs[activeTabIdx].name === key;
+        return activeView === "tmpl" && templateMode === "tmpl" && tabs[ctx.state.activeTabIdx] && tabs[ctx.state.activeTabIdx].name === key;
       }
 
       // Activate an editor by key (used when closing the active one).
@@ -2741,7 +2737,7 @@
 
       function selectTemplateTab(i) {
         templateMode = "tmpl";
-        activeView = "tmpl"; activeTabIdx = i;
+        activeView = "tmpl"; ctx.state.activeTabIdx = i;
         ensureOpen(tmplKeyForIndex(i));
         showActiveTab();
       }
@@ -2770,7 +2766,7 @@
 
       // catalog.yaml (ADR-029) — the i18n message catalog, an authored YAML file
       // (unlike config.yaml it is not generated). Edited in the same data pane;
-      // its source persists in `catalogSource` and feeds the t/number/… bag.
+      // its source persists in `ctx.state.catalogSource` and feeds the t/number/… bag.
       function selectCatalogTab() {
         activeView = "catalog";
         ensureOpen("catalog");
@@ -2780,7 +2776,7 @@
       function showCatalogTab() {
         byId("data-editor-container").hidden = false;
         dataPaneMode = "catalog";
-        setEditorText(dataView, catalogSource);
+        setEditorText(dataView, ctx.state.catalogSource);
         dataView.dispatch({ effects: dataLangComp.reconfigure([yaml(), yamlHighlighting]) });
         renderTabs();
       }
@@ -2798,8 +2794,8 @@
         const v = res.value;
         escapeMode = v.escape; byId("escape-select").value = v.escape;
         standalone = v.trim;   byId("standalone-cb").checked = v.trim;
-        allowList = v.allow; minbarsCompat = v.mustacheJs; labLocale = v.locale;
-        labPathSchema = v.pathSchema;
+        ctx.state.allowList = v.allow; ctx.state.minbarsCompat = v.mustacheJs; ctx.state.labLocale = v.locale;
+        ctx.state.labPathSchema = v.pathSchema;
         updateRenderStatus(); renderTabs();
         scheduleRun(); saveHash();
       }
@@ -2808,12 +2804,12 @@
       // the file in the explorer — reopen any time from there. Closing the last
       // editor leaves an empty pane (VS Code-style).
       function closeEditor(key) {
-        const at = openEditors.indexOf(key);
+        const at = ctx.state.openEditors.indexOf(key);
         if (at < 0) return;
         const wasActive = isActiveKey(key);
-        openEditors.splice(at, 1);
-        if (!openEditors.length) { showEmptyEdit(); return; }
-        if (wasActive) openKey(openEditors[Math.min(at, openEditors.length - 1)]);
+        ctx.state.openEditors.splice(at, 1);
+        if (!ctx.state.openEditors.length) { showEmptyEdit(); return; }
+        if (wasActive) openKey(ctx.state.openEditors[Math.min(at, ctx.state.openEditors.length - 1)]);
         else renderTabs();
       }
 
@@ -2855,7 +2851,7 @@
       function addOverlay() {
         let n = 1, name;
         do { name = "overlay" + n++; } while (overlayByName(name));
-        dataOverlays.push({ name, source: "", dirty: false });
+        ctx.state.dataOverlays.push({ name, source: "", dirty: false });
         markCustom();
         // Set before `selectDataTab` so the renderExplorer it triggers picks
         // up the pending rename target on the freshly built row.
@@ -2867,11 +2863,11 @@
       // Remove the overlay at index `i`. The active tab falls back to
       // `data` if the removed overlay was the active one.
       function removeOverlay(i) {
-        const ov = dataOverlays[i];
+        const ov = ctx.state.dataOverlays[i];
         if (!ov) return;
         if (!confirm(`Delete the "${ov.name}" overlay? This can't be undone.`)) return;
         const wasActive = dataFile === ov.name;
-        dataOverlays.splice(i, 1);
+        ctx.state.dataOverlays.splice(i, 1);
         markCustom();
         if (wasActive) selectDataTab("data"); else { renderDataTabs(); scheduleRun(); }
       }
@@ -2884,7 +2880,7 @@
         byId("data-editor-container").hidden = false;
         dataPaneMode = "data";
         const overlay = overlayByName(dataFile);
-        setEditorText(dataView, overlay ? overlay.source : yamlSrc);
+        setEditorText(dataView, overlay ? overlay.source : ctx.state.yamlSrc);
         dataView.dispatch({
           effects: dataLangComp.reconfigure([yaml(), yamlHighlighting]),
         });
@@ -2899,7 +2895,7 @@
         let n = 1, name;
         do { name = "partial" + n++; } while (tabs.some((t) => t.name === name));
         tabs.push({ name, source: "" });
-        activeView = "tmpl"; activeTabIdx = tabs.length - 1;
+        activeView = "tmpl"; ctx.state.activeTabIdx = tabs.length - 1;
         ensureOpen(name);
         markCustom();
         // Set before `showActiveTab` so the renderExplorer it triggers picks
@@ -2915,7 +2911,7 @@
           selectTemplateTab(idx);
         } else {
           tabs.push({ name, source: "", dirty: false });
-          activeView = "tmpl"; activeTabIdx = tabs.length - 1;
+          activeView = "tmpl"; ctx.state.activeTabIdx = tabs.length - 1;
           ensureOpen(name);
           markCustom();
           showActiveTab(); run();
@@ -2925,13 +2921,13 @@
         if (i === 0) return;
         if (!confirm(`Delete the "${tabs[i].name}" partial? This can't be undone.`)) return;
         const name = tabs[i].name;
-        const wasActive = activeView === "tmpl" && templateMode === "tmpl" && activeTabIdx === i;
-        const k = openEditors.indexOf(name); if (k >= 0) openEditors.splice(k, 1);
-        if (activeTabIdx > i) activeTabIdx -= 1;
+        const wasActive = activeView === "tmpl" && templateMode === "tmpl" && ctx.state.activeTabIdx === i;
+        const k = ctx.state.openEditors.indexOf(name); if (k >= 0) ctx.state.openEditors.splice(k, 1);
+        if (ctx.state.activeTabIdx > i) ctx.state.activeTabIdx -= 1;
         tabs.splice(i, 1);
         markCustom();
         // Closing the active file falls back to the pinned entry template.
-        if (wasActive) { activeTabIdx = 0; templateMode = "tmpl"; activeView = "tmpl"; }
+        if (wasActive) { ctx.state.activeTabIdx = 0; templateMode = "tmpl"; activeView = "tmpl"; }
         showActiveTab(); run(); // the partial set changed, so re-render
       }
 
@@ -2945,14 +2941,14 @@
         if (templateMode === "transform") {
           // The transform is a data → view-model preprocess (JSONata), shown in
           // the template editor; it is engine-agnostic.
-          setEditorText(templateView, transformSrc);
+          setEditorText(templateView, ctx.state.transformSrc);
           templateView.dispatch({ effects: templateLangComp.reconfigure([jsonataLang]) });
           byId("sources-sub").textContent = "transform · JSONata";
         } else if (templateMode === "helpers") {
           // Custom helpers (ADR-018) — a fundamentally different thing from the
           // transform: registerHelper(...) JS that extends the engine, ClassicBars
           // only, run in the Worker sandbox.
-          setEditorText(templateView, helpersSrc);
+          setEditorText(templateView, ctx.state.helpersSrc);
           templateView.dispatch({ effects: templateLangComp.reconfigure([jsLang]) });
           byId("sources-sub").textContent = "helpers · JS · registerHelper";
         } else {
@@ -2960,7 +2956,7 @@
           templateView.dispatch({
             effects: templateLangComp.reconfigure([htmlLang(), flatbarsHighlighting]),
           });
-          byId("sources-sub").textContent = activeTabIdx === 0
+          byId("sources-sub").textContent = ctx.state.activeTabIdx === 0
             ? ""
             : `partial · referenced as {{partial "${activeTab().name}"}}`;
         }
@@ -2995,7 +2991,7 @@
       // the decorations are file-scoped.
       function refreshCoverageGutter() {
         if (!templateView) return;
-        const file = activeTab()?.name === undefined ? "main" : (activeTabIdx === 0 ? "main" : activeTab().name);
+        const file = activeTab()?.name === undefined ? "main" : (ctx.state.activeTabIdx === 0 ? "main" : activeTab().name);
         const rows = ctx.caches.lastCoverage.filter((r) => r.file === file);
         const source = templateView.state.doc.toString();
         templateView.dispatch({ effects: setCoverageEffect.of(buildCoverageDeco(source, rows)) });
@@ -3007,18 +3003,6 @@
       // ./app/render-helpers.mjs. applyEscape takes the `escape-modes` capability
       // as an argument (it was the only engine coupling).
 
-      // The shared render-context object (CTX-DESIGN.md). Phase 0 introduces it for
-      // the output caches first — the cluster's most widely-read group. Other last*
-      // caches migrate into ctx.caches as their owning subsystem moves out.
-      const ctx = {
-        caches: {
-          lastOutput: "",
-          lastSegments: [],
-          lastData: null,    // the post-transform data the template rendered (Render Data view)
-          lastProgram: null, // the compiled wire program, for the Bytecode view
-          lastSegViews: [],  // [{from,to,file,kind,start,end}] — segment char ranges in the output editor
-        },
-      };
       ctx.caches.lastUsedTransformers = []; // ADR-0013 report: transformer names called by the compiled program
       ctx.caches.dockProblems = []; // diagnostics for the Problems tab, refreshed each run()
       let hadProblems = false; // tracks the 0->>0 transition so the dock auto-opens once
@@ -3060,7 +3044,7 @@
       // instances (no playground_utils dual-instance).
       const { setOutput, paintTextView, renderPreview } = createOutputView(ctx, {
         getView: () => outputView,
-        getMinbarsCompat: () => minbarsCompat,
+        getMinbarsCompat: () => ctx.state.minbarsCompat,
         getAllowScripts: () => allowScripts,
         renderer, outputEditor, Decoration, setProvenance, setOutLink,
         renderDock, renderDataInspect, refreshSearchPanel, updateOutLang,
@@ -3115,10 +3099,10 @@
           out.push(`## ${t.name === "main" ? "Template — main" : "Partial — " + t.name}`, "");
           out.push(mdFence(t.source, TEMPLATE_FENCE), "");
         }
-        out.push("## Data", "", mdFence(yamlSrc, "yaml"), "");
-        if (transformSrc.trim()) out.push(
+        out.push("## Data", "", mdFence(ctx.state.yamlSrc, "yaml"), "");
+        if (ctx.state.transformSrc.trim()) out.push(
           "## Transform (JSONata)", "",
-          mdFence(transformSrc, "jsonata"), "");
+          mdFence(ctx.state.transformSrc, "jsonata"), "");
         out.push("## Output", "", mdFence(ctx.caches.lastOutput, ""), "");
         return out.join("\n");
       }
@@ -3130,12 +3114,12 @@
           name: t.name === "main" ? `main.${TEMPLATE_EXT}` : `partials/${t.name}.${TEMPLATE_EXT}`,
           content: t.source,
         }));
-        files.push({ name: "data.yaml", content: yamlSrc });
-        if (transformSrc.trim()) files.push({
+        files.push({ name: "data.yaml", content: ctx.state.yamlSrc });
+        if (ctx.state.transformSrc.trim()) files.push({
           name: "transform.jsonata",
-          content: transformSrc,
+          content: ctx.state.transformSrc,
         });
-        if (helpersSrc.trim()) files.push({ name: "helpers.js", content: helpersSrc });
+        if (ctx.state.helpersSrc.trim()) files.push({ name: "helpers.js", content: ctx.state.helpersSrc });
         files.push({ name: "output.txt", content: ctx.caches.lastOutput });
         files.push({ name: "README.md", content: await buildMarkdownDoc() });
         return files;
@@ -3278,7 +3262,7 @@
         }
         if (outputView !== "source") return;
         if (outLangChoice === "Auto") {
-          const kind = loadedExampleIdx !== -1 ? examples[loadedExampleIdx].view : lastExView;
+          const kind = ctx.state.loadedExampleIdx !== -1 ? examples[ctx.state.loadedExampleIdx].view : lastExView;
           const ext = kind === "markdown" ? markdown() : kind === "source" ? [] : htmlLang();
           outputEditor.dispatch({ effects: outLangComp.reconfigure(ext) });
           return;
@@ -3309,13 +3293,13 @@
       // instances). renderPending is set via the injected setter; caretLinkKey via
       // resetCaretLink (the caret subsystem owns it).
       const { run, scheduleRun } = createRun(ctx, {
-        getYamlSrc: () => yamlSrc, getTabs: () => tabs, getActiveTabIdx: () => activeTabIdx,
-        getStandalone: () => standalone, getTransformSrc: () => transformSrc,
-        getHelpersSrc: () => helpersSrc, getCatalogSource: () => catalogSource,
-        getAllowList: () => allowList, getEscapeMode: () => escapeMode,
-        getMinbarsCompat: () => minbarsCompat, getLabLocale: () => labLocale,
-        getLabPathSchema: () => labPathSchema, getDataOverlays: () => dataOverlays,
-        getLoadedExampleIdx: () => loadedExampleIdx, getHelperCache: () => helperCache,
+        getYamlSrc: () => ctx.state.yamlSrc, getTabs: () => tabs, getActiveTabIdx: () => ctx.state.activeTabIdx,
+        getStandalone: () => standalone, getTransformSrc: () => ctx.state.transformSrc,
+        getHelpersSrc: () => ctx.state.helpersSrc, getCatalogSource: () => ctx.state.catalogSource,
+        getAllowList: () => ctx.state.allowList, getEscapeMode: () => escapeMode,
+        getMinbarsCompat: () => ctx.state.minbarsCompat, getLabLocale: () => ctx.state.labLocale,
+        getLabPathSchema: () => ctx.state.labPathSchema, getDataOverlays: () => ctx.state.dataOverlays,
+        getLoadedExampleIdx: () => ctx.state.loadedExampleIdx, getHelperCache: () => ctx.state.helperCache,
         examples, ENGINE,
         renderer, partialsMap, fileSource, engineHas,
         setError, setOutput, renderDock, saveHash, clearDiagnostics, updateDiagnostics,
@@ -3328,12 +3312,12 @@
       });
 
       function updateDiagnostics(diags) {
-        templateDiagnostics = diags;
+        ctx.state.templateDiagnostics = diags;
         templateView.dispatch({ effects: setDiagnosticsEffect.of(diags) });
       }
       function clearDiagnostics() {
-        if (!templateDiagnostics.length) return;
-        templateDiagnostics = [];
+        if (!ctx.state.templateDiagnostics.length) return;
+        ctx.state.templateDiagnostics = [];
         templateView.dispatch({ effects: setDiagnosticsEffect.of([]) });
       }
 
@@ -3530,7 +3514,7 @@
         const file = sv.file;
         const start = sv.start, end = sv.end;
         const idx = tabIndexByFile(file);
-        const active = idx === activeTabIdx;
+        const active = idx === ctx.state.activeTabIdx;
 
         // Refine the tooltip hint every hover (the tooltip is rebuilt each time).
         const hint = segTip.querySelector(".seg-tip-hint");
@@ -3576,7 +3560,7 @@
           caretLinkKey = null;
           return;
         }
-        const file = activeTabIdx === 0 ? "main" : activeTab().name;
+        const file = ctx.state.activeTabIdx === 0 ? "main" : activeTab().name;
         const src = templateView.state.doc.toString();
         const caretChar = templateView.state.selection.main.head;
         const pos = caretChar; // engine spans are char offsets — compare char↔char
@@ -3753,7 +3737,7 @@
 
       // ── Focus mode ────────────────────────────────────────────────────
       function setFocus(mode) {
-        focusMode = mode;
+        ctx.state.focusMode = mode;
         const ws = qs(".workspace");
         ws.classList.remove("focus-sources", "focus-output");
         for (const b of document.querySelectorAll(".focus-toggle")) b.classList.remove("on");
@@ -3763,7 +3747,7 @@
           if (btn) btn.classList.add("on");
         }
       }
-      function toggleFocus(mode) { setFocus(focusMode === mode ? null : mode); }
+      function toggleFocus(mode) { setFocus(ctx.state.focusMode === mode ? null : mode); }
 
       // ── Examples ──────────────────────────────────────────────────────
       // The example picker is a custom dropdown (see the markup note): build the
@@ -3774,7 +3758,7 @@
       // on open so the loaded example shows as active.
       function renderExampleMenu() {
         render(
-          html`${examples.map((ex, i) => html`<li class=${"dropdown-item" + (i === loadedExampleIdx ? " active" : "")} role="option" onClick=${() => { closeExampleMenu(); loadExample(i); }}>${ex.label}</li>`)}`,
+          html`${examples.map((ex, i) => html`<li class=${"dropdown-item" + (i === ctx.state.loadedExampleIdx ? " active" : "")} role="option" onClick=${() => { closeExampleMenu(); loadExample(i); }}>${ex.label}</li>`)}`,
           byId("example-menu")
         );
       }
@@ -3855,45 +3839,45 @@
         ]);
         tabs = [{ name: "main", source: mainSrc }];
         ex.partials.forEach((name, i) => tabs.push({ name, source: partialSrcs[i] }));
-        activeTabIdx = 0; activeView = "tmpl";
+        ctx.state.activeTabIdx = 0; activeView = "tmpl";
         // Examples ship their data as YAML; an optional transform is the Controller.
-        yamlSrc = dataText;
-        transformSrc = ex.transform
+        ctx.state.yamlSrc = dataText;
+        ctx.state.transformSrc = ex.transform
           ? await files.readText(dir + ex.transform)
           : "";
-        helpersSrc = ""; // catalog examples carry no custom helpers
-        catalogSource = ""; catalogDirty = false; labLocale = "en"; // i18n reset (ADR-029)
-        labPathSchema = []; // ADR-030 path-schema reset
+        ctx.state.helpersSrc = ""; // catalog examples carry no custom helpers
+        ctx.state.catalogSource = ""; ctx.state.catalogDirty = false; ctx.state.labLocale = "en"; // i18n reset (ADR-029)
+        ctx.state.labPathSchema = []; // ADR-030 path-schema reset
         // Reset + load data overlays from the manifest, if any. Each entry
         // is `{ name, file }` — name is the slash-path the overlay mounts
         // at, file is fetched alongside data.yaml. A stale overlay from
         // the previous workspace would silently affect this example's
         // render, so the reset is unconditional.
-        dataOverlays = [];
+        ctx.state.dataOverlays = [];
         if (Array.isArray(ex.overlays) && ex.overlays.length) {
           const overlayTexts = await Promise.all(
             ex.overlays.map((o) => files.readText(dir + o.file))
           );
           ex.overlays.forEach((o, i) => {
-            dataOverlays.push({ name: o.name, source: overlayTexts[i], dirty: false });
+            ctx.state.dataOverlays.push({ name: o.name, source: overlayTexts[i], dirty: false });
           });
         }
-        dataTab = "edit"; dataFile = "data"; openEditors = autoOpenEditors();
+        dataTab = "edit"; dataFile = "data"; ctx.state.openEditors = autoOpenEditors();
         templateMode = "tmpl";
         showDataTab();
         escapeMode = "";
         byId("escape-select").value = "";
         standalone = true;
-        minbarsCompat = true; // default mustacheJs (ADR-029)
-        allowList = null;
+        ctx.state.minbarsCompat = true; // default mustacheJs (ADR-029)
+        ctx.state.allowList = null;
         syncStandaloneUI();
         updateRenderStatus();
         setExampleLabel(ex.label);
         { const s = byId("vendored-source"); if (s) s.hidden = true; } // catalog example: no vendored source
-        loadedExampleIdx = idx;
-        exampleModified = false;
+        ctx.state.loadedExampleIdx = idx;
+        ctx.state.exampleModified = false;
         tabs.forEach(t => { t.dirty = false; });
-        yamlDirty = false; transformDirty = false;
+        ctx.state.yamlDirty = false; ctx.state.transformDirty = false;
         outLangChoice = "Auto";
         persistOutLang();
         lastExView = ex.view;
@@ -3936,26 +3920,26 @@
         const ws = vendoredWorkspace(fx);
         tabs = [{ name: "main", source: ws.template, dirty: false }];
         ws.partials.forEach((p) => tabs.push({ name: p.name, source: p.source, dirty: false }));
-        activeTabIdx = 0; activeView = "tmpl";
-        yamlSrc = ws.dataText;
-        transformSrc = "";
-        helpersSrc = "";
-        catalogSource = ""; catalogDirty = false; labLocale = "en"; // i18n reset (ADR-029)
-        labPathSchema = []; // ADR-030 path-schema reset
-        dataOverlays = [];
-        dataTab = "edit"; dataFile = "data"; openEditors = autoOpenEditors();
+        ctx.state.activeTabIdx = 0; activeView = "tmpl";
+        ctx.state.yamlSrc = ws.dataText;
+        ctx.state.transformSrc = "";
+        ctx.state.helpersSrc = "";
+        ctx.state.catalogSource = ""; ctx.state.catalogDirty = false; ctx.state.labLocale = "en"; // i18n reset (ADR-029)
+        ctx.state.labPathSchema = []; // ADR-030 path-schema reset
+        ctx.state.dataOverlays = [];
+        dataTab = "edit"; dataFile = "data"; ctx.state.openEditors = autoOpenEditors();
         templateMode = "tmpl";
         showDataTab();
         escapeMode = "";
         byId("escape-select").value = "";
         standalone = true;
-        minbarsCompat = true; // default mustacheJs (ADR-029)
-        allowList = null;
+        ctx.state.minbarsCompat = true; // default mustacheJs (ADR-029)
+        ctx.state.allowList = null;
         syncStandaloneUI();
         updateRenderStatus();
-        loadedExampleIdx = -1;
-        exampleModified = false;
-        yamlDirty = false; transformDirty = false;
+        ctx.state.loadedExampleIdx = -1;
+        ctx.state.exampleModified = false;
+        ctx.state.yamlDirty = false; ctx.state.transformDirty = false;
         outLangChoice = "Auto";
         persistOutLang();
         updateLangPlaceholder();
@@ -3978,11 +3962,11 @@
       // example: flag it custom so the URL state reflects that. The dropdown
       // keeps showing the example name but appends ● to signal modification.
       function markCustom() {
-        if (loadedExampleIdx === -1) return;
-        if (exampleModified) return;
-        const prevIdx = loadedExampleIdx;
-        exampleModified = true;
-        loadedExampleIdx = -1;
+        if (ctx.state.loadedExampleIdx === -1) return;
+        if (ctx.state.exampleModified) return;
+        const prevIdx = ctx.state.loadedExampleIdx;
+        ctx.state.exampleModified = true;
+        ctx.state.loadedExampleIdx = -1;
         // The dropdown keeps showing the example name; the URL state flips to
         // custom (-1) so a share link records the edits, not the pristine example.
         setExampleLabel(examples[prevIdx].label);
@@ -3992,29 +3976,29 @@
       function snapshotState() {
         return {
           tabs: tabs.map((t) => ({ n: t.name, s: t.source })),
-          d: yamlSrc,
-          t: transformSrc,
+          d: ctx.state.yamlSrc,
+          t: ctx.state.transformSrc,
           // Custom-helper source (ADR-018), a separate field from the transform.
-          ...(helpersSrc.trim() ? { h: helpersSrc } : {}),
+          ...(ctx.state.helpersSrc.trim() ? { h: ctx.state.helpersSrc } : {}),
           // i18n (ADR-029): the message catalog + the active locale (default en omitted).
-          ...(catalogSource.trim() ? { cat: catalogSource } : {}),
-          ...(labLocale && labLocale !== "en" ? { loc: labLocale } : {}),
+          ...(ctx.state.catalogSource.trim() ? { cat: ctx.state.catalogSource } : {}),
+          ...(ctx.state.labLocale && ctx.state.labLocale !== "en" ? { loc: ctx.state.labLocale } : {}),
           // ADR-030 analyse path schema — persisted so a "watch suppression" link round-trips.
-          ...(labPathSchema.length ? { ps: labPathSchema } : {}),
+          ...(ctx.state.labPathSchema.length ? { ps: ctx.state.labPathSchema } : {}),
           // Data overlays — each entry is { n: name, s: source }. Omitted when
           // there are none so legacy/short links stay compact.
-          ...(dataOverlays.length ? { do: dataOverlays.map((o) => ({ n: o.name, s: o.source })) } : {}),
+          ...(ctx.state.dataOverlays.length ? { do: ctx.state.dataOverlays.map((o) => ({ n: o.name, s: o.source })) } : {}),
           e: escapeMode, v: outputView,
           sa: standalone ? 1 : 0,       // ADR-0016 standalone flag
-          ...(allowList !== null ? { al: allowList } : {}), // ADR-0013 transformer allow-list
-          av: activeView, ai: activeTabIdx,
+          ...(ctx.state.allowList !== null ? { al: ctx.state.allowList } : {}), // ADR-0013 transformer allow-list
+          av: activeView, ai: ctx.state.activeTabIdx,
           // MinBars truthiness toggle (ADR-022 S2); omitted when off so links stay compact.
-          ...(minbarsCompat ? {} : { mj: 0 }), // default mustacheJs; persist only the spec opt-out
+          ...(ctx.state.minbarsCompat ? {} : { mj: 0 }), // default mustacheJs; persist only the spec opt-out
           // Active template-pane mode (1 = transform tab, 0/omitted = tmpl).
           // Persisted so a shared "I'm editing the transform" link round-trips.
           ...(templateMode === "transform" ? { tm: 1 } : {}),
           ...(templateMode === "helpers" ? { hm: 1 } : {}),
-          x: loadedExampleIdx, // which example (or -1 for an edited "custom" state)
+          x: ctx.state.loadedExampleIdx, // which example (or -1 for an edited "custom" state)
         };
       }
 
@@ -4046,18 +4030,18 @@
           tabs = Array.isArray(s.tabs) && s.tabs.length
             ? s.tabs.map((t, i) => ({ name: i === 0 ? "main" : (t.n ?? "partial"), source: t.s ?? "", dirty: false }))
             : [{ name: "main", source: "", dirty: false }];
-          activeTabIdx = Math.max(0, Math.min(tabs.length - 1, s.ai ?? 0));
+          ctx.state.activeTabIdx = Math.max(0, Math.min(tabs.length - 1, s.ai ?? 0));
           activeView = s.av === "data" ? "data" : "tmpl";
-          yamlSrc = s.d ?? "";
-          transformSrc = s.t ?? "";
-          helpersSrc = s.h ?? ""; // custom-helper source (ADR-018), separate field
-          catalogSource = s.cat ?? ""; // i18n message catalog (ADR-029)
-          labLocale = s.loc ?? "en";   // i18n active locale
-          labPathSchema = Array.isArray(s.ps) ? s.ps.map((p) => String(p)) : []; // ADR-030 path schema
+          ctx.state.yamlSrc = s.d ?? "";
+          ctx.state.transformSrc = s.t ?? "";
+          ctx.state.helpersSrc = s.h ?? ""; // custom-helper source (ADR-018), separate field
+          ctx.state.catalogSource = s.cat ?? ""; // i18n message catalog (ADR-029)
+          ctx.state.labLocale = s.loc ?? "en";   // i18n active locale
+          ctx.state.labPathSchema = Array.isArray(s.ps) ? s.ps.map((p) => String(p)) : []; // ADR-030 path schema
           // Data overlays — accept only entries whose name passes the same
           // validator the UI enforces, dedupe by name (last write wins so
           // the shared snapshot's order is preserved as far as possible).
-          dataOverlays = [];
+          ctx.state.dataOverlays = [];
           if (Array.isArray(s.do)) {
             const seen = new Set();
             for (const o of s.do) {
@@ -4065,22 +4049,22 @@
               const name = String(o.n ?? "");
               if (validateOverlayName(name) || seen.has(name)) continue;
               seen.add(name);
-              dataOverlays.push({ name, source: String(o.s ?? ""), dirty: false });
+              ctx.state.dataOverlays.push({ name, source: String(o.s ?? ""), dirty: false });
             }
           }
-          yamlDirty = false; transformDirty = false;
-          exampleModified = false;
-          dataTab = "edit"; dataFile = "data"; openEditors = autoOpenEditors();
+          ctx.state.yamlDirty = false; ctx.state.transformDirty = false;
+          ctx.state.exampleModified = false;
+          dataTab = "edit"; dataFile = "data"; ctx.state.openEditors = autoOpenEditors();
           templateMode = s.hm === 1 ? "helpers" : s.tm === 1 ? "transform" : "tmpl";
           showDataTab();
           escapeMode = s.e ?? "";
           byId("escape-select").value = escapeMode;
           standalone   = s.sa !== 0;  // default true; explicit 0 opts out
-          minbarsCompat = s.mj !== 0; // default mustacheJs; explicit mj:0 = spec (ADR-029)
-          allowList = Array.isArray(s.al) ? s.al.map(String) : null;
+          ctx.state.minbarsCompat = s.mj !== 0; // default mustacheJs; explicit mj:0 = spec (ADR-029)
+          ctx.state.allowList = Array.isArray(s.al) ? s.al.map(String) : null;
           syncStandaloneUI();
           updateRenderStatus();
-          loadedExampleIdx = -1;
+          ctx.state.loadedExampleIdx = -1;
           setExampleLabel("(custom)");
           setOutputView(validView(s.v));
           // A shared "Lint" link opens the requested dock panel (feature-gated
@@ -4338,8 +4322,8 @@
       // generated, not a source, so it's excluded.
       function searchSources() {
         const out = tabs.map((t) => ({ file: t.name, kind: "tmpl", source: t.source }));
-        out.push({ file: "data.yaml", kind: "data", source: yamlSrc });
-        if (transformSrc.trim()) out.push({ file: "transform", kind: "transform", source: transformSrc });
+        out.push({ file: "data.yaml", kind: "data", source: ctx.state.yamlSrc });
+        if (ctx.state.transformSrc.trim()) out.push({ file: "transform", kind: "transform", source: ctx.state.transformSrc });
         return out;
       }
 
@@ -4394,9 +4378,9 @@
       }
 
       function fileSourceByKind(file, kind) {
-        if (kind === "data") return yamlSrc;
-        if (kind === "transform") return transformSrc;
-        if (kind === "helpers") return helpersSrc;
+        if (kind === "data") return ctx.state.yamlSrc;
+        if (kind === "transform") return ctx.state.transformSrc;
+        if (kind === "helpers") return ctx.state.helpersSrc;
         const i = tabIndexByFile(file);
         return i >= 0 ? tabs[i].source : "";
       }
@@ -4404,20 +4388,20 @@
       // Write a source back and keep the visible editor in sync.
       function setFileSource(file, kind, next) {
         if (kind === "data") {
-          yamlSrc = next;
+          ctx.state.yamlSrc = next;
           if (activeView === "data" && dataTab === "edit" && dataFile === "data") setEditorText(dataView, next);
         } else if (kind === "transform") {
-          transformSrc = next;
+          ctx.state.transformSrc = next;
           // The transform now lives in the template pane.
           if (activeView === "tmpl" && templateMode === "transform") setEditorText(templateView, next);
         } else if (kind === "helpers") {
-          helpersSrc = next;
+          ctx.state.helpersSrc = next;
           if (activeView === "tmpl" && templateMode === "helpers") setEditorText(templateView, next);
         } else {
           const i = tabIndexByFile(file);
           if (i < 0) return;
           tabs[i].source = next;
-          if (i === activeTabIdx && activeView === "tmpl") setEditorText(templateView, next);
+          if (i === ctx.state.activeTabIdx && activeView === "tmpl") setEditorText(templateView, next);
         }
       }
 
@@ -4760,7 +4744,7 @@
             usedTransformers: ctx.caches.lastUsedTransformers,
             stemAllowList: engineHas("stem-allow-list"),
             engineMeta,
-            escapeMode, standalone, allowList,
+            escapeMode, standalone, allowList: ctx.state.allowList,
           }) },
         { id: "perf", label: "Performance",
           count: () => ctx.caches.lastTimings ? Math.round(ctx.caches.lastTimings.totalMs) : 0,
@@ -4796,7 +4780,7 @@
             return ctx.caches.lastAnalyse.findings.length ? "warn" : "success";
           },
           render: (body) => renderTruthiness(body,
-            { analyse: ctx.caches.lastAnalyse, suppressed: ctx.caches.lastAnalyseSuppressed, pathSchema: labPathSchema },
+            { analyse: ctx.caches.lastAnalyse, suppressed: ctx.caches.lastAnalyseSuppressed, pathSchema: ctx.state.labPathSchema },
             { openProblem }) },
         // ADR-019: deprecated aliases + non-canonical scoped variables, each with
         // the canonical spelling the editor quick-fix / `flatbars lint` steers to.
@@ -4812,7 +4796,7 @@
         // the active file / last render (re-rendered by renderDock after each run).
         { id: "context", label: "Context Inspector", noBadge: true, requires: ["context-inspect"],
           count: () => 0, badge: () => "", render: (body) => renderContext(body,
-            { ctxTarget, program: ctx.caches.lastProgram, data: ctx.caches.lastData, inspectAt: renderer.inspectAt, minbarsCompat }) },
+            { ctxTarget, program: ctx.caches.lastProgram, data: ctx.caches.lastData, inspectAt: renderer.inspectAt, minbarsCompat: ctx.state.minbarsCompat }) },
         { id: "ast", label: "Syntax Tree", noBadge: true,
           count: () => 0, badge: () => "", render: renderAst },
       ];
@@ -4994,7 +4978,7 @@
       // Panel #5: Capabilities / escape provenance now lives in
       // ./app/dock/capabilities.mjs — a pure DOM build taking the two caches
       // (ctx.caches.lastEscapeRuns / ctx.caches.lastUsedTransformers), the stem-allow-list capability,
-      // engineMeta, and the render policy (escapeMode / standalone / allowList).
+      // engineMeta, and the render policy (escapeMode / standalone / ctx.state.allowList).
       // The descriptor above passes them.
 
       // Panel #6: Performance now lives in ./app/dock/performance.mjs — the first
@@ -5385,7 +5369,7 @@
       function cfgLine(kv, comment) {
         return kv + " ".repeat(Math.max(1, 26 - kv.length)) + "# " + comment;
       }
-      function buildConfigYaml(v = { escape: escapeMode, trim: standalone, allow: allowList }) {
+      function buildConfigYaml(v = { escape: escapeMode, trim: standalone, allow: ctx.state.allowList }) {
         const esc = v.escape ? v.escape : '""';
         // `null` = unconstrained (the default); a real array (even empty)
         // locks the surface to that positive list. Mirrors the engine's
@@ -5402,11 +5386,11 @@
           cfgLine(`  allow: ${allow}`, "ADR-0013 positive list — ~ = unconstrained (default); [eval] = only listed names render"),
           // MinBars-only: the truthiness rule (ADR-029). Replaces the old UI toggle.
           ...(ENGINE === "minbars"
-            ? ["", "minbars:", cfgLine(`  truthiness: ${minbarsCompat ? "mustacheJs" : "spec"}`, 'mustacheJs (0/"" falsy, default) · spec (0/"" truthy)')]
+            ? ["", "minbars:", cfgLine(`  truthiness: ${ctx.state.minbarsCompat ? "mustacheJs" : "spec"}`, 'mustacheJs (0/"" falsy, default) · spec (0/"" truthy)')]
             // t-surfaces: the active locale for catalog.yaml's messages (ADR-029),
             // plus the ADR-030 analyse path schema (paths the host guarantees safe).
-            : ["", "i18n:", cfgLine(`  locale: ${labLocale}`, "the locale catalog.yaml is rendered in"),
-              "", "analyse:", cfgLine(`  pathSchema: [${labPathSchema.join(", ")}]`, "ADR-030 — paths guaranteed safe; suppresses their potential/miss findings")]),
+            : ["", "i18n:", cfgLine(`  locale: ${ctx.state.labLocale}`, "the locale catalog.yaml is rendered in"),
+              "", "analyse:", cfgLine(`  pathSchema: [${ctx.state.labPathSchema.join(", ")}]`, "ADR-030 — paths guaranteed safe; suppresses their potential/miss findings")]),
         ].join("\n");
       }
 
@@ -5574,7 +5558,7 @@
         const mod = e.metaKey || e.ctrlKey;
         if (mod && e.shiftKey && e.key.toLowerCase() === "f") {
           e.preventDefault(); showSearch();
-        } else if (e.key === "Escape" && focusMode) {
+        } else if (e.key === "Escape" && ctx.state.focusMode) {
           setFocus(null);
         }
       });
