@@ -4,16 +4,16 @@
 -- | scanner (`Lexer.tokenizeTemplate`) to delimit tags, builds the tree from the
 -- | flat token stream, and parses each tag's *interior* by first lexing it into
 -- | an interior token stream (`FlatBars.Token.tokenizeInterior`) and then handing
--- | those tokens to the dialect grammar (`ParseOptions.parseExpr`; the default is
--- | the prefix grammar `FlatBars.Expr`). Tokenizing is meaning-free and shared;
--- | the grammar (prefix vs. MaxBars infix) is the dialect seam.
+-- | those tokens to the core prefix grammar (`FlatBars.Expr`). This serves
+-- | RawBars/ClassicBars/MinBars, whose head and output grammars are identical;
+-- | MaxBars, which needed a distinct infix head grammar, owns its own parser
+-- | (`MaxBars.Parser`, ADR-041).
 module FlatBars.Parser
   ( parse
   , parseWith
   , parseRecovering
   , ParseResult
   , ParseOptions
-  , ExprParser
   , defaultParseOptions
   , buildFromTokens
   , collectDirectives
@@ -37,30 +37,17 @@ import FlatBars.Span (Span)
 import FlatBars.Syntax (Directive, Expr(..), Node(..), Sigil(..), Template)
 import FlatBars.Token (Interior, LexOptions, PosToken, Token(..), defaultLexOptions)
 
--- | A tag-interior expression parser: it consumes the interior **token stream**
--- | (the core tokenizes interiors via `FlatBars.Token.tokenizeInterior`; this
--- | parses those tokens into an `Expr`). The core grammar (`FlatBars.Expr`) is
--- | the default; a *dialect* (e.g. MaxBars, with infix operators and pipes)
--- | plugs in its own — the structural tree-builder below is grammar-agnostic.
-type ExprParser = Array PosToken -> Either ParseError Expr
-
 -- | Knobs the *front-end* (CLI/host) sets; per-file `@`-directives may override
 -- | them. `trimStandalone` toggles Handlebars-style standalone whitespace
 -- | removal (default on; a `@trim: standalone | none` directive wins over it).
--- | `parseExpr` is the interior expression grammar (dialect seam). `extras`
--- | allows the Handlebars-only tag shapes — raw blocks `{{{{…}}}}`, the inverse
--- | block `{{^…}}`/`{{{^…}}}`, and unescaped `{{&…}}`. The core *lexer* always
--- | recognizes them (meaning-free); a dialect that doesn't accept them (RawBars,
--- | MaxBars) sets `extras = false` and the parser rejects them.
--- | `parseHead` parses a *head* — a helper name then arguments (`{{# … }}` opens
--- | AND `{{ name args }}` separators like `{{elif …}}`/`{{when …}}`); it defaults to
--- | `parseExpr` (so the head reads exactly like any other interior), but a dialect
--- | may override it to parse the head specially — MaxBars uses this to read
--- | `{{#if a && b}}` (and `{{elif a < b}}`) as `if (a && b)` (the helper name then a
--- | single infix condition), which the uniform expression grammar cannot, since
--- | application binds tighter than the operators. Block opens and ident-headed
--- | separators consult it; output, closes, raw blocks, and bare-value tags keep
--- | `parseExpr`.
+-- | The interior expression grammar is the core prefix grammar (`FlatBars.Expr`)
+-- | for every dialect this parser serves (RawBars/ClassicBars/MinBars); their head
+-- | and output grammars are identical, so there is no head/output seam. MaxBars,
+-- | which needed a distinct infix head grammar, owns its own parser now (ADR-041).
+-- | `extras` allows the Handlebars-only tag shapes — raw blocks `{{{{…}}}}`, the
+-- | inverse block `{{^…}}`/`{{{^…}}}`, and unescaped `{{&…}}`. The core *lexer*
+-- | always recognizes them (meaning-free); a dialect that doesn't accept them
+-- | (RawBars) sets `extras = false` and the parser rejects them.
 -- | `inheritance` gates the Mustache-inheritance block shapes — the parent tag
 -- | `{{<name}}…{{/name}}` (`Parent`) and the override-block tag
 -- | `{{$name}}…{{/name}}` (`BlockDef`), each with a dynamic `*`-headed spelling.
@@ -73,8 +60,6 @@ type ExprParser = Array PosToken -> Either ParseError Expr
 -- | `{{ x }}` separator (indistinguishable from output) is left alone.
 type ParseOptions =
   { trimStandalone :: Boolean
-  , parseExpr :: ExprParser
-  , parseHead :: ExprParser
   , extras :: Boolean
   , inheritance :: Boolean
   -- opt-in for the Handlebars block sigils the core now lexes structurally:
@@ -93,14 +78,11 @@ type ParseOptions =
   , lexConfig :: LexConfig
   }
 
--- | Standalone trimming on (Handlebars parity), the core expression grammar, and
--- | Handlebars-extras allowed (the engine + ClassicBars use this; RawBars/MaxBars
--- | override `extras = false`).
+-- | Standalone trimming on (Handlebars parity) and Handlebars-extras allowed (the
+-- | engine + ClassicBars use this; RawBars overrides `extras = false`).
 defaultParseOptions :: ParseOptions
 defaultParseOptions =
   { trimStandalone: true
-  , parseExpr: Expr.parseExpr
-  , parseHead: Expr.parseExpr
   , extras: true
   , inheritance: false
   -- the ClassicBars surface accepts both Handlebars block sigils; austere dialects
@@ -164,7 +146,7 @@ parseRecovering opts src = case tokenizeTemplate opts.lexConfig opts.lexOptions 
     -> { nodes :: Template, errors :: Array ParseError }
   runSeq toks idx accNodes accErrs =
     let
-      r = parseSeq opts.parseExpr opts.parseHead (gatesOf opts) toks idx
+      r = parseSeq (gatesOf opts) toks idx
       nodes' = accNodes <> r.nodes
       errs' = accErrs <> r.errors
     in
@@ -203,7 +185,7 @@ buildFromTokens opts toks =
     -- Each tag already carries its pre-lexed interior (`tokenizeTemplate`, or a
     -- dialect pass that re-tokenized after mutating it — see MinBars' Mustache
     -- standalone/partial-indent pass).
-    r = parseSeq opts.parseExpr opts.parseHead (gatesOf opts)
+    r = parseSeq (gatesOf opts)
       (Array.filter (not <<< isComment) toks)
       0
   in
@@ -328,25 +310,24 @@ isSpace c = c == ' ' || c == '\t' || c == '\n' || c == '\r'
 -- | (`Right []`, i.e. blank or whitespace-only) is `EmptyOutput` at the tag's
 -- | offset (not the interior's), matching the diagnostics tests; an interior lex
 -- | error rides through as `Left`.
-outputExpr :: ExprParser -> Span -> Interior -> Either ParseError Expr
-outputExpr pe span = case _ of
+outputExpr :: Span -> Interior -> Either ParseError Expr
+outputExpr span = case _ of
   Left e -> Left e
   Right toks
     | Array.null toks -> Left (EmptyOutput span.start)
-    | otherwise -> pe toks
+    | otherwise -> Expr.parseExpr toks
 
 -- | A *headed* tag (`{{# name args}}`, `{{name args}}`, `{{/name}}`, raw): its
 -- | interior is one application whose head names the helper/block/separator.
 headed
-  :: ExprParser
-  -> Span
+  :: Span
   -> Interior
   -> Either ParseError { name :: String, args :: Array Expr }
-headed pe span = case _ of
+headed span = case _ of
   Left e -> Left e
   Right toks
     | Array.null toks -> Left (HeadNotIdent span.start)
-    | otherwise -> case pe (partialHead toks) of
+    | otherwise -> case Expr.parseExpr (partialHead toks) of
         Left e -> Left e
         Right (App name args) -> Right { name, args }
         Right _ -> Left (HeadNotIdent span.start)
@@ -362,19 +343,6 @@ partialHead toks = case Array.uncons toks of
   Just { head: pt, tail } | pt.tok == TOp ">" -> Array.cons (pt { tok = TIdent ">" }) tail
   _ -> toks
 
--- | Is this bare-tag interior a *clause separator* — does it lead with one of the
--- | engine's clause-marker names (`else`/`elif`/…)? Such a tag (`{{elif a < b}}`) is
--- | a head and is parsed through `parseHead` (`name arg*`), so its args read like a
--- | block head's: `elif (lt a b)`, not the `lt ((elif a)) b` the output grammar
--- | would fold (the `{{elif}}`-needs-parens bug). Every other bare tag (`{{ a && b }}`,
--- | `{{ x }}`, `{{42}}`) stays an output expression parsed through `parseExpr`.
-sepHeadIsClause :: Array String -> Interior -> Boolean
-sepHeadIsClause seps = case _ of
-  Right toks -> case _.tok <$> Array.head toks of
-    Just (TIdent n) -> Array.elem n seps
-    _ -> false
-  Left _ -> false
-
 -- | Project a `ParseOptions` onto the block-sigil opt-in `Gates` the tree
 -- | builder threads through nested blocks.
 gatesOf :: ParseOptions -> Gates
@@ -385,7 +353,6 @@ gatesOf opts =
   , partialBlocks: opts.partialBlocks
   , rawBlockHbs: opts.rawBlockHbs
   , rawBlockHash: opts.rawBlockHash
-  , clauseSeps: opts.standaloneSeps
   }
 
 -- | `headed`, but for the *recovering* parser: it never discards everything on a
@@ -394,15 +361,14 @@ gatesOf opts =
 -- | name `"if"`, no args, and the args error. Only a genuinely head-less interior
 -- | (no leading identifier) yields `name = Nothing`.
 headedRecovering
-  :: ExprParser
-  -> Span
+  :: Span
   -> Interior
   -> { name :: Maybe String, args :: Array Expr, error :: Maybe ParseError }
-headedRecovering pe span = case _ of
+headedRecovering span = case _ of
   Left e -> { name: Nothing, args: [], error: Just e }
   Right toks
     | Array.null toks -> { name: Nothing, args: [], error: Just (HeadNotIdent span.start) }
-    | otherwise -> case pe (partialHead toks) of
+    | otherwise -> case Expr.parseExpr (partialHead toks) of
         Right (App name args) -> { name: Just name, args, error: Nothing }
         Right _ -> { name: Nothing, args: [], error: Just (HeadNotIdent span.start) }
         Left e -> { name: salvageName (partialHead toks), args: [], error: Just e }
@@ -433,7 +399,7 @@ type SeqResult = { nodes :: Template, stop :: Stop, errors :: Array ParseError }
 -- | a close `{{/name}}`. A block captures a single body; multi-branch control
 -- | flow is expressed as nested clause blocks the engine interprets.
 -- | The per-block-sigil opt-in gates, carried as one record so the recursive
--- | block descent threads a single value rather than four loose booleans.
+-- | block descent threads a single value rather than six loose booleans.
 type Gates =
   { extras :: Boolean
   , inheritance :: Boolean
@@ -441,22 +407,14 @@ type Gates =
   , partialBlocks :: Boolean
   , rawBlockHbs :: Boolean
   , rawBlockHash :: Boolean
-  -- The clause-separator head names (`else`/`elif`/…). A bare `{{ name args }}` tag
-  -- whose head is one of these is a *clause marker* parsed through `parseHead`
-  -- (`name arg*`, so `{{elif a < b}}` reads `elif (lt a b)`); any other bare tag is
-  -- an output expression parsed through `parseExpr` (so `{{ a && b }}` stays
-  -- `and(a,b)`). Same list `trimStandalone` uses.
-  , clauseSeps :: Array String
   }
 
 parseSeq
-  :: ExprParser
-  -> ExprParser
-  -> Gates
+  :: Gates
   -> Array RawTok
   -> Int
   -> SeqResult
-parseSeq pe ph gates toks = go Nil []
+parseSeq gates toks = go Nil []
   where
   -- Siblings accumulate in a *reversed* `List` (O(1) prepend); the finished
   -- run is reversed into an `Array` once. Building the `Template` with
@@ -488,7 +446,7 @@ parseSeq pe ph gates toks = go Nil []
       -- An unterminated construct from the recovering lexer (ADR-023): record its
       -- structural error in source order and drop a `NodeError` marker in place.
       RError sp e -> recover acc errs sp e (i + 1)
-      ROutput span _ _ int -> case outputExpr pe span int of
+      ROutput span _ _ int -> case outputExpr span int of
         Left e -> recover acc errs span e (i + 1)
         Right e -> go (Output span e : acc) errs (i + 1)
       -- `{{&x}}` is unescaped output (= `{{{x}}}`); a Handlebars-extra, gated.
@@ -496,7 +454,7 @@ parseSeq pe ph gates toks = go Nil []
         | not gates.extras -> recover acc errs span
             (DisallowedShape "{{& }} (unescaped output)" span.start)
             (i + 1)
-        | otherwise -> case outputExpr pe span int of
+        | otherwise -> case outputExpr span int of
             Left e -> recover acc errs span e (i + 1)
             Right e -> go (Output span e : acc) errs (i + 1)
       -- Two raw-block spellings, gated separately: `{{{{#name}}}}` (FlatBars,
@@ -509,31 +467,25 @@ parseSeq pe ph gates toks = go Nil []
         | not hash && not gates.rawBlockHbs -> recover acc errs span
             (DisallowedShape "{{{{ }}}} (raw block)" span.start)
             (i + 1)
-        | otherwise -> case headed pe span int of
+        | otherwise -> case headed span int of
             Left e -> recover acc errs span e (i + 1)
             Right h -> go (RawBlock span h.name h.args body : acc) errs (i + 1)
-      -- A bare `{{ … }}` tag. A *clause separator* (head ∈ `clauseSeps`, e.g.
-      -- `{{elif …}}`/`{{else}}`) is a head, parsed through `parseHead` so its infix
-      -- args read like a block head's (`{{elif a < b}}` → `elif (lt a b)`). Every
-      -- other bare tag is an output expression, parsed through `parseExpr` as before
-      -- (`{{ a && b }}` → `and(a,b)`). For ClassicBars the two grammars are identical,
-      -- so this only changes MaxBars (where `parseHead` is the `name arg*` grammar).
+      -- A bare `{{ … }}` tag. Its interior is read by the one core expression
+      -- grammar (head and output are identical for the dialects this parser serves
+      -- — MaxBars, which distinguished them, owns its own parser now, ADR-041).
       RSep span _ s int ->
-        let
-          hp = if sepHeadIsClause gates.clauseSeps int then ph else pe
-        in
-          case headed hp span int of
-            Right h -> go (Sep span h.name h.args : acc) errs (i + 1)
-            -- A non-empty interior that is a bare literal (`{{42}}`, `{{"x"}}`) is
-            -- not an application head, but it is still a valid value — emit it as
-            -- output, the same node `{{{42}}}` produces. An empty `{{}}` keeps its
-            -- HeadNotIdent error (the guard excludes it).
-            Left (HeadNotIdent _)
-              | trim s /= "" -> case outputExpr pe span int of
-                  Left e -> recover acc errs span e (i + 1)
-                  Right e -> go (Output span e : acc) errs (i + 1)
-            Left e -> recover acc errs span e (i + 1)
-      RClose span base _ int -> case headed pe { start: base, end: base } int of
+        case headed span int of
+          Right h -> go (Sep span h.name h.args : acc) errs (i + 1)
+          -- A non-empty interior that is a bare literal (`{{42}}`, `{{"x"}}`) is
+          -- not an application head, but it is still a valid value — emit it as
+          -- output, the same node `{{{42}}}` produces. An empty `{{}}` keeps its
+          -- HeadNotIdent error (the guard excludes it).
+          Left (HeadNotIdent _)
+            | trim s /= "" -> case outputExpr span int of
+                Left e -> recover acc errs span e (i + 1)
+                Right e -> go (Output span e : acc) errs (i + 1)
+          Left e -> recover acc errs span e (i + 1)
+      RClose span base _ int -> case headed { start: base, end: base } int of
         -- A malformed close head can't name a block; flag it and keep scanning,
         -- so the enclosing block still reports its own missing close.
         Left e -> recover acc errs span e (i + 1)
@@ -590,7 +542,7 @@ parseSeq pe ph gates toks = go Nil []
     -> SeqResult
   buildBlock acc errs gateErr span sigil interior i =
     let
-      hr = headedRecovering ph span interior
+      hr = headedRecovering span interior
       errs1 = errs <> Array.catMaybes [ gateErr, hr.error ]
     in
       case hr.name of
@@ -598,7 +550,7 @@ parseSeq pe ph gates toks = go Nil []
           i
         Just name ->
           let
-            inner = parseSeq pe ph gates toks i
+            inner = parseSeq gates toks i
             errs2 = errs1 <> inner.errors
             node = Block span sigil name hr.args inner.nodes
           in
