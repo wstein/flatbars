@@ -10,6 +10,7 @@ import { mkdtemp, writeFile, mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import { jail, makeFsHandler, injectToken, createLabServer } from "./lab-server.mjs";
+import { localFileProvider } from "../lab/app/file-provider.mjs";
 
 async function fixture() {
   const dir = await mkdtemp(join(tmpdir(), "fb-lab-"));
@@ -90,10 +91,12 @@ test("(3) writes are forbidden by default, allowed under --write, and jailed", a
   assert.equal((await call(rw, { url: "/__fs/write?path=../escape.txt", method: "POST", headers: ok(), body: "x" })).code, 403);
 });
 
-test("injectToken inserts window.__FB_TOKEN into the page head", () => {
+test("injectToken inserts the token + the fb-transport=local meta into the head", () => {
   const out = injectToken("<html><head><title>x</title></head><body></body></html>", "secret");
   assert.match(out, /window\.__FB_TOKEN="secret"/);
+  assert.match(out, /<meta name="fb-transport" content="local">/);
   assert.ok(out.indexOf("__FB_TOKEN") < out.indexOf("</head>"));
+  assert.ok(out.indexOf("fb-transport") < out.indexOf("</head>"));
 });
 
 test("end-to-end: the server serves the bridge over a real socket", async () => {
@@ -108,6 +111,34 @@ test("end-to-end: the server serves the bridge over a real socket", async () => 
     const bad = await fetch(`http://127.0.0.1:${port}/__fs/read?path=hello.hbs`);
     assert.equal(bad.status, 403);
   } finally {
+    server.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("end-to-end: the local provider's watch() fires on a file change (SSE)", async () => {
+  const root = await fixture();
+  const labRoot = resolve(import.meta.dirname, "..");
+  const { server, token } = createLabServer({ labRoot, projectRoot: root });
+  await new Promise((r) => server.listen(0, "127.0.0.1", r));
+  const port = server.address().port;
+  const provider = localFileProvider({ token, base: `http://127.0.0.1:${port}/__fs` });
+  assert.ok(provider.capabilities.has("watch"));
+
+  const seen = [];
+  let resolveChange;
+  const got = new Promise((r) => (resolveChange = r));
+  // Resolve only when the hello.hbs change arrives (recursive watch may also emit
+  // stray events for the fixture's other paths).
+  const stop = provider.watch((evt) => { seen.push(evt); if (evt.path && evt.path.includes("hello.hbs")) resolveChange(); });
+  try {
+    // Give the SSE stream a moment to attach, then touch a file.
+    await new Promise((r) => setTimeout(r, 100));
+    await writeFile(join(root, "hello.hbs"), "Hi {{name}}!! changed");
+    await Promise.race([got, new Promise((_, rej) => setTimeout(() => rej(new Error("watch timed out")), 3000))]);
+    assert.ok(seen.some((e) => e.path && e.path.includes("hello.hbs")), `expected a hello.hbs change, saw ${JSON.stringify(seen)}`);
+  } finally {
+    stop();
     server.close();
     await rm(root, { recursive: true, force: true });
   }

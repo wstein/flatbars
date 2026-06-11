@@ -164,14 +164,83 @@ fn list_dir(dir: &Path) -> std::io::Result<String> {
     Ok(format!("[{}]", items.join(",")))
 }
 
-/// Inject the session token into the served Lab page so the in-page `local` provider
-/// can authenticate (Phase 6 adds the `<meta fb-transport=local>` that flips boot).
+/// Inject the bootstrap the in-page `local` provider needs: the session token
+/// (`window.__FB_TOKEN`) and the `<meta name="fb-transport" content="local">` that
+/// flips boot into project mode (Phase 6).
 pub fn inject_token(html: &str, token: &str) -> String {
-    let tag = format!("<script>window.__FB_TOKEN={};</script>", json_str(token));
+    let tag = format!(
+        "<meta name=\"fb-transport\" content=\"local\">\n<script>window.__FB_TOKEN={};</script>",
+        json_str(token)
+    );
     match html.find("</head>") {
         Some(i) => format!("{}{tag}\n{}", &html[..i], &html[i..]),
         None => format!("{tag}{html}"),
     }
+}
+
+/// Is this `/__fs/*` request authorized? `None` = ok; `Some(reason)` = a 403 reason.
+/// Shared by the bridge ops and the watch stream (the watch can't return a buffered
+/// [`Resp`], so it needs the decision separately).
+pub fn fs_auth_error(headers: &BTreeMap<String, String>, token: &str, origin: Option<&str>) -> Option<&'static str> {
+    if headers.get("x-fb-token").map(String::as_str) != Some(token) {
+        return Some("bad or missing token");
+    }
+    if let (Some(req_origin), Some(server_origin)) = (headers.get("origin"), origin)
+        && req_origin != server_origin
+    {
+        return Some("cross-origin");
+    }
+    None
+}
+
+/// A recursive snapshot of file modification times under `root`, keyed by `/`-joined
+/// relative path. The watch loop diffs successive snapshots (std-only — no notify dep).
+pub fn scan_mtimes(root: &Path) -> BTreeMap<String, std::time::SystemTime> {
+    let mut out = BTreeMap::new();
+    scan_into(root, root, &mut out);
+    out
+}
+
+fn scan_into(root: &Path, dir: &Path, out: &mut BTreeMap<String, std::time::SystemTime>) {
+    let Ok(entries) = fs::read_dir(dir) else { return };
+    for e in entries.flatten() {
+        let path = e.path();
+        let Ok(ft) = e.file_type() else { continue };
+        if ft.is_dir() {
+            scan_into(root, &path, out);
+        } else if let Ok(meta) = e.metadata()
+            && let Ok(mtime) = meta.modified()
+            && let Ok(rel) = path.strip_prefix(root)
+        {
+            out.insert(rel.to_string_lossy().replace('\\', "/"), mtime);
+        }
+    }
+}
+
+/// The changes between two [`scan_mtimes`] snapshots: a new/modified file is `"change"`,
+/// a vanished one is `"rename"` (matching the Node server's vocabulary). Sorted by path.
+pub fn diff_scans(
+    prev: &BTreeMap<String, std::time::SystemTime>,
+    cur: &BTreeMap<String, std::time::SystemTime>,
+) -> Vec<(String, &'static str)> {
+    let mut changes = Vec::new();
+    for (path, mtime) in cur {
+        if prev.get(path) != Some(mtime) {
+            changes.push((path.clone(), "change"));
+        }
+    }
+    for path in prev.keys() {
+        if !cur.contains_key(path) {
+            changes.push((path.clone(), "rename"));
+        }
+    }
+    changes.sort();
+    changes
+}
+
+/// One SSE `data:` frame for a change event (`data: {"path":…,"type":…}\n\n`).
+pub fn sse_change(path: &str, kind: &str) -> String {
+    format!("data: {{\"path\":{},\"type\":\"{kind}\"}}\n\n", json_str(path))
 }
 
 /// Parse the request head (everything before the blank line): the request line + the
@@ -374,5 +443,44 @@ mod tests {
         let t = make_token();
         assert_eq!(t.len(), 48);
         assert!(t.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn fs_auth_error_enforces_token_and_origin() {
+        let mut h = BTreeMap::new();
+        assert_eq!(fs_auth_error(&h, "tok", None), Some("bad or missing token"));
+        h.insert("x-fb-token".into(), "tok".into());
+        assert_eq!(fs_auth_error(&h, "tok", None), None);
+        h.insert("origin".into(), "http://evil.test".into());
+        assert_eq!(fs_auth_error(&h, "tok", Some("http://127.0.0.1:9000")), Some("cross-origin"));
+        h.insert("origin".into(), "http://127.0.0.1:9000".into());
+        assert_eq!(fs_auth_error(&h, "tok", Some("http://127.0.0.1:9000")), None);
+    }
+
+    #[test]
+    fn scan_and_diff_detect_added_changed_removed() {
+        let dir = std::env::temp_dir().join(format!("fb-lab-watch-{}", make_token()));
+        fs::create_dir_all(dir.join("sub")).unwrap();
+        fs::write(dir.join("a.hbs"), "one").unwrap();
+        let snap1 = scan_mtimes(&dir);
+        assert!(snap1.contains_key("a.hbs"));
+
+        // Add a nested file → a "change" for the new path.
+        fs::write(dir.join("sub").join("b.hbs"), "two").unwrap();
+        let snap2 = scan_mtimes(&dir);
+        let added = diff_scans(&snap1, &snap2);
+        assert_eq!(added, vec![("sub/b.hbs".to_string(), "change")]);
+
+        // Remove a file → a "rename".
+        fs::remove_file(dir.join("a.hbs")).unwrap();
+        let snap3 = scan_mtimes(&dir);
+        assert_eq!(diff_scans(&snap2, &snap3), vec![("a.hbs".to_string(), "rename")]);
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn sse_change_is_a_valid_frame() {
+        assert_eq!(sse_change("sub/x.hbs", "change"), "data: {\"path\":\"sub/x.hbs\",\"type\":\"change\"}\n\n");
     }
 }

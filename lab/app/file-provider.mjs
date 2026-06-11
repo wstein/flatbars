@@ -110,7 +110,7 @@ export function localFileProvider({ token = "", base = "/__fs", fetchImpl } = {}
   const url = (op, path) => `${base}/${op}?path=${encodeURIComponent(path)}`;
   return {
     id: "local",
-    capabilities: new Set(["read", "list"]),
+    capabilities: new Set(["read", "list", "watch"]),
     // Mirrors httpFileProvider.readText: the body is returned regardless of status,
     // so a missing optional partial yields the server's 404 body exactly as before.
     readText: (path) => doFetch(url("read", path), { headers }).then((r) => r.text()),
@@ -122,6 +122,32 @@ export function localFileProvider({ token = "", base = "/__fs", fetchImpl } = {}
       if (!res.ok) throw new Error(`${dir}: ${res.status} ${res.statusText}`);
       return res.json();
     }),
+    // Subscribe to change events over the launch dir (Phase 6 — render/analyse-on-save).
+    // Consumes the `/__fs/watch` SSE through a fetch stream so the token rides in the
+    // header (EventSource can't set headers). Returns an unsubscribe that aborts it.
+    watch: (cb, path = ".") => {
+      const ctrl = new AbortController();
+      (async () => {
+        const res = await doFetch(url("watch", path), { headers, signal: ctrl.signal });
+        if (!res.ok || !res.body) throw new Error(`watch: ${res.status}`);
+        const reader = res.body.getReader();
+        const dec = new TextDecoder();
+        let buf = "";
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          let i;
+          while ((i = buf.indexOf("\n\n")) >= 0) {
+            const evt = buf.slice(0, i);
+            buf = buf.slice(i + 2);
+            const line = evt.split("\n").find((l) => l.startsWith("data:"));
+            if (line) { try { cb(JSON.parse(line.slice(5).trim())); } catch { /* keep-alive / non-JSON */ } }
+          }
+        }
+      })().catch(() => { /* aborted or stream ended */ });
+      return () => ctrl.abort();
+    },
   };
 }
 

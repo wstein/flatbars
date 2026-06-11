@@ -287,8 +287,15 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   Lab. The bridge NEVER renders (the engine is in-page wasm); its security baseline is a
   per-session token (`window.__FB_TOKEN`), a CSRF `Origin` guard, read-only unless
   `--write`, and 127.0.0.1-only. `scripts/lab-server.mjs` (`npm run lab:local`) is the
-  Node reference of the same server. The project model that consumes the transport (and
-  flips boot to the `local` provider) is the Phase 6 follow-up.
+  Node reference of the same server. Both servers also expose `/__fs/watch` (SSE — Node
+  `fs.watch`; the Rust binary std-only mtime polling) and inject `<meta
+  name="fb-transport" content="local">`, which flips boot into **project mode**: when
+  `detectTransport` sees it, `lab/app/project.mjs` walks the launch directory into a
+  workspace (a `main` template + cross-tree partials + a data file) and the Lab
+  re-renders on save via the provider's `watch()`. The `local_project_smoke.mjs` browser
+  test proves project mode + render-on-save end to end. Still open (the workbench
+  follow-ups): writing edits back to disk, glob analyze/lint across the tree, and the
+  differential provider picker (Phase 7).
 - **`cli`** (`flatbars-cli`) — render templates, and the `examples verify`
   conformance gate.
 - **`linter`** — cross-dialect lowering (MaxBars → RawBars source).

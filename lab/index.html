@@ -1730,7 +1730,8 @@
       import { renderContext } from "./app/dock/context.mjs?v=9673ce33";
       import { createOutputView } from "./app/output.mjs?v=55b63f9a";
       import { createRun } from "./app/render.mjs?v=a8f9db2f";
-      import { httpFileProvider } from "./app/file-provider.mjs?v=a6459bdb";
+      import { httpFileProvider, detectTransport, localFileProvider } from "./app/file-provider.mjs?v=8f21c2e4";
+      import { loadProject } from "./app/project.mjs?v=d018f0c6";
       import { createStatusBar } from "./app/statusbar.mjs?v=15b53d45";
       import { TRANSFORMER_RISK } from "./app/transformer-risk.mjs?v=c55054b4";
       import { EditorState, Annotation, StateField, StateEffect, Compartment } from "https://esm.sh/@codemirror/state@6.5.2/es2022/state.mjs";
@@ -3458,6 +3459,53 @@
         showActiveTab(); run();
       }
 
+      // ── Project mode (Phase 6) ────────────────────────────────────────────
+      // When the page was served by `trussbars lab` (detectTransport → local), the Lab
+      // is a workbench over a real directory: load its template tree (main + cross-tree
+      // partials + a data file) instead of the bundled examples, and re-render on save.
+      let projectWatchStop = null;
+      function applyWorkspace(ws) {
+        ctx.state.tabs = ws.tabs.map((t) => ({ name: t.name, source: t.source, dirty: false }));
+        ctx.state.activeTabIdx = 0; ctx.state.activeView = "tmpl";
+        ctx.state.yamlSrc = ws.dataSource || "{}";
+        ctx.state.transformSrc = "";
+        ctx.state.helpersSrc = ""; ctx.state.catalogSource = ""; ctx.state.catalogDirty = false;
+        ctx.state.labLocale = "en"; ctx.state.labPathSchema = [];
+        ctx.state.dataOverlays = [];
+        ctx.state.dataTab = "edit"; ctx.state.dataFile = "data"; ctx.state.openEditors = autoOpenEditors();
+        templateMode = "tmpl"; showDataTab();
+        ctx.state.escapeMode = ""; byId("escape-select").value = "";
+        ctx.state.standalone = true; ctx.state.minbarsCompat = true; ctx.state.allowList = null;
+        syncStandaloneUI(); updateRenderStatus();
+        setExampleLabel(`Project · ${ws.root === "." ? "(launch dir)" : ws.root}${ws.truncated ? " (truncated)" : ""}`);
+        { const s = byId("vendored-source"); if (s) s.hidden = true; }
+        ctx.state.loadedExampleIdx = -1; ctx.state.exampleModified = false;
+        ctx.state.yamlDirty = false; ctx.state.transformDirty = false;
+        outLangChoice = "Auto"; persistOutLang(); updateLangPlaceholder();
+        setOutputView(validView("source"));
+        showActiveTab(); run();
+      }
+      async function enterProjectMode(token) {
+        const projectFiles = localFileProvider({ token });
+        applyWorkspace(await loadProject(projectFiles));
+        // render-on-save: reload the workspace on any change (the on-disk file is the
+        // source of truth in project mode), debounced, preserving the active tab.
+        if (projectFiles.capabilities.has("watch")) {
+          let timer = null;
+          projectWatchStop = projectFiles.watch(() => {
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(async () => {
+              const activeName = ctx.state.tabs[ctx.state.activeTabIdx]?.name;
+              try {
+                applyWorkspace(await loadProject(projectFiles));
+                const idx = ctx.state.tabs.findIndex((t) => t.name === activeName);
+                if (idx >= 0) { ctx.state.activeTabIdx = idx; showActiveTab(); }
+              } catch (err) { setError("project reload: " + (err && err.message || err)); }
+            }, 80);
+          });
+        }
+      }
+
       // ── Vendored conformance fixtures (example-loader-spec.md §8, E2) ──────
       // `?vendored=<id>` deep-links a fixture from the vendored corpus
       // (lab/examples/vendored/<id>.json). The fixture must run under
@@ -5057,8 +5105,12 @@
       // The app shell + handlers are wired by here, so a failed example load shows
       // the overlay but does not re-throw — the cosmetic init below still runs.
       try {
+        const transport = detectTransport();
         const vendoredParam = new URLSearchParams(location.search).get("vendored");
-        if (vendoredParam) {
+        if (transport.id === "local") {
+          // Served by `trussbars lab`: open the launch directory as a workspace.
+          await enterProjectMode(transport.token);
+        } else if (vendoredParam) {
           await loadVendoredById(vendoredParam);
         } else if (!(await restoreHash())) {
           // Landing example: "greeting" (ClassicBars/MaxBars catalogs) or "hello"

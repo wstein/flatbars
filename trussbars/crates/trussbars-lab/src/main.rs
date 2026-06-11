@@ -13,8 +13,11 @@ use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::thread;
 
+use std::time::Duration;
+
 use trussbars_lab::{
-    handle_fs, inject_token, jail, make_token, mime_for, parse_head, split_target, Req, Resp,
+    diff_scans, fs_auth_error, handle_fs, inject_token, jail, make_token, mime_for, parse_head,
+    scan_mtimes, split_target, sse_change, Req, Resp,
 };
 
 fn main() {
@@ -96,6 +99,16 @@ fn serve(mut stream: TcpStream, project: &Path, lab_root: &Path, token: &str, al
     };
     let (path, query) = split_target(&target);
 
+    // The watch SSE stream is special-cased: it holds the connection open and can't
+    // return a buffered Resp. Auth mirrors the bridge; then mtime-poll + push changes.
+    if path == "/__fs/watch" {
+        let origin = format!("http://127.0.0.1:{port}");
+        if let Some(reason) = fs_auth_error(&headers, token, Some(&origin)) {
+            return write_resp(&mut stream, &Resp::text(403, "Forbidden", format!("forbidden: {reason}")));
+        }
+        return watch_stream(stream, project);
+    }
+
     // Read the body (Content-Length) for writes.
     let mut body = buf[head_end + 4..].to_vec();
     if let Some(len) = headers.get("content-length").and_then(|v| v.parse::<usize>().ok()) {
@@ -152,6 +165,26 @@ fn route(
             Err(_) => Resp::text(404, "Not Found", format!("404 not found: {path}")),
         },
         None => Resp::text(403, "Forbidden", "forbidden"),
+    }
+}
+
+/// The `/__fs/watch` SSE loop — std-only: poll the tree's mtimes every ~400ms and push
+/// a `data:` frame per change. Exits when a write fails (the client disconnected).
+fn watch_stream(mut stream: TcpStream, project: &Path) -> std::io::Result<()> {
+    stream.write_all(
+        b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-store\r\nConnection: keep-alive\r\n\r\n: watching\n\n",
+    )?;
+    stream.flush()?;
+    let mut prev = scan_mtimes(project);
+    loop {
+        std::thread::sleep(Duration::from_millis(400));
+        let cur = scan_mtimes(project);
+        for (path, kind) in diff_scans(&prev, &cur) {
+            stream.write_all(sse_change(&path, kind).as_bytes())?;
+        }
+        stream.write_all(b": ping\n\n")?; // keep-alive + disconnect probe
+        stream.flush()?;
+        prev = cur;
     }
 }
 

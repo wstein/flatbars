@@ -232,13 +232,28 @@ Plus: random port, bind `127.0.0.1` only.
 The `local` FileProvider talks to these endpoints; `boot.mjs` detects the
 injected `<meta fb-transport=local>` and defaults the provider to `trussbars`.
 
-### Phase 6 — Project model + watch
+### Phase 6 — Project model + watch  ✅ DONE (2026-06-11)
 
-On the `local` (and partially `fs-access`) transport: a real workspace —
-multi-file partials resolved across the tree, glob-based `analyze`/`lint`, and
-**render/analyse-on-save** via `watch()` (SSE for `local`, change observers for
-`fs-access`). `app/persist.mjs` gains a disk-backed project store; localStorage
-stays the hosted fallback. This is the toy→workbench jump.
+The toy→workbench jump, in three tested layers:
+- **watch** — `/__fs/watch` SSE on both servers (Node `fs.watch`; the Rust binary
+  std-only mtime polling via `scan_mtimes`/`diff_scans`) + `watch(cb)` on the `local`
+  FileProvider (consumes the SSE through a fetch stream so the token rides in the
+  header). Proven end-to-end over a real socket both sides.
+- **the project model** (`lab/app/project.mjs`) — walks a `list`+`read` provider tree
+  (skipping `node_modules`/dotdirs, bounded by `maxFiles` with truncation surfaced),
+  classifies templates vs data, picks a `main` (index/main/shallowest) + cross-tree
+  partials (keyed by path-without-ext) + a data file. 6 unit tests with a fake provider.
+- **boot project mode** (`lab/index.html`) — when `detectTransport` sees the injected
+  `fb-transport=local` meta, `enterProjectMode` loads the workspace instead of the
+  bundled examples and wires `watch → reload + run` (render-on-save; the on-disk file is
+  the source of truth). Verified in a real browser (`lab/test/local_project_smoke.mjs`):
+  project mode, on-disk render with a cross-tree partial, and render-on-save all pass.
+
+**Still deferred:** glob-based `analyze`/`lint` across the tree, `fs-access` change
+observers (its `watch` capability), and the `app/persist.mjs` disk-backed project
+store (localStorage remains the hosted fallback). Writes from the Lab back to disk
+(`/__fs/write` exists, gated `--write`) are not yet wired to the editors — project
+mode reflects disk read-only for now.
 
 ### Phase 7 — Differential view + provenance diff
 

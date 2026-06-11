@@ -24,7 +24,8 @@
 
 import { createServer } from "node:http";
 import { randomBytes } from "node:crypto";
-import { readFile, readdir, writeFile, stat } from "node:fs/promises";
+import { watch } from "node:fs";
+import { readFile, readdir, writeFile } from "node:fs/promises";
 import { resolve, sep, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { makeHandler } from "./serve-lab.mjs";
@@ -97,12 +98,46 @@ function readBody(req) {
   });
 }
 
-// Inject the session token into the served Lab page so the in-page `local` provider can
-// authenticate. (Phase 6 adds the `<meta fb-transport=local>` that flips boot to the
-// local provider, together with the project model.)
+// Inject the bootstrap the in-page `local` provider needs: the session token
+// (window.__FB_TOKEN, for `/__fs/*` auth) and the `<meta name="fb-transport"
+// content="local">` that flips boot into project mode (selectFileProvider → local).
 export function injectToken(html, token) {
-  const tag = `<script>window.__FB_TOKEN=${JSON.stringify(token)};</script>`;
+  const tag = `<meta name="fb-transport" content="local">\n<script>window.__FB_TOKEN=${JSON.stringify(token)};</script>`;
   return html.includes("</head>") ? html.replace("</head>", `${tag}\n</head>`) : tag + html;
+}
+
+// The `/__fs/watch` SSE handler — a change stream over `root` (Phase 6). Auth +
+// CSRF mirror the bridge; then `fs.watch` (recursive) pushes a debounced
+// `data: {"path","type"}` event per change. The provider's watch() consumes this via a
+// fetch stream (so the token rides in the header). Closing the request stops the watch.
+export function makeWatchHandler(root, { token, origin } = {}) {
+  const base = resolve(root);
+  return (req, res) => {
+    if (token && req.headers["x-fb-token"] !== token) { res.writeHead(403); return res.end("forbidden: bad or missing token"); }
+    const reqOrigin = req.headers["origin"];
+    if (reqOrigin && origin && reqOrigin !== origin) { res.writeHead(403); return res.end("forbidden: cross-origin"); }
+    res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive" });
+    res.write(": watching\n\n");
+    let timer = null;
+    const pending = new Map();
+    const flush = () => {
+      timer = null;
+      for (const [path, type] of pending) res.write(`data: ${JSON.stringify({ path, type })}\n\n`);
+      pending.clear();
+    };
+    let watcher;
+    try {
+      watcher = watch(base, { recursive: true }, (type, filename) => {
+        if (filename == null) return;
+        pending.set(String(filename).split(sep).join("/"), type === "rename" ? "rename" : "change");
+        if (!timer) timer = setTimeout(flush, 50);
+      });
+    } catch (e) {
+      res.write(`event: error\ndata: ${JSON.stringify(String(e && e.message ? e.message : e))}\n\n`);
+    }
+    const keepalive = setInterval(() => res.write(": ping\n\n"), 25000);
+    req.on("close", () => { clearInterval(keepalive); if (timer) clearTimeout(timer); if (watcher) watcher.close(); });
+  };
 }
 
 // Compose the full server: static Lab (over `labRoot`, the repo root → /lab/) + the
@@ -113,6 +148,10 @@ export function createLabServer({ labRoot, projectRoot, allowWrite = false }) {
   const staticHandler = makeHandler(labRoot);
   const server = createServer(async (req, res) => {
     const path = new URL(req.url, "http://127.0.0.1").pathname;
+    if (path === "/__fs/watch") {
+      const origin = `http://${req.headers.host}`;
+      return makeWatchHandler(projectRoot, { token, origin })(req, res);
+    }
     if (path.startsWith("/__fs/")) {
       // Stamp the live origin for the CSRF check now that we know the bound port.
       const origin = `http://${req.headers.host}`;
