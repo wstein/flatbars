@@ -125,7 +125,7 @@ AOT remains the speed story while the VM owns dynamic flexibility.
 **Conclusion (evidence-first, like docs/05):** a *cheap-clone `Value` + tree-walk* clears
 the bar (VM ≥ handlebars, by 3×) without bytecode.
 
-### 4.2 Bytecode VM — separate crate, measured (≥2× the interpreter)
+### 4.2 Bytecode VM — separate crate, measured (faster than the tree-walk)
 
 The deferral was *pending a measurement* that bytecode beats the tree-walk. The bytecode
 VM now lives in its **own crate, `trussbars-vm`** — honestly separated from the tree-walk
@@ -139,32 +139,41 @@ an `Rc` refcount bump per loop entry). It covers the benchmark subset and errors
 rest. Criterion medians (release; the perf-gate min-of-N agrees within noise):
 
 ```text
-              AOT     vy(unsafe)  BYTECODE-VM   interpreter   handlebars
-big-table     36 µs   20 µs       326 µs        1.14 ms       2.67 ms     VM ~3.5× the interpreter
-teams         88 ns   137 ns      403 ns        1.43 µs       4.03 µs     VM ~3.5× the interpreter
+              AOT     vy(unsafe)  BYTECODE-VM   interpreter   Tera     handlebars
+big-table     36 µs   20 µs       329 µs        502 µs        585 µs   2.67 ms    VM ~1.5× the interpreter
+teams         88 ns   137 ns      420 ns        1.20 µs       2.50 µs  4.03 µs    VM ~2.9× the interpreter
 ```
 
-> **Correction (the honest re-measurement).** The earlier figures here showed the
-> tree-walk at ~1.14 ms / ~1.25 µs but the *benchmark column* at ~371 µs — because the
-> interpreter's `Template` silently ran the bytecode fast path for the covered subset, so
-> the "interpreter" column was secretly measuring bytecode (the two came out *tied*). That
-> fast path is **removed**: `trussbars-interp` is now a pure tree-walker, and the columns
-> measure what they say. The true interpreter is ~1.14 ms; the (now borrow-based) VM is
-> ~326 µs — **~3.5× faster**, comfortably past the 2× bar, and the perf gate ratchets
-> `VM × 2 ≤ interpreter` on both workloads.
+> **Two honest re-measurements.** (1) The original figures showed the tree-walk at
+> ~1.14 ms / ~1.25 µs but the *benchmark column* at ~371 µs — because the interpreter's
+> `Template` silently ran the bytecode fast path for the covered subset, so the
+> "interpreter" column was secretly measuring bytecode (the two came out *tied*). That fast
+> path was **removed**: `trussbars-interp` became a pure tree-walker measuring ~1.14 ms,
+> the (borrow-based) VM ~326 µs — then ~3.5× faster. (2) Profiling that tree-walk found its
+> cost was **per-cell allocation**: `eval_for` allocated an `Rc<LoopFrame>` *and* an
+> `Rc<ParentNode>` for every iteration, plus a whole-collection `Vec` per loop entry —
+> 20 304 allocations for a 10 000-cell render. The fix: allocate **one** reused loop frame
+> (interior-mutable `index0`/`key`, advanced in place) + **one** parent-chain node per loop
+> *entry*, build the child scope once, and iterate by reference (20 304 → **306**
+> allocations, ~2.4× faster). The interpreter now clears Tera, and the VM's lead over it
+> shrank to ~1.5× (big-table) / ~2.9× (teams). So the perf gate ratchets the **ordering**
+> `AOT ≤ VM ≤ interpreter ≤ handlebars`, not a fixed multiple.
 
-So **the bytecode VM is ~3.5× the interpreter** — real, and as expected (no AST
-pointer-chasing, flat dispatch, borrow-based output). Two things still temper it: **(a)**
-AOT stays ~9–11× faster than the *VM* (it's still the speed path — if you need speed,
-compile), and **(b)** the interpreter alone already clears the hard bar (≥ handlebars).
+So **the bytecode VM is ~1.5–2.9× the interpreter** — still real (no AST pointer-chasing,
+flat dispatch, a borrow-based zero-clone hot loop), but narrower now that the interpreter
+no longer allocates per cell. Two things temper it: **(a)** AOT stays ~9–14× faster than
+the *VM* (it's still the speed path — if you need speed, compile), and **(b)** the
+interpreter alone now clears not just handlebars but Tera, so the VM is an *optimization*,
+not the thing that makes the dynamic path viable.
 
-**Verdict:** the VM is a genuine ~3.5× dynamic-path speedup and now ships as its own crate
-(`trussbars-vm`) covering the benchmarked subset. Growing it to the *full* catalog (a
-name→slot resolve pass + a 3rd conformance axis + perpetual two-backend maintenance) stays
-gated on a real trigger: a workload where *dynamic-path throughput* is the proven
-bottleneck, a named *embedding* consumer (a portable bytecode artifact), or the AOT-compat
-*compile pass* (load-time checks + slot resolution, which is half a bytecode compiler
-anyway). Not a speed chase — but the crate is here, optimized, with the head-start banked.
+**Verdict:** the VM is a genuine dynamic-path speedup and ships as its own crate
+(`trussbars-vm`) covering the benchmarked subset. Whether to grow it to the *full* catalog
+(a name→slot resolve pass + a 3rd conformance axis + perpetual two-backend maintenance) is
+*more* of a judgement call now that the optimized tree-walk is itself fast — gated on a
+real trigger: a workload where *dynamic-path throughput* is the proven bottleneck, a named
+*embedding* consumer (a portable bytecode artifact), or the AOT-compat *compile pass*
+(load-time checks + slot resolution, which is half a bytecode compiler anyway). Not a speed
+chase — but the crate is here, optimized, with the head-start banked.
 
 [`Value`]: ../crates/trussbars-interp/src/lib.rs
 

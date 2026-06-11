@@ -91,7 +91,7 @@ before deserializing into `T`). See [docs/01 §10][spec].
 | [`trussbars-std`](crates/trussbars-std) | The prelude/stdlib operations as monomorphized functions (string / number / array packs). |
 | [`trussbars-derive`](crates/trussbars-derive) | `#[derive(Trussbars)]` — the `Truthy` impl for context structs. |
 | [`trussbars-interp`](crates/trussbars-interp) | The dynamic **tree-walk interpreter** backend (runtime templates, same no-data-derived-names law) — the always-correct dynamic path; `no_std + alloc`. |
-| [`trussbars-vm`](crates/trussbars-vm) | The dynamic **bytecode VM** backend: a flat instruction array + borrow-based machine over the interpreter's `Value`. Covers a subset of the interpreter, ~3.5× faster where it does (docs/11 §4). |
+| [`trussbars-vm`](crates/trussbars-vm) | The dynamic **bytecode VM** backend: a flat instruction array + borrow-based machine over the interpreter's `Value`. Covers a subset of the interpreter, ~1.5–2.9× faster where it does (docs/11 §4). |
 | [`trussbars-import`](crates/trussbars-import) | Migration **read half**: Mustache / Handlebars / Liquid / StringTemplate4 → faithful spanned ASTs. |
 | [`trussbars-i18n`](crates/trussbars-i18n) | The host-locale translator seam (English fallback). |
 
