@@ -1,347 +1,382 @@
 //! # trussbars-vm — the bytecode VM
 //!
 //! The **bytecode VM** backend for Trussbars (`docs/11` §4): it compiles the desugared
-//! MaxBars AST to a flat instruction array run by a small machine — the optimization
-//! path the tree-walk [interpreter](trussbars_interp) (`trussbars-interp`) defers to.
-//! Its purpose is **speed where it covers**: no AST pointer-chasing, flat dispatch, and
-//! — crucially — a **borrow-based** evaluator that resolves paths to `&Value` references
-//! and writes them straight to the output buffer, so the render hot loop performs **zero
-//! `Value` clones and keeps no value stack** (only an `Rc` refcount bump per loop entry).
+//! MaxBars AST to a flat instruction array run by a small machine — the no-AST-pointer-
+//! chasing, flat-dispatch alternative to the tree-walk [interpreter](trussbars_interp)
+//! (`trussbars-interp`).
 //!
-//! ## Subset (honest coverage)
+//! ## First-class, full coverage (docs/11 §4.3)
 //!
-//! It compiles only the dynamic constructs the benchmark workloads use — text, escaped /
-//! raw output of `this`/`root`/field paths, nested bare `each` (`{% for … %}`), and a
-//! plain `if` (incl. `loop.first`). Anything else returns a **compile error** (so the VM
-//! never renders a wrong answer; the full instruction set is only worth building if a
-//! workload proves it, `docs/11` §4.2). The covered subset is identical to what the
-//! interpreter accepts for it, so output is **byte-identical** — asserted against the
-//! interpreter in the tests here and in `trussbars/benchmarks`.
+//! Every valid Trussbars template compiles — there is **no subset and no fallback**. The
+//! architecture is a *bytecode skeleton over a shared engine*:
 //!
-//! It reuses [`trussbars_interp::Value`] and the interpreter's [`write_escaped`] /
-//! [`Value::raw_text`] writers verbatim, which is what keeps the two dynamic backends
-//! byte-identical.
+//! - **Structure** is bytecode: `Text`, `Out`, and the `if` / `each` jump-and-loop ops
+//!   (`JumpUnless`/`Jump`/`EachStart`/`EachNext`).
+//! - **Expressions** (operators, ternary, pipes, value/collection helpers, literals,
+//!   paths) come from the shared [`trussbars_interp::eval_expr`] against the live [`Env`],
+//!   so the catalog is **single-sourced** — there is no second implementation to keep in
+//!   sync, and VM output is **byte-identical** to the interpreter by construction (the
+//!   conformance axis just proves the structural compiler dropped nothing).
+//! - **The less-common blocks** (`with`/`scope`, `let`/`local`, `case`, partials, host
+//!   block helpers, raw) render through a `Delegate` op → [`trussbars_interp::eval_nodes`]
+//!   — full coverage first; promoted to native bytecode ops opportunistically (perf),
+//!   never as a gate on coverage.
+//!
+//! It reuses [`trussbars_interp::Value`], the interpreter's [`write_escaped`] /
+//! [`Value::raw_text`] writers, and its `Env`/loop machinery — which is what keeps the two
+//! dynamic backends byte-identical (asserted in the tests here and in `trussbars/benchmarks`).
 //!
 //! [`write_escaped`]: trussbars_interp::write_escaped
+//! [`Env`]: trussbars_interp::Env
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
 
-use alloc::boxed::Box;
+use alloc::collections::BTreeMap;
 use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::cell::Cell;
 
-use trussbars_interp::{Value, write_escaped};
-use trussbars_template::{Expr, Node, Value as Lit, parse};
+use trussbars_interp::{Env, Helpers, TruthMode, Value, eval_expr, eval_nodes, hoist, write_escaped};
+use trussbars_template::{Expr, Node, parse};
 
-/// Which root a resolved path starts from: the current iteration's `this`, or the
-/// render's top-level `root` data. Fixed at **compile** time (a name, never data) — the
-/// injection boundary the whole project rests on (`docs/11` §6).
-#[derive(Clone, Copy)]
-enum Base {
-    /// The current `this` (the innermost loop element, or `root` outside any loop).
-    This,
-    /// The render's top-level data.
-    Root,
-}
-
-/// A VM instruction. Jump targets are absolute instruction indices. Output and control
-/// ops carry a **pre-resolved path** (`base` + the string keys) so the machine resolves
-/// and writes in one step — no intermediate value stack.
+/// A VM instruction. Jump targets are absolute instruction indices. The straight-line
+/// structure (text, output, the `if`/`each` jump skeleton) is bytecode; expression values
+/// come from the shared `trussbars_interp::eval_expr` against the live [`Env`], and the
+/// less-common blocks delegate to `eval_nodes` — so the operator / helper / collection-op
+/// catalog stays single-sourced (docs/11 §4.3).
 enum Op {
     /// `out.push_str(literal)`.
     Text(Rc<str>),
-    /// Resolve `base`.`path` and write it — HTML-escaped (`raw = false`) or raw.
+    /// Evaluate `expr` and write it — HTML-escaped (`raw = false`) or raw (`{{ x | safe }}`).
     Out {
-        /// Where the path starts.
-        base: Base,
-        /// The dotted field keys from `base` (empty → `base` itself).
-        path: Box<[Rc<str>]>,
-        /// Write raw (`{{{ }}}`) instead of HTML-escaped.
+        /// The output expression (evaluated against the current `Env`).
+        expr: Expr,
+        /// Write raw instead of HTML-escaped.
         raw: bool,
     },
-    /// Resolve `base`.`path`; if falsy (or missing), jump to `target`.
-    JumpIfFalsy {
-        /// Where the path starts.
-        base: Base,
-        /// The dotted field keys from `base`.
-        path: Box<[Rc<str>]>,
-        /// Jump here when the value is falsy.
+    /// Evaluate `cond`; if it is falsy (under the render's truthiness policy), XOR
+    /// `negate` (for `{% unless %}`), jump to `target`. Drives `if`/`unless`/`elif`.
+    JumpUnless {
+        /// The condition expression.
+        cond: Expr,
+        /// Negate the truthiness test (`{% unless %}`).
+        negate: bool,
+        /// Jump here when the (negated) test is false.
         target: usize,
     },
-    /// `{% if loop.first %}`: if the current iteration is **not** the first, jump.
-    JumpIfNotFirst(usize),
-    /// Resolve `base`.`path` to an array and begin iterating (push a frame); if it is not
-    /// a non-empty array, jump to `end` (past the loop body).
+    /// Unconditional jump — skips the remaining arms of a conditional / the `{% else %}` of
+    /// a non-empty loop.
+    Jump(usize),
+    /// Evaluate `subject`; if it is an empty / non-collection value, jump to `empty` (the
+    /// `{% else %}` body); else enter the loop (push a child [`Env`] with the loop frame +
+    /// the optional `item`/`index`/`label` bindings) and fall into the body.
     EachStart {
-        /// Where the subject path starts.
-        base: Base,
-        /// The dotted field keys to the collection.
-        path: Box<[Rc<str>]>,
-        /// Jump here when the subject is empty / not an array.
-        end: usize,
+        /// The collection expression.
+        subject: Expr,
+        /// `{% for item … %}` — bind each element to this name.
+        item: Option<Rc<str>>,
+        /// `{% for item i … %}` — bind the 0-based index to this name.
+        index: Option<Rc<str>>,
+        /// `{% for … label name %}` — expose this loop's frame under the label.
+        label: Option<Rc<str>>,
+        /// Jump here when the subject is empty / not a collection.
+        empty: usize,
     },
-    /// Advance the innermost iteration; if more elements remain, jump back to `body`,
-    /// else pop the frame and fall through.
+    /// Advance the innermost iteration; if more elements remain, rebind and jump back to
+    /// `body`, else pop the loop context and fall through (to the post-loop `Jump`).
     EachNext(usize),
+    /// Render a node through the shared interpreter eval (the blocks not yet given native
+    /// bytecode: `with`/`let`/`case`/partials/host block helpers/raw). Byte-identical by
+    /// construction; promoted to native ops opportunistically (perf), never for coverage.
+    Delegate(Node),
 }
 
-/// One active `each` iteration: the (shared) array being walked and the cursor into it.
-/// Holding the `Rc<[Value]>` keeps the elements alive so paths can borrow into them; the
-/// clone at [`Op::EachStart`] is a single refcount bump, not a copy.
-struct Frame {
-    items: Rc<[Value]>,
-    index: usize,
+/// The materialized elements of an active loop — arrays index directly; an object's
+/// entries are snapshotted once (so iteration is O(1) per step, not `nth(i)`).
+enum Items {
+    /// An array (shared, indexed directly).
+    Array(Rc<[Value]>),
+    /// An object's `(key, value)` entries in order.
+    Object(Vec<(String, Value)>),
+}
+
+impl Items {
+    fn len(&self) -> usize {
+        match self {
+            Items::Array(a) => a.len(),
+            Items::Object(o) => o.len(),
+        }
+    }
+    /// The `(key, element)` at index `i` — `key` is `Some` only for object iteration.
+    fn at(&self, i: usize) -> (Option<&str>, &Value) {
+        match self {
+            Items::Array(a) => (None, &a[i]),
+            Items::Object(o) => {
+                let (k, v) = &o[i];
+                (Some(k.as_str()), v)
+            }
+        }
+    }
+}
+
+/// One active `each` iteration: the elements, the cursor, and the binding names to rebind
+/// each step.
+struct LoopState {
+    items: Items,
+    idx: usize,
+    item: Option<Rc<str>>,
+    index: Option<Rc<str>>,
 }
 
 /// A compiled template program — parse + compile once, [`render`](Program::render) many.
+/// First-class, full-coverage backend (docs/11 §4.3): any valid template compiles.
 pub struct Program {
     ops: Vec<Op>,
+    /// The hoisted `{% inline %}` registry, shared across renders (the partial bodies the
+    /// engine splices at `{% include %}`/`{% partial %}`).
+    partials: Rc<BTreeMap<String, Vec<Node>>>,
     /// Adaptive output-capacity hint (mirrors the interpreter's `Template`): seed each
     /// render's buffer with the previous render's length so it grows without realloc.
     cap: Cell<usize>,
 }
 
 impl Program {
-    /// Compile a MaxBars template to bytecode.
+    /// Compile a Trussbars (MaxBars) template to bytecode.
     ///
     /// # Errors
-    /// A parse error, or a construct outside the VM's covered subset.
+    /// A parse error.
     pub fn compile(template: &str) -> Result<Program, String> {
-        Self::from_nodes(&parse(template).map_err(|e| e.message)?)
-    }
-
-    /// Compile from an already-parsed node tree — lets a caller try the VM fast path
-    /// without re-parsing.
-    ///
-    /// # Errors
-    /// A construct outside the VM's covered subset.
-    pub fn from_nodes(nodes: &[Node]) -> Result<Program, String> {
+        let nodes = parse(template).map_err(|e| e.message)?;
+        let (registry, nodes) = hoist(nodes);
         let mut ops = Vec::new();
-        compile_nodes(nodes, &mut ops)?;
+        compile_nodes(&nodes, &mut ops);
         Ok(Program {
             ops,
+            partials: Rc::new(registry),
             cap: Cell::new(64),
         })
     }
 
-    /// Run the program against `data`, returning the rendered string.
-    #[must_use]
-    pub fn render(&self, data: &Value) -> String {
+    /// Compile from an already-parsed node tree (no `{% inline %}` hoisting — for callers,
+    /// e.g. the benchmarks, whose templates define no inline partials).
+    ///
+    /// # Errors
+    /// Never (kept `Result` for API stability); full coverage means no construct is
+    /// rejected at compile time.
+    pub fn from_nodes(nodes: &[Node]) -> Result<Program, String> {
+        let mut ops = Vec::new();
+        compile_nodes(nodes, &mut ops);
+        Ok(Program {
+            ops,
+            partials: Rc::new(BTreeMap::new()),
+            cap: Cell::new(64),
+        })
+    }
+
+    /// Render against `data` under the default `NonEmpty` truthiness and no host helpers.
+    ///
+    /// # Errors
+    /// An evaluation error (a type error, an unknown helper, a malformed predicate, …) —
+    /// the same located reason the interpreter would return.
+    pub fn render(&self, data: &Value) -> Result<String, String> {
+        self.render_with(data, TruthMode::NonEmpty, &Rc::new(Helpers::new()))
+    }
+
+    /// Render against `data` under a chosen truthiness `mode` and host `helpers`.
+    ///
+    /// # Errors
+    /// An evaluation error (see [`render`](Program::render)).
+    pub fn render_with(
+        &self,
+        data: &Value,
+        mode: TruthMode,
+        helpers: &Rc<Helpers>,
+    ) -> Result<String, String> {
         let mut out = String::with_capacity(self.cap.get().max(16));
-        let mut frames: Vec<Frame> = Vec::new();
-        let ops = &self.ops;
+        // The Env stack mirrors scope nesting: index 0 is the render root; a loop pushes a
+        // child Env (with its loop frame), popped when the loop ends. The top is `this`.
+        let mut envs: Vec<Env> =
+            Vec::from([Env::root(data, Rc::clone(&self.partials), mode, Rc::clone(helpers))]);
+        let mut loops: Vec<LoopState> = Vec::new();
         let mut pc = 0;
-        while pc < ops.len() {
-            match &ops[pc] {
+        while pc < self.ops.len() {
+            match &self.ops[pc] {
                 Op::Text(s) => out.push_str(s),
-                Op::Out { base, path, raw } => {
-                    if let Some(v) = resolve(*base, path, &frames, data) {
-                        if *raw {
-                            v.raw_text(&mut out);
-                        } else {
-                            write_escaped(v, &mut out);
+                Op::Out { expr, raw } => {
+                    let v = eval_expr(envs.last().unwrap(), expr)?;
+                    if *raw {
+                        v.raw_text(&mut out);
+                    } else {
+                        write_escaped(&v, &mut out);
+                    }
+                }
+                Op::JumpUnless {
+                    cond,
+                    negate,
+                    target,
+                } => {
+                    let mut t = eval_expr(envs.last().unwrap(), cond)?.truthy_in(mode);
+                    if *negate {
+                        t = !t;
+                    }
+                    if !t {
+                        pc = *target;
+                        continue;
+                    }
+                }
+                Op::Jump(target) => {
+                    pc = *target;
+                    continue;
+                }
+                Op::EachStart {
+                    subject,
+                    item,
+                    index,
+                    label,
+                    empty,
+                } => {
+                    let subj = eval_expr(envs.last().unwrap(), subject)?;
+                    let items = match subj {
+                        Value::Array(a) => Items::Array(a),
+                        Value::Object(o) => {
+                            Items::Object(o.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
                         }
-                    }
-                }
-                Op::JumpIfFalsy { base, path, target } => {
-                    let falsy = resolve(*base, path, &frames, data).is_none_or(|v| !v.truthy());
-                    if falsy {
-                        pc = *target;
-                        continue;
-                    }
-                }
-                Op::JumpIfNotFirst(target) => {
-                    let first = frames.last().is_none_or(|f| f.index == 0);
-                    if !first {
-                        pc = *target;
-                        continue;
-                    }
-                }
-                Op::EachStart { base, path, end } => {
-                    let items = match resolve(*base, path, &frames, data) {
-                        Some(Value::Array(a)) if !a.is_empty() => a.clone(),
                         _ => {
-                            pc = *end;
+                            pc = *empty;
                             continue;
                         }
                     };
-                    frames.push(Frame { items, index: 0 });
+                    let len = items.len();
+                    if len == 0 {
+                        pc = *empty;
+                        continue;
+                    }
+                    let mut child = envs.last().unwrap().push_loop(len, label.as_deref());
+                    let (key, elem) = items.at(0);
+                    child.set_iter(0, key, elem, item.as_deref(), index.as_deref());
+                    envs.push(child);
+                    loops.push(LoopState {
+                        items,
+                        idx: 0,
+                        item: item.clone(),
+                        index: index.clone(),
+                    });
                 }
                 Op::EachNext(body) => {
-                    let frame = frames.last_mut().expect("EachNext without a frame");
-                    frame.index += 1;
-                    if frame.index < frame.items.len() {
+                    let (i, more) = {
+                        let ls = loops.last_mut().unwrap();
+                        ls.idx += 1;
+                        (ls.idx, ls.idx < ls.items.len())
+                    };
+                    if more {
+                        let ls = loops.last().unwrap();
+                        let (key, elem) = ls.items.at(i);
+                        let (item, index) = (ls.item.as_deref(), ls.index.as_deref());
+                        envs.last_mut().unwrap().set_iter(i, key, elem, item, index);
                         pc = *body;
                         continue;
                     }
-                    frames.pop();
+                    envs.pop();
+                    loops.pop();
+                }
+                Op::Delegate(node) => {
+                    eval_nodes(envs.last().unwrap(), core::slice::from_ref(node), &mut out)?;
                 }
             }
             pc += 1;
         }
         self.cap.set(out.len());
-        out
+        Ok(out)
     }
-}
-
-/// The current `this`: the innermost active iteration's element, or `root` outside any
-/// loop. A borrow into `frames` / `root` — no clone.
-fn cur_this<'a>(frames: &'a [Frame], root: &'a Value) -> &'a Value {
-    match frames.last() {
-        Some(f) => &f.items[f.index],
-        None => root,
-    }
-}
-
-/// Resolve `base`.`path` to a borrowed value, or `None` if any segment is missing / not
-/// an object (lenient, exactly like the interpreter's `field`). Borrow-only: no clones.
-fn resolve<'a>(
-    base: Base,
-    path: &[Rc<str>],
-    frames: &'a [Frame],
-    root: &'a Value,
-) -> Option<&'a Value> {
-    let mut v = match base {
-        Base::This => cur_this(frames, root),
-        Base::Root => root,
-    };
-    for k in path {
-        match v {
-            Value::Object(o) => v = o.get(&**k)?,
-            _ => return None,
-        }
-    }
-    Some(v)
 }
 
 // ── compiler (AST → bytecode) ─────────────────────────────────────────────────
 
-/// A path classified at compile time: either a data path (`base` + string keys) or the
-/// `loop.first` flag (a control-only value, not data).
-enum PathSpec {
-    Data { base: Base, keys: Box<[Rc<str>]> },
-    LoopFirst,
-}
-
-fn compile_nodes(nodes: &[Node], ops: &mut Vec<Op>) -> Result<(), String> {
+fn compile_nodes(nodes: &[Node], ops: &mut Vec<Op>) {
     for n in nodes {
-        compile_node(n, ops)?;
+        compile_node(n, ops);
     }
-    Ok(())
 }
 
-fn compile_node(n: &Node, ops: &mut Vec<Op>) -> Result<(), String> {
+/// Patch a jump op's target to `to`.
+fn patch(ops: &mut [Op], at: usize, to: usize) {
+    match &mut ops[at] {
+        Op::JumpUnless { target, .. } | Op::Jump(target) | Op::EachStart { empty: target, .. } => {
+            *target = to;
+        }
+        _ => unreachable!("patching a non-jump op"),
+    }
+}
+
+fn compile_node(n: &Node, ops: &mut Vec<Op>) {
     match n {
         Node::Text(s) => ops.push(Op::Text(Rc::from(s.as_str()))),
-        Node::Output { expr, raw, .. } => match classify(expr)? {
-            PathSpec::Data { base, keys } => ops.push(Op::Out {
-                base,
-                path: keys,
-                raw: *raw,
-            }),
-            PathSpec::LoopFirst => {
-                return Err("vm subset: loop.first in output position unsupported".into());
+        Node::Output { expr, raw, .. } => ops.push(Op::Out {
+            expr: expr.clone(),
+            raw: *raw,
+        }),
+        // `if`/`unless` cond body, `{% elif %}` arms, `{% else %}`. Each arm jumps to the
+        // end after its body; a failed test falls to the next arm.
+        Node::Cond(c) => {
+            let mut to_end: Vec<usize> = Vec::new();
+            let j = ops.len();
+            ops.push(Op::JumpUnless {
+                cond: c.cond.clone(),
+                negate: c.negated,
+                target: 0,
+            });
+            compile_nodes(&c.body, ops);
+            to_end.push(ops.len());
+            ops.push(Op::Jump(0));
+            let next = ops.len();
+            patch(ops, j, next);
+            for (econd, ebody) in &c.elifs {
+                let je = ops.len();
+                ops.push(Op::JumpUnless {
+                    cond: econd.clone(),
+                    negate: false,
+                    target: 0,
+                });
+                compile_nodes(ebody, ops);
+                to_end.push(ops.len());
+                ops.push(Op::Jump(0));
+                let n = ops.len();
+                patch(ops, je, n);
             }
-        },
+            compile_nodes(&c.otherwise, ops);
+            let end = ops.len();
+            for ej in to_end {
+                patch(ops, ej, end);
+            }
+        }
+        // `{% for … %} body {% else %} otherwise {% endfor %}`.
         Node::For(e) => {
-            if e.item.is_some() || e.index.is_some() || e.label.is_some() || !e.otherwise.is_empty()
-            {
-                return Err("vm subset: each bindings / else unsupported".into());
-            }
-            let PathSpec::Data { base, keys } = classify(&e.subject)? else {
-                return Err("vm subset: each over loop.first unsupported".into());
-            };
             let start = ops.len();
             ops.push(Op::EachStart {
-                base,
-                path: keys,
-                end: 0,
-            }); // end patched below
+                subject: e.subject.clone(),
+                item: e.item.as_deref().map(Rc::from),
+                index: e.index.as_deref().map(Rc::from),
+                label: e.label.as_deref().map(Rc::from),
+                empty: 0,
+            });
             let body = ops.len();
-            compile_nodes(&e.body, ops)?;
+            compile_nodes(&e.body, ops);
             ops.push(Op::EachNext(body));
+            let after = ops.len();
+            ops.push(Op::Jump(0)); // skip the else body after a completed (non-empty) loop
+            let else_start = ops.len();
+            patch(ops, start, else_start); // EachStart.empty → the else body
+            compile_nodes(&e.otherwise, ops);
             let end = ops.len();
-            if let Op::EachStart { end: slot, .. } = &mut ops[start] {
-                *slot = end;
-            }
+            patch(ops, after, end);
         }
-        Node::Cond(c) => {
-            if c.negated || !c.elifs.is_empty() || !c.otherwise.is_empty() {
-                return Err("vm subset: unless / elif / else unsupported".into());
-            }
-            let jump = ops.len();
-            match classify(&c.cond)? {
-                PathSpec::Data { base, keys } => ops.push(Op::JumpIfFalsy {
-                    base,
-                    path: keys,
-                    target: 0,
-                }),
-                PathSpec::LoopFirst => ops.push(Op::JumpIfNotFirst(0)),
-            }
-            compile_nodes(&c.body, ops)?;
-            let end = ops.len();
-            match &mut ops[jump] {
-                Op::JumpIfFalsy { target, .. } => *target = end,
-                Op::JumpIfNotFirst(target) => *target = end,
-                _ => unreachable!("patching a non-jump op"),
-            }
-        }
-        _ => return Err("vm subset: unsupported node".into()),
+        // The blocks not yet bytecoded (with/let/case/partials/host block helpers/raw) and
+        // any leftover node render through the shared interpreter eval — full coverage.
+        other => ops.push(Op::Delegate(other.clone())),
     }
-    Ok(())
-}
-
-/// Classify an output/condition expression into a [`PathSpec`], mirroring exactly what
-/// the interpreter accepts for the covered subset (so the two stay byte-identical).
-fn classify(e: &Expr) -> Result<PathSpec, String> {
-    match e {
-        Expr::App(name, args) => match (name.as_str(), args.as_slice()) {
-            ("this", []) => Ok(PathSpec::Data {
-                base: Base::This,
-                keys: Box::new([]),
-            }),
-            ("root", []) => Ok(PathSpec::Data {
-                base: Base::Root,
-                keys: Box::new([]),
-            }),
-            ("lookup", _) => classify_path(args),
-            _ => Err(alloc::format!("vm subset: expr '{name}' unsupported")),
-        },
-        Expr::Lit(_) => Err("vm subset: literal in output unsupported".into()),
-    }
-}
-
-/// Classify a `lookup`-form path (a head expr + dotted string keys). The `loop.first`
-/// head is the one non-data case.
-fn classify_path(args: &[Expr]) -> Result<PathSpec, String> {
-    let (head, keys) = args.split_first().ok_or("lookup without a subject")?;
-    if let Expr::App(h, hargs) = head
-        && hargs.is_empty()
-        && h == "loop"
-    {
-        return match keys {
-            [Expr::Lit(Lit::Str(f))] if f == "first" => Ok(PathSpec::LoopFirst),
-            _ => Err("vm subset: only loop.first supported".into()),
-        };
-    }
-    let PathSpec::Data { base, keys: hkeys } = classify(head)? else {
-        return Err("vm subset: loop.first cannot start a path".into());
-    };
-    let mut all: Vec<Rc<str>> = hkeys.into_vec();
-    for k in keys {
-        match k {
-            Expr::Lit(Lit::Str(s)) => all.push(Rc::from(s.as_str())),
-            _ => return Err("vm subset: computed key unsupported".into()),
-        }
-    }
-    Ok(PathSpec::Data {
-        base,
-        keys: all.into_boxed_slice(),
-    })
 }
 
 #[cfg(test)]
@@ -390,19 +425,44 @@ mod tests {
         for (tpl, data) in cases {
             let prog = Program::compile(tpl).unwrap_or_else(|e| panic!("{tpl}: {e}"));
             assert_eq!(
-                prog.render(data),
+                prog.render(data).unwrap(),
                 render(tpl, data.clone()).unwrap(),
                 "{tpl}"
             );
         }
     }
 
-    /// Constructs outside the subset must be a compile error, never a wrong render.
+    /// First-class coverage (docs/11 §4.3): the constructs the old subset rejected now
+    /// render, and byte-identically to the interpreter (the shared engine guarantees it).
     #[test]
-    fn out_of_subset_errors() {
-        // `with` block — not in the subset.
-        assert!(Program::compile("{% with x %}{{this}}{% endwith %}").is_err());
-        // `unless` (negated cond).
-        assert!(Program::compile("{% if not x %}y{% endif %}").is_err());
+    fn full_coverage_matches_interpreter() {
+        let cases: &[(&str, Value)] = &[
+            // operators / helpers / literals in output (were `vm subset: expr unsupported`).
+            ("{{ 2 | add 3 }}", Value::Null),
+            ("{{ name | uppercase }}", obj(&[("name", s("ann"))])),
+            ("{% if n > 2 %}big{% elif n > 0 %}mid{% else %}small{% endif %}", obj(&[("n", Value::Num(1.0))])),
+            // unless (negated cond).
+            ("{% if not done %}todo{% endif %}", obj(&[("done", Value::Bool(false))])),
+            // each bindings + index + else; loop metadata in output.
+            ("{% for x i in xs %}{{i}}:{{x}}/{{loop.last}} {% else %}none{% endfor %}", obj(&[("xs", arr(&[s("a"), s("b")]))])),
+            ("{% for xs %}x{% else %}EMPTY{% endfor %}", obj(&[("xs", arr(&[]))])),
+            // with / scope (re-root) and let / local (bindings) — delegated, still exact.
+            ("{% scope p %}{{n}}{% endscope %}", obj(&[("p", obj(&[("n", s("Z"))]))])),
+            ("{% local t=(multiply n 2) %}{{t}}{% endlocal %}", obj(&[("n", Value::Num(3.0))])),
+            // case.
+            ("{% case s %}{% when \"a\" %}A{% when \"b\" %}B{% else %}Z{% endcase %}", obj(&[("s", s("b"))])),
+            // inline partial + yield.
+            (r#"{% inline "card" %}<{% yield %}>{% endinline %}{% partial "card" %}hi{% endpartial %}"#, Value::Null),
+            // a parent-chain path inside a loop + collection op.
+            ("{% for xs %}{{parent.t}}:{{this}} {% endfor %}", obj(&[("t", s("T")), ("xs", arr(&[s("a")]))])),
+        ];
+        for (tpl, data) in cases {
+            let prog = Program::compile(tpl).unwrap_or_else(|e| panic!("compile {tpl}: {e}"));
+            assert_eq!(
+                prog.render(data).unwrap_or_else(|e| panic!("render {tpl}: {e}")),
+                render(tpl, data.clone()).unwrap(),
+                "{tpl}"
+            );
+        }
     }
 }

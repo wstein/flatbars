@@ -518,7 +518,7 @@ pub fn vm_big_table_program() -> Program {
 }
 
 pub fn vm_big_table(p: &Program, data: &VmValue) -> String {
-    p.render(data)
+    p.render(data).expect("vm big-table renders")
 }
 
 pub fn vm_teams_program() -> Program {
@@ -531,7 +531,7 @@ pub fn vm_teams_program() -> Program {
 }
 
 pub fn vm_teams(p: &Program, data: &VmValue) -> String {
-    p.render(data)
+    p.render(data).expect("vm teams renders")
 }
 
 // ─── 7. vy (compile-time HTML macro DSL) ──────────────────────────────────────

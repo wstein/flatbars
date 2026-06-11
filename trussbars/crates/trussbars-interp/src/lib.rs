@@ -307,6 +307,62 @@ impl Env {
         child.this = new_this;
         child
     }
+
+    /// Enter a loop of `length` elements (optionally `label`led): a child context with a
+    /// fresh loop frame pushed and the enclosing `this` pushed onto the parent chain —
+    /// allocated **once per loop entry**, then advanced each iteration with
+    /// [`Env::set_iter`]. The bytecode VM drives loops through this pair (docs/11 §4.3),
+    /// matching `eval_for` exactly so the two backends stay byte-identical.
+    #[must_use]
+    pub fn push_loop(&self, length: usize, label: Option<&str>) -> Env {
+        let frame = Rc::new(LoopFrame {
+            index0: Cell::new(0),
+            length,
+            depth: self.loop_frame.as_ref().map_or(0, |p| p.depth) + 1,
+            key: RefCell::new(None),
+            parent: self.loop_frame.clone(),
+        });
+        let mut child = self.clone();
+        child.parents = Some(Rc::new(ParentNode {
+            value: self.this.clone(),
+            next: self.parents.clone(),
+        }));
+        child.loop_frame = Some(Rc::clone(&frame));
+        if let Some(label) = label {
+            child.labels.insert(label.to_string(), Rc::clone(&frame));
+        }
+        child
+    }
+
+    /// Advance a loop child (built by [`Env::push_loop`]) to iteration `i`: set `this` to
+    /// `element`, advance the loop frame's `index0`/`key`, and bind the optional `item` /
+    /// `index` names.
+    pub fn set_iter(
+        &mut self,
+        i: usize,
+        key: Option<&str>,
+        element: &Value,
+        item: Option<&str>,
+        index: Option<&str>,
+    ) {
+        if let Some(frame) = &self.loop_frame {
+            frame.index0.set(i);
+            *frame.key.borrow_mut() = key.map(str::to_string);
+        }
+        if let Some(item) = item {
+            self.params.insert(item.to_string(), element.clone());
+        }
+        if let Some(index) = index {
+            self.params.insert(index.to_string(), Value::Num(i as f64));
+        }
+        self.this = element.clone();
+    }
+
+    /// Bind a `let`/`local` alias (or block param) into the current scope — the VM's
+    /// `{% local %}` / block-param entry.
+    pub fn bind(&mut self, name: &str, value: Value) {
+        self.params.insert(name.to_string(), value);
+    }
 }
 
 type HostHelper = Box<dyn Fn(&[Value]) -> Result<Value, String>>;
@@ -468,7 +524,7 @@ impl Template {
 
 /// Lift every `{% inline "name" %}…{% endinline %}` definition (anywhere in the tree) into
 /// a registry and return the tree with those definitions removed.
-fn hoist(nodes: Vec<Node>) -> (BTreeMap<String, Vec<Node>>, Vec<Node>) {
+pub fn hoist(nodes: Vec<Node>) -> (BTreeMap<String, Vec<Node>>, Vec<Node>) {
     let mut reg = BTreeMap::new();
     let top = hoist_into(nodes, &mut reg);
     (reg, top)
