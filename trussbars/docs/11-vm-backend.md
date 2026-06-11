@@ -175,6 +175,63 @@ real trigger: a workload where *dynamic-path throughput* is the proven bottlenec
 (load-time checks + slot resolution, which is half a bytecode compiler anyway). Not a speed
 chase — but the crate is here, optimized, with the head-start banked.
 
+### 4.3 Promotion to a first-class backend (the trigger fired)
+
+The trigger is now a **product decision**: the VM is promoted from a benchmark subset to a
+**first-class, full-coverage dynamic backend** — it renders *every* valid Trussbars
+template (no compile-time subset rejection, no fallback to the interpreter) and becomes a
+**conformance axis** (`harness.mjs --vm`, byte-matched to the oracle over the whole corpus,
+alongside `--interp`).
+
+The §4.2 objections are answered by **one architectural choice — share the interpreter's
+evaluator, don't fork it:**
+
+- **No "perpetual two-backend maintenance" of the catalog.** The operator / value-helper /
+  collection-op semantics live in exactly *one* place — `trussbars_interp::eval_expr` — and
+  the VM *calls* it. The VM owns only the **structural bytecode** (text, output, the
+  control-flow jump skeleton) and the **borrow-based path fast-path** (the §4.2 zero-clone
+  `this`/`root`/field resolver). A new helper added to the interpreter is instantly available
+  to the VM; there is no second catalog to keep in sync.
+- **No "name→slot resolve pass."** The VM keeps interpreting names against a dynamic
+  context (it is a *dynamic* backend — that is its whole reason to exist next to AOT). Slot
+  resolution is an AOT-compile-pass concern, explicitly out of scope here.
+- **The "3rd conformance axis" is a thin gate, not a third implementation.** Because the
+  semantics are single-sourced, `--vm` byte-matching the oracle is mechanically guaranteed
+  for everything routed through `eval_expr`; the axis just *proves* the structural compiler
+  didn't drop or reorder anything.
+
+**Architecture — bytecode skeleton over a shared engine.** The VM compiles the desugared
+`Node` tree to a flat op array and drives a render context that mirrors the interpreter's
+`Env` (`this`/`root`/scope bindings/loop frames/parents/partials/`yield`/truthiness/helpers):
+
+- **Structure** → bytecode ops: `Text`, `Out`, the `if`/`each`/`with`/`let`/`case` jump and
+  frame ops, partial/`yield` ops. This is the flat-dispatch, no-AST-pointer-chasing win.
+- **Simple paths** (`this`/`root`/`field…`) → the existing **borrow-based fast op** —
+  resolve to `&Value`, write straight to the buffer, zero clones. The common hot case stays
+  fast.
+- **Everything else in an expression** (operators, ternary, pipes, value/collection
+  helpers, literals) → the shared `eval_expr` against the VM's context. Correct and
+  byte-identical by construction; optimized later only where profiling shows a hot path.
+
+**Completeness-first, then specialize.** A construct with no native fast op yet still
+renders — it routes through the shared engine — so coverage reaches 100% before any
+micro-optimization. We promote a construct from shared-eval to a native borrow-based op only
+when the benchmark says it matters; speed is a ratchet on top of correctness, never a gate
+on coverage.
+
+**Interpreter surface this needs (kept minimal).** `trussbars-interp` exposes its evaluator
+as the shared engine: `eval_expr` and the render context (`Env`) become a small public API
+the VM constructs from its frame state and calls. The interpreter's own tree-walk is
+unchanged; the VM is a second *driver* of the same semantics, not a copy of them.
+
+**Plan (each slice green + `--vm` byte-matched):** (1) expose the interp engine + add the
+`--vm` conformance axis; (2) general expression `Out`/condition via shared `eval_expr`
+(operators/helpers/literals in output + `if`); (3) full `each` (bindings, `else`, loop
+metadata), `unless`/`elif`/`else`; (4) `with`/`scope`, `let`/`local`, `case`; (5) partials
+(`inline`/`include`/`partial`/`yield`) + recursion guard; (6) the non-default truthiness
+policy (drop the interpreter fallback). Native borrow-based fast ops are added opportunistically,
+gated on the perf benchmark — not on the conformance axis.
+
 [`Value`]: ../crates/trussbars-interp/src/lib.rs
 
 ## 5. The dynamic `Value` model (the part AOT shed)
