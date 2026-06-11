@@ -1311,11 +1311,12 @@ main = do
   assert' "separability: a core helper (e.g. 'if') survives the split in coreSchema"
     (Map.member "if" KP.coreSchema.helpers)
   -- `coreOperationDefs` is the non-primitive base; the full roster adds exactly the
-  -- 42-strong primitive pack on top (string + number + array, incl. aliases, range,
-  -- and the ADR-036 key-based filters where/reject/find/some/every).
+  -- 46-strong primitive pack on top (string + number + array, incl. aliases, range,
+  -- the ADR-036 key-based filters where/reject/find/some/every, and the ADR-042
+  -- numeric predicates even/odd/divisibleBy + the `~`-backing concat).
   assert'
-    "separability: operationDefs = coreOperationDefs <> primitiveOperationDefs (42 primitives)"
-    (Map.size KP.preludeSchema.helpers == Map.size KP.coreSchema.helpers + 42)
+    "separability: operationDefs = coreOperationDefs <> primitiveOperationDefs (46 primitives)"
+    (Map.size KP.preludeSchema.helpers == Map.size KP.coreSchema.helpers + 46)
 
   -- Set delimiters are EXCLUDED from ClassicBars (ADR-015): it is the Handlebars-
   -- faithful dialect, and Handlebars has no set delimiters. The `@delimiters`

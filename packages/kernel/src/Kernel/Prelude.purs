@@ -273,14 +273,6 @@ coreOperationDefs =
   , valDef "modulo"
       "The remainder of dividing the first number by the second — the `%` operator's helper."
       (binary (arith jsMod))
-  -- numeric parity / divisibility predicates (ADR-042): typed value operations,
-  -- `Number -> Bool`. `even`/`odd` are defined against the same `jsMod` as
-  -- `modulo` (so `even n ≡ eq (modulo n 2) 0` bit-for-bit), and `odd` is `not
-  -- even` so the two can never disagree. Callable `(even n)` or piped `n | even`.
-  , valDef "even" "True when the number is even." (unary evenH)
-  , valDef "odd" "True when the number is odd." (unary oddH)
-  , valDef "divisibleBy" "True when the first number is divisible by the second."
-      (binary divisibleByH)
   -- handlebars-helpers aliases: render identically to the canonical helpers
   -- (`add`/`subtract`/`multiply`); marked as aliases so the catalog flags them,
   -- the alias lint warns, and the lift normalises them to the `+ - *` operators.
@@ -360,6 +352,14 @@ primitiveOperationDefs =
   , valDef "floor" "Rounds a number down to the nearest integer." (unary (numUnary Number.floor))
   , valDef "ceil" "Rounds a number up to the nearest integer." (unary (numUnary Number.ceil))
   , valDef "round" "Rounds a number to the nearest integer." (unary (numUnary Number.round))
+  -- numeric parity / divisibility predicates (ADR-042): typed value helpers,
+  -- `Number -> Bool` (primitives, like `abs`/`floor` and the string predicates).
+  -- `even`/`odd` share `jsMod` with `modulo` (so `even n ≡ eq (modulo n 2) 0`
+  -- bit-for-bit), and `odd` is `not even` so the two can never disagree.
+  , valDef "even" "True when the number is even." (unary evenH)
+  , valDef "odd" "True when the number is odd." (unary oddH)
+  , valDef "divisibleBy" "True when the first number is divisible by the second."
+      (binary divisibleByH)
   , valDef "toFixed" "Formats a number with a fixed number of decimal places." (binary toFixedH)
   , valDef "toInt" "Parses its argument as an integer." (unary toIntH)
   , valDef "toFloat" "Parses its argument as a floating-point number." (unary toFloatH)
