@@ -67,6 +67,11 @@ pub enum Value {
     Num(f64),
     /// A string (shared).
     Str(Rc<str>),
+    /// A **pre-escaped** (safe) string — the dynamic mirror of `trussbars_core::Safe`
+    /// (docs/25). Carries already-HTML-escaped markup *as a value* so it survives binding,
+    /// piping and re-output: `{{ x }}` emits it **verbatim** (no double-escape), unlike a
+    /// plain `Str`. Produced by the internal `render`/`safe` ops; never by `from_json`.
+    Safe(Rc<str>),
     /// An array (shared).
     Array(Rc<[Value]>),
     /// An object (ordered, shared).
@@ -82,7 +87,7 @@ impl Value {
             Value::Null => false,
             Value::Bool(b) => *b,
             Value::Num(_) => true,
-            Value::Str(s) => !s.is_empty(),
+            Value::Str(s) | Value::Safe(s) => !s.is_empty(),
             Value::Array(a) => !a.is_empty(),
             Value::Object(o) => !o.is_empty(),
         }
@@ -102,7 +107,7 @@ impl Value {
                 Value::Null => false,
                 Value::Bool(b) => *b,
                 Value::Num(n) => *n != 0.0 && !n.is_nan(),
-                Value::Str(s) => !s.is_empty(),
+                Value::Str(s) | Value::Safe(s) => !s.is_empty(),
                 Value::Array(a) => !a.is_empty(),
                 Value::Object(_) => true,
             },
@@ -117,7 +122,7 @@ impl Value {
             Value::Null => {}
             Value::Bool(b) => b.write_text(out),
             Value::Num(n) => n.write_text(out),
-            Value::Str(s) => out.push_str(s),
+            Value::Str(s) | Value::Safe(s) => out.push_str(s),
             Value::Array(a) => {
                 // Direct array output joins with `,` (matches the reference / AOT ToText).
                 for (i, v) in a.iter().enumerate() {
@@ -156,6 +161,8 @@ impl Value {
 pub fn write_escaped(v: &Value, out: &mut String) {
     match v {
         Value::Str(s) => escape_html(s, out),
+        // A `Safe` value is already escaped — emit verbatim (the no-double-escape rule, docs/25).
+        Value::Safe(s) => out.push_str(s),
         Value::Null => {}
         Value::Bool(_) | Value::Num(_) => v.raw_text(out),
         Value::Array(a) => {
@@ -1208,7 +1215,7 @@ fn order(a: &Value, b: &Value) -> core::cmp::Ordering {
     use core::cmp::Ordering::Equal;
     match (a, b) {
         (Value::Num(x), Value::Num(y)) => x.partial_cmp(y).unwrap_or(Equal),
-        (Value::Str(x), Value::Str(y)) => x.cmp(y),
+        (Value::Str(x) | Value::Safe(x), Value::Str(y) | Value::Safe(y)) => x.cmp(y),
         _ => Equal,
     }
 }
@@ -1309,7 +1316,9 @@ fn eval_helper(env: &Env, name: &str, args: &[Expr]) -> Result<Value, String> {
         // `~` (ADR-042): strict string concat — both operands must be strings, a
         // non-string is an error (matching the oracle's TypeError + the AOT's
         // string-typed `concat`), *not* the lenient stringify `append` uses.
-        ("concat", [Value::Str(x), Value::Str(y)]) => Ok(str_val(alloc::format!("{x}{y}"))),
+        ("concat", [Value::Str(x) | Value::Safe(x), Value::Str(y) | Value::Safe(y)]) => {
+            Ok(str_val(alloc::format!("{x}{y}")))
+        }
         ("concat", [_, _]) => Err("concat expects two strings".into()),
         ("replace", [a, b, c]) => Ok(str_val(s(a).replace(&s(b), &s(c)))),
         ("includes", [a, b]) => Ok(Value::Bool(s(a).contains(&s(b)))),
@@ -1318,7 +1327,7 @@ fn eval_helper(env: &Env, name: &str, args: &[Expr]) -> Result<Value, String> {
         ("count" | "size", [a]) => Ok(Value::Num(match a {
             Value::Array(x) => x.len() as f64,
             Value::Object(o) => o.len() as f64,
-            Value::Str(x) => x.chars().count() as f64,
+            Value::Str(x) | Value::Safe(x) => x.chars().count() as f64,
             _ => 0.0,
         })),
         ("join", [Value::Array(a), sep]) => {
@@ -1392,6 +1401,28 @@ mod tests {
         let d = obj(&[("name", s("<b>"))]);
         assert_eq!(render("{{name}}", d.clone()).unwrap(), "&lt;b&gt;");
         assert_eq!(render("{{ name | safe }}", d).unwrap(), "<b>");
+    }
+
+    /// `Value::Safe` (docs/25) — a pre-escaped value: `{{ x }}` emits it verbatim (no
+    /// double-escape, unlike `Str`), it's truthy iff non-empty, and string ops treat it
+    /// like `Str` (coerced via `raw_text`, or the `Safe`-aware direct-match arms).
+    #[test]
+    fn safe_value_rules() {
+        use super::{Value, order, write_escaped};
+        let safe = Value::Safe(Rc::from("&lt;b&gt;")); // already-escaped markup
+        let plain = Value::Str(Rc::from("&lt;b&gt;"));
+        // the no-double-escape rule: Safe emits verbatim, Str re-escapes the `&`.
+        let mut a = String::new();
+        write_escaped(&safe, &mut a);
+        assert_eq!(a, "&lt;b&gt;");
+        let mut b = String::new();
+        write_escaped(&plain, &mut b);
+        assert_eq!(b, "&amp;lt;b&amp;gt;");
+        // truthiness like Str.
+        assert!(safe.truthy());
+        assert!(!Value::Safe(Rc::from("")).truthy());
+        // ordering treats Safe like Str (so sortBy on captured values works).
+        assert_eq!(order(&safe, &plain), core::cmp::Ordering::Equal);
     }
 
     #[test]
