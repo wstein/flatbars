@@ -155,6 +155,9 @@ jobs:
   examples:
     runs-on: ubuntu-latest
     strategy:
+      # Each example is an independent workspace, so don't let one failing example
+      # cancel the others — report every example's status in a single run.
+      fail-fast: false
       matrix:
         example: [blog, changelog, lab, i18n-data, i18n-fluent, truthiness]
     defaults:
