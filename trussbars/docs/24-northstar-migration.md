@@ -131,9 +131,11 @@ before.
 
 `trussbars/examples/vm-hotreload/` is the runnable proof: a `Reloader` re-reads + recompiles a
 `layout.truss` base + a `page.truss` that `{% extends %}` it on every render via
-`Program::compile_with_partials`, and the demo (`cargo run`) edits the page, then the shared base,
-in a *running* process — the output gains a tagline, then a footer, with no Rust rebuild. CI-gated
-in the `examples` matrix.
+`Program::compile_with_partials`. The default `cargo run` is a deterministic scripted session
+(edit the page, then the shared base, in a *running* process — the output gains a tagline, then a
+footer, no Rust rebuild); `cargo run -- --watch` is the opt-in live mode — a real `notify`
+filesystem watcher that re-renders on every editor save. The deterministic path is CI-gated in the
+`examples` matrix (the watch loop is never entered there).
 
 ## Non-goals (for the proof)
 

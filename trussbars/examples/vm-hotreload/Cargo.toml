@@ -20,3 +20,6 @@ path = "src/main.rs"
 trussbars-vm = { path = "../../crates/trussbars-vm" }
 # The dynamic data `Value` the VM renders against.
 trussbars-interp = { path = "../../crates/trussbars-interp" }
+# The opt-in `--watch` mode: a real filesystem watcher so an editor save re-renders.
+# (The default `cargo run` is the scripted demo and never touches this.)
+notify = "6"
