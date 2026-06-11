@@ -242,7 +242,13 @@ fn parent_at(parents: &Parents, depth: usize) -> Option<&Value> {
 /// (Rc-backed heap), the env holds values directly — entering a block scope is a
 /// handful of refcount bumps, not a deep copy of the data.
 #[derive(Clone)]
-struct Env {
+/// The render context — `this`/`root`, scope bindings, the loop-frame chain, the
+/// partial registry, the truthiness policy, and the host-helper table. It is the
+/// interpreter's evaluation context, exposed (with [`eval_expr`]/[`eval_nodes`]) as the
+/// **shared engine** the bytecode VM (`trussbars-vm`) drives, so the operator /
+/// value-helper / collection-op catalog stays single-sourced (docs/11 §4.3). Fields stay
+/// private; the VM navigates it through the methods below.
+pub struct Env {
     this: Value,
     root: Value,
     params: BTreeMap<String, Value>,
@@ -263,9 +269,36 @@ struct Env {
 }
 
 impl Env {
+    /// A root render context (no loop, no scope bindings) for `data`, with the given
+    /// hoisted `partials`, truthiness `mode`, and host `helpers`. The VM builds one of
+    /// these per render and drives it with [`eval_expr`]/[`eval_nodes`] + the navigation
+    /// methods (docs/11 §4.3).
+    #[must_use]
+    pub fn root(
+        data: &Value,
+        partials: Rc<BTreeMap<String, Vec<Node>>>,
+        mode: TruthMode,
+        helpers: Rc<Helpers>,
+    ) -> Env {
+        Env {
+            this: data.clone(),
+            root: data.clone(),
+            params: BTreeMap::new(),
+            parents: None,
+            loop_frame: None,
+            labels: BTreeMap::new(),
+            partials,
+            yield_html: None,
+            expanding: Vec::new(),
+            mode,
+            helpers,
+        }
+    }
+
     /// A child scope that re-roots `this` and pushes the old `this` onto the parent
     /// chain (O(1)).
-    fn rerooted(&self, new_this: Value) -> Env {
+    #[must_use]
+    pub fn rerooted(&self, new_this: Value) -> Env {
         let mut child = self.clone();
         child.parents = Some(Rc::new(ParentNode {
             value: self.this.clone(),
@@ -508,7 +541,13 @@ pub fn render(template: &str, data: Value) -> Result<String, String> {
     Template::parse(template)?.render(&data)
 }
 
-fn eval_nodes(env: &Env, nodes: &[Node], out: &mut String) -> Result<(), String> {
+/// Render a run of desugared [`Node`]s into `out` against the context `env` — the shared
+/// engine entry the bytecode VM delegates a block's body to (docs/11 §4.3).
+///
+/// # Errors
+/// Propagates any evaluation error (a type error, an unknown helper/partial, a `{% yield %}`
+/// outside a block partial, …).
+pub fn eval_nodes(env: &Env, nodes: &[Node], out: &mut String) -> Result<(), String> {
     for n in nodes {
         eval_node(env, n, out)?;
     }
@@ -733,7 +772,14 @@ fn eval_for(env: &Env, e: &For, out: &mut String) -> Result<(), String> {
     Ok(())
 }
 
-fn eval_expr(env: &Env, e: &Expr) -> Result<Value, String> {
+/// Evaluate a desugared [`Expr`] against the context `env` to a dynamic [`Value`] — the
+/// single source of the operator / value-helper / collection-op catalog, shared with the
+/// bytecode VM (docs/11 §4.3) so the two dynamic backends cannot diverge.
+///
+/// # Errors
+/// Returns the located reason for a type error, an unknown helper, a malformed predicate,
+/// or `loop`/`@parentchain` misuse.
+pub fn eval_expr(env: &Env, e: &Expr) -> Result<Value, String> {
     let (name, args) = match e {
         Expr::Lit(l) => return Ok(Value::from_lit(l)),
         Expr::App(name, args) => (name.as_str(), args.as_slice()),
