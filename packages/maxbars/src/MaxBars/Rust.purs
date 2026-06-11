@@ -332,12 +332,16 @@ yieldHere env = case env.yield of
   Just code -> Right code
   Nothing -> Left "unsupported: '{{yield}}' outside a block partial"
 
--- `{{> name}}` (implicit `this`) or `{{> name ctx}}` (explicit context).
+-- `{{> name}}` (implicit `this`), `{{> name ctx}}` (explicit context), or
+-- `{% include "name" k=v %}` (a trailing `dict` of hash arguments, ADR-042).
 emitPartial :: Env -> Array Expr -> Either String String
 emitPartial env = case _ of
-  [ Lit (VString name) ] -> inlinePartial env name (App "this" []) Nothing
-  [ Lit (VString name), ctxE ] -> inlinePartial env name ctxE Nothing
-  _ -> Left "unsupported: partial with a hash or a dynamic name"
+  [ Lit (VString name) ] -> inlinePartial env name (App "this" []) [] Nothing
+  [ Lit (VString name), ctxE ] -> inlinePartial env name ctxE [] Nothing
+  [ Lit (VString name), ctxE, App "dict" kvs ] -> do
+    pairs <- hashPairs kvs
+    inlinePartial env name ctxE pairs Nothing
+  _ -> Left "unsupported: partial with a dynamic name"
 
 -- `{{#partial "name"}}body{{/partial}}` — render the body in the caller's frame,
 -- then inline the named partial with that pre-rendered body bound to `{{yield}}`.
@@ -345,25 +349,45 @@ partialBlock :: Env -> Array Expr -> Template -> Either String String
 partialBlock env args body = do
   yieldCode <- nodes env body
   case args of
-    [ Lit (VString name) ] -> inlinePartial env name (App "this" []) (Just yieldCode)
-    [ Lit (VString name), ctxE ] -> inlinePartial env name ctxE (Just yieldCode)
-    _ -> Left "unsupported: block partial with a hash or a dynamic name"
+    [ Lit (VString name) ] -> inlinePartial env name (App "this" []) [] (Just yieldCode)
+    [ Lit (VString name), ctxE ] -> inlinePartial env name ctxE [] (Just yieldCode)
+    [ Lit (VString name), ctxE, App "dict" kvs ] -> do
+      pairs <- hashPairs kvs
+      inlinePartial env name ctxE pairs (Just yieldCode)
+    _ -> Left "unsupported: block partial with a dynamic name"
 
--- Inline the hoisted partial body with the passed context as the new scope, and an
--- optional pre-rendered `yield` body. Loop metadata and block params do not cross
--- into a partial; `root` (a function-level binding) does. Recursion is rejected.
-inlinePartial :: Env -> String -> Expr -> Maybe String -> Either String String
-inlinePartial env name ctxE yieldCode = case Map.lookup name env.partials of
+-- The `key=value` pairs of an include's trailing `dict` (a flat `[key, val, …]`).
+hashPairs :: Array Expr -> Either String (Array (Tuple String Expr))
+hashPairs = go []
+  where
+  go acc xs = case Array.uncons xs of
+    Nothing -> Right acc
+    Just { head: Lit (VString k), tail } -> case Array.uncons tail of
+      Just { head: v, tail: rest } -> go (Array.snoc acc (Tuple k v)) rest
+      Nothing -> Left "unsupported: malformed include hash"
+    Just _ -> Left "unsupported: include hash with a non-literal key"
+
+-- Inline the hoisted partial body with the passed context as the new scope, the
+-- include's hash arguments bound as scoped parameters (ADR-042 — each `key=value`
+-- enters `env.params`, so a bare `{{key}}` in the body resolves to the emitted
+-- value), and an optional pre-rendered `yield` body. Loop metadata and block params
+-- do not cross into a partial; `root` (a function-level binding) does. Recursion is
+-- rejected.
+inlinePartial :: Env -> String -> Expr -> Array (Tuple String Expr) -> Maybe String -> Either String String
+inlinePartial env name ctxE hash yieldCode = case Map.lookup name env.partials of
   Nothing -> Left ("unsupported: unknown partial '" <> name <> "'")
   Just body
     | Array.elem name env.expanding -> Left ("unsupported: recursive partial '" <> name <> "'")
     | otherwise -> do
         ctxCode <- expr env ctxE
+        -- the hash values are emitted in the *caller* env (the include site), then
+        -- bound for the partial body — exactly how `local`/loop variables bind.
+        bound <- traverse (\(Tuple k vE) -> Tuple k <$> expr env vE) hash
         nodes
           ( env
               { scope = ctxCode
               , loop = Nothing
-              , params = Map.empty
+              , params = Map.fromFoldable bound
               , parents = []
               , expanding = Array.cons name env.expanding
               , yield = yieldCode
@@ -960,6 +984,14 @@ path env args = case Array.uncons args of
           segs <- traverse seg keys
           Right (pvar <> foldMap identity segs)
         Nothing -> Left "unsupported: 'parent' beyond the enclosing context depth"
+  -- a hash-argument include (ADR-042) binds its keys in `env.params`; a
+  -- `this`-rooted lookup of a bound key resolves to the emitted hash value,
+  -- shadowing the partial's context — the AOT mirror of the oracle's `mergeHash`.
+  Just { head: App "this" [], tail: keys }
+    | Just { head: Lit (VString k), tail: rest } <- Array.uncons keys
+    , Just code <- Map.lookup k env.params -> do
+        segs <- traverse seg rest
+        Right (code <> foldMap identity segs)
   Just { head: subj, tail: keys } -> do
     base <- expr env subj
     segs <- traverse seg keys
