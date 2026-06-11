@@ -34,7 +34,7 @@ import Data.Either (Either)
 import Data.Tuple (Tuple)
 import FlatBars.Error (Error, ParseError)
 import FlatBars.Lexer (defaultLexConfig)
-import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
+import FlatBars.Parser (ParseOptions, defaultParseOptions)
 import FlatBars.Token (infixOperatorChars)
 import FlatBars.Value (Value)
 import Kernel.Engine (Operation)
@@ -45,6 +45,7 @@ import Kernel.Schema (InferResult, inferTemplate, inferTemplateData)
 import Kernel.Walk (Issue)
 import MaxBars.Expr (parseMaxExpr, parseMaxHead)
 import MaxBars.Lint (booleanInOutputWarnings, labelShadowWarnings)
+import MaxBars.Parser as Parser
 
 -- | Parse options for the MaxBars dialect: the default front-end knobs
 -- | (standalone trimming, …) with the interior grammar swapped for
@@ -107,7 +108,7 @@ renderMax = renderSurfaceDiagWith false maxLoopVars maxOptions nonEmpty
 -- | a report. Data-observed refinement and enums (§5) are follow-on increments.
 inferMax :: String -> Either String InferResult
 inferMax src = do
-  parsed <- lmap (show <<< NEA.head) (parseWith maxOptions src)
+  parsed <- lmap (show <<< NEA.head) (Parser.parse src)
   -- ADR-040: infer over the flattened template, so block bodies' fields are seen.
   inherited <- lmap show (resolveInheritance parsed.nodes)
   pure (inferTemplate (desugarSurfaceWith maxLoopVars (renameSurfaceHeads inherited)))
@@ -117,7 +118,7 @@ inferMax src = do
 -- | observe. Many samples are unioned.
 inferMaxData :: Array Value -> String -> Either String InferResult
 inferMaxData samples src = do
-  parsed <- lmap (show <<< NEA.head) (parseWith maxOptions src)
+  parsed <- lmap (show <<< NEA.head) (Parser.parse src)
   inherited <- lmap show (resolveInheritance parsed.nodes)
   pure
     (inferTemplateData samples (desugarSurfaceWith maxLoopVars (renameSurfaceHeads inherited)))
@@ -199,7 +200,7 @@ compileMaxJsWith partials =
 -- |    yields `true`/`false` rather than a value — the fix is `??`/`?:`.
 maxbarsWarnings :: String -> Either ParseError (Array Issue)
 maxbarsWarnings src = do
-  { nodes } <- lmap NEA.head (parseWith maxOptions src)
+  { nodes } <- lmap NEA.head (Parser.parse src)
   -- both lints read the *desugared* tree (a label survives as the `@label` marker;
   -- the boolean operators surface as `or`/`and` applications). The stray-head-bar
   -- lint is gone — a head bar is now a parse error (block params drop the pipes),
