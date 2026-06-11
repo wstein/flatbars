@@ -950,6 +950,15 @@ mod tests {
                 r#"{% inline "@t" %}<b>{{x}}</b>{% endinline %}{{ render "@t" }}"#,
                 obj(&[("x", s("<i>"))]),
             ),
+            // ADR-25 stage 5: {% capture %} / {% apply %} desugar over `render`.
+            (
+                "{% capture c %}{{n}}!{% endcapture %}<{{c}}><{{c}}>",
+                obj(&[("n", s("hi"))]),
+            ),
+            (
+                "{% apply uppercase | truncate 4 %}hello{% endapply %}",
+                Value::Null,
+            ),
             ("{{ name | uppercase }}", obj(&[("name", s("ann"))])),
             (
                 "{% if n > 2 %}big{% elif n > 0 %}mid{% else %}small{% endif %}",

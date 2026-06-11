@@ -196,6 +196,13 @@ impl Blocks<'_> {
                         let stop = self.capture_desugar(*span, interior_str, scope, &mut nodes)?;
                         return Ok((nodes, stop));
                     }
+                    // `{% apply PIPELINE %}BODY{% endapply %}` (ADR-25): output the body piped
+                    // through PIPELINE (the body is its leading subject). Unlike capture it does
+                    // not wrap the tail — it emits an inline + an Output, then parsing continues.
+                    if head_word(interior_str) == "apply" {
+                        self.apply_desugar(*span, interior_str, scope, &mut nodes)?;
+                        continue;
+                    }
                     let node = self.open_block(*span, interior_str, scope)?;
                     nodes.push(node);
                 }
@@ -235,6 +242,12 @@ impl Blocks<'_> {
             "scope" => self.with_block(span, "scope", rest, scope),
             "with" => err(
                 "the context re-root is renamed `scope` (ADR-039) — write `{% scope … %}` … `{% endscope %}`",
+                span.start,
+            ),
+            // ADR-25: the block filter is `apply`, not `filter` (which collides with the
+            // collection filter / value pipes — Twig's correction).
+            "filter" => err(
+                "the block filter is `apply` (ADR-25) — write `{% apply upper | truncate 50 %}` … `{% endapply %}` to pipe the body",
                 span.start,
             ),
             // `{% local … %}` is the bounded block binding (docs-17). The retired `let`
@@ -540,6 +553,47 @@ impl Blocks<'_> {
             body: tail,
         });
         Ok(tail_stop)
+    }
+
+    /// `{% apply PIPELINE %}BODY{% endapply %}` → an inline def holding BODY + an `Output` of
+    /// `(render "@app$k") | PIPELINE` (ADR-25): the rendered body is the pipeline's implicit
+    /// leading subject. The interior is parsed with the *full* expression parser (not the
+    /// block-head grammar, which forbids `|`), with the `render` call prepended as the subject —
+    /// so `{% apply upper | truncate 50 %}` becomes `truncate(upper(render "@app$k"), 50)`.
+    /// Pushes the two nodes; parsing of the sibling tail continues normally (apply outputs, it
+    /// does not bind).
+    fn apply_desugar(
+        &mut self,
+        span: crate::span::Span,
+        interior: &str,
+        scope: &Scope,
+        nodes: &mut Vec<Node>,
+    ) -> Result<(), ParseError> {
+        let pipeline = interior[head_word(interior).len()..].trim();
+        if pipeline.is_empty() {
+            return Err(ParseError {
+                message: "{% apply %} needs a filter pipeline (e.g. `{% apply upper %}`)".into(),
+                at: span.start,
+            });
+        }
+        self.pos += 1; // consume the `{% apply %}` open tag
+        let (body, stop) = self.parse_until(scope)?;
+        expect_close(&stop, "apply", span.start)?;
+        let app = format!("@app${}", span.start);
+        // Parse `(render "@app$k") | <pipeline>` with the value-expression parser (pipes allowed).
+        let expr = parse_expr(&format!("(render \"{app}\") | {pipeline}"), scope)?;
+        nodes.push(Node::Inline {
+            span,
+            name: app,
+            params: Vec::new(),
+            body,
+        });
+        nodes.push(Node::Output {
+            span,
+            expr,
+            raw: false,
+        });
+        Ok(())
     }
 
     fn inline_block(

@@ -1484,6 +1484,35 @@ mod tests {
         );
     }
 
+    /// `{% apply P %}…{% endapply %}` (ADR-25 stages 4/5) — render the body, pipe it through P
+    /// (the body is P's leading subject), output the result. Desugars to an `@app$` inline + an
+    /// Output of `(render "@app$") | P`.
+    #[test]
+    fn apply_block() {
+        // single filter: body rendered, uppercased, output.
+        let d = obj(&[("name", s("ann"))]);
+        assert_eq!(
+            render("{% apply uppercase %}hi {{name}}{% endapply %}", d).unwrap(),
+            "HI ANN"
+        );
+        // a pipeline: the body is the leading subject — uppercase THEN truncate.
+        assert_eq!(
+            render(
+                "{% apply uppercase | truncate 4 %}hello{% endapply %}",
+                Value::Null
+            )
+            .unwrap(),
+            "HELL…"
+        );
+        // the result is escaped on output (uppercase returns a plain String, not Safe), so a
+        // literal `<b>` in the body re-escapes after the filter (the type-driven output rule).
+        let d2 = obj(&[("x", s("a"))]);
+        assert_eq!(
+            render("{% apply uppercase %}<b>{{x}}</b>{% endapply %}", d2).unwrap(),
+            "&lt;B&gt;A&lt;/B&gt;"
+        );
+    }
+
     /// `Value::Safe` (docs/25) — a pre-escaped value: `{{ x }}` emits it verbatim (no
     /// double-escape, unlike `Str`), it's truthy iff non-empty, and string ops treat it
     /// like `Str` (coerced via `raw_text`, or the `Safe`-aware direct-match arms).
