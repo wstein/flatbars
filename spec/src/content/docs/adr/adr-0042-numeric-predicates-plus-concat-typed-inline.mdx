@@ -196,3 +196,42 @@ partial application read the same as today; the signature only adds the *names +
 
 Each is a self-contained, separately-committed, fully-green increment (the surface is frozen here, so
 no spelling churn mid-implementation).
+
+## 8. Amendment (2026-06-11) — the signature binds at the *include site*, not in the body
+
+The first implementation of §4 desugared the signature **into the partial body**: each optional
+parameter `q=default` was wrapped `{% local q = (q ?? default) %}`, and a required parameter read the
+merged `{% include %}` hash via a context lookup. That is correct and complete for the **dynamic
+path** (oracle / interpreter — committed), where a missing field is leniently `null`. It does **not**
+generalise to the **typed AOT**, and the difference is the whole point of a *typed* macro:
+
+- The AOT inlines a partial's body once per call site against a **typed context struct**. A required
+  parameter's `ctx.title` is fine when the field exists, but an *optional* parameter compiles to
+  `ctx.badge` on a struct that, at a call site which omits `badge`, has **no `badge` field** — a Rust
+  compile error, not a lenient `null`. A body-baked default cannot see the per-call-site hash.
+- The AOT also did not support hash-argument includes **at all** (`emitPartial`: *"partial with a
+  hash or a dynamic name"*) — a pre-existing gap that gates everything here.
+
+**Revised model — apply the signature where the hash is known (the include site).** The partial body
+references each parameter as a **scoped name** (no body-baked defaults); the *binding* of those names
+is established when the partial is expanded/inlined, from that call's hash:
+
+| Backend | Per-call-site parameter binding |
+| --- | --- |
+| **Oracle / interpreter** | `partialH` binds each signature parameter as a scoped helper around the body render — `hash[p]` if provided, else the signature default; a required parameter with neither is a located error. |
+| **AOT (typed)** | `emitPartial` binds each parameter into `env.params` (the existing scoped-binding map that `local`/loop variables already use) — the emitted hash value, or the default; the body's `{{p}}` resolves there. A required parameter the call omits is a compile-time error (the typed-macro check). |
+
+This needs the **signature in the partial registry** (a parallel `Map String (Array Param)` beside the
+existing `Map String Template` body registry — *additive*, so the ~60 registry use-sites are
+untouched), populated by `hoistInline` from the parser's marker args; the body is stored **without**
+any signature desugar. The §4 body-`local` desugar is then **retired** in favour of this include-site
+binding, so the oracle and the AOT apply the *same* signature the *same* way.
+
+**Revised build order.** (3a) the AOT **hash-partial primitive** — bind an include's hash into
+`env.params` (closes the pre-existing gap; makes plain parameterised includes and all-*required*
+signatures compile in AOT). (3b) the **signature registry** + include-site binding in the oracle and
+AOT (retires the body desugar; enables *optional* defaults and the required-arg compile check in AOT).
+(3c) the **Rust front-end** (`trussbars-template`: signature parse + the same registry/binding in
+`emit.rs` and the interpreter), so the surface ports to `.truss` and the conformance corpus covers it
+across all axes. (3d) `engine/maxbars.mdx` + the `/maxbars` tutorial. Effort is dominated by 3b/3c
+(touching both forked front-ends + the inference that types a parameter from its call-site argument).
