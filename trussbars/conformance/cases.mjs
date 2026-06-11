@@ -369,9 +369,12 @@ export const cases = [
   },
   {
     // ADR-042 §8 follow-up: a hash-argument include WITHOUT a signature — the body's
-    // `{{who}}` is a `lookup this "who"`, shadowed by the hash key (so AOT-typed from
-    // the call value `name`, no phantom `who` context field).
+    // `{{who}}` is a `lookup this "who"`, bound by the hash key `who=name` at the call site.
+    // inference gap (docs/03 §Not-yet): the unsignatured hash binding is mis-read as a phantom
+    // `who` context field, so use the data shape (which omits it) — same class as the capture
+    // bindings below. (The committed report.json had not caught this — it was stale.)
     id: "include-hash-no-sig",
+    ctxFromData: true,
     template: '{% inline "g" %}hi {{who}}!{% endinline %}{% include "g" who=name %}',
     data: { name: "Ada" },
   },
@@ -566,5 +569,37 @@ export const cases = [
     ctxFromData: true, // inference gap: where-key / with-into-dict re-root mis-hoist root fields (docs/03 §Not-yet)
     template: "{% scope {a: {b: 1}} %}{{a.b}}{% endscope %}",
     data: {},
+  },
+  // {% capture %} (ADR-25 / docs/18): render the body once into a forward-bound Safe value.
+  // inference gap (docs/03 §Not-yet): the captured *binding* (`by`/`b`) is read as `{{ … }}`
+  // output, so schema inference mis-classifies it as a context field instead of a `{% local %}`
+  // shadow — use the data shape, which omits it (the binding is generated, not a ctx field).
+  {
+    id: "capture-reuse",
+    ctxFromData: true,
+    template:
+      "{% capture by %}{{author}}{% if vip %} ★{% endif %}{% endcapture %}<h>{{by}}</h><f>{{by}}</f>",
+    data: { author: "Ann", vip: true },
+  },
+  {
+    id: "capture-no-double-escape",
+    ctxFromData: true,
+    template: "{% capture b %}{{html}}{% endcapture %}{{b}}",
+    data: { html: "<i>x</i>" },
+  },
+  {
+    id: "capture-pipeable",
+    ctxFromData: true,
+    template: "{% capture b %}  hi  {% endcapture %}[{{b | trim}}]",
+    data: {},
+  },
+  {
+    id: "capture-in-loop",
+    // inference gap (docs/03 §Not-yet): the loop element type is unpinned when `{{this}}`
+    // is used only inside the capture's hoisted `@cap` inline partial — use the data shape.
+    ctxFromData: true,
+    template:
+      "{% for xs %}{% capture c %}<{{this}}>{% endcapture %}{{c}}{{c}}{% endfor %}",
+    data: { xs: ["a", "b"] },
   },
 ];

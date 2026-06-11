@@ -990,6 +990,22 @@ fn emit_app(env: &Env, name: &str, args: &[Expr]) -> Result<String, String> {
         ("some", _) => coll_filter(env, "any", false, args),
         ("every", _) => coll_filter(env, "all", false, args),
         ("find", _) => coll_find(env, args),
+        // ADR-25: render a hoisted `{% capture %}`/`{% apply %}` body (an `@…` inline partial)
+        // to a `Safe` value in the CURRENT scope — loop vars / locals preserved. Emits a block
+        // that shadows the output buffer (`out`) with a fresh `String`, renders the body into
+        // it, and wraps it `Safe`. Literal `@`-name only (internal; the names-static boundary).
+        ("render", [Expr::Lit(Value::Str(name))]) if name.starts_with('@') => {
+            let Some(def) = env.partials.get(name) else {
+                return Err(format!("internal: unknown captured fragment '{name}'"));
+            };
+            let def_src = Rc::clone(&def.src);
+            let def_body = def.body.clone();
+            let mut body_code = String::new();
+            emit_nodes(env, &def_src, &def_body, &mut body_code)?;
+            Ok(format!(
+                "trussbars_std::safe(&{{ let mut out = String::new();\n{body_code}out }})"
+            ))
+        }
         _ => {
             if let Some(call) = emit_helper(env, name, args) {
                 call

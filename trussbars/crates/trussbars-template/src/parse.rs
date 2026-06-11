@@ -187,7 +187,16 @@ impl Blocks<'_> {
                     interior,
                     span,
                 } => {
-                    let node = self.open_block(*span, interior.of(self.src), scope)?;
+                    let interior_str = interior.of(self.src);
+                    // `{% capture NAME %}` (ADR-25 / docs/18) is a *tail-wrapping* desugar: the
+                    // rest of this sibling list becomes the body of a forward `{% local %}`, so
+                    // NAME binds forward to the enclosing block's close. Handled here, not in
+                    // `open_block`, because it emits two nodes and consumes the sibling tail.
+                    if head_word(interior_str) == "capture" {
+                        let stop = self.capture_desugar(*span, interior_str, scope, &mut nodes)?;
+                        return Ok((nodes, stop));
+                    }
+                    let node = self.open_block(*span, interior_str, scope)?;
                     nodes.push(node);
                 }
                 Lexeme::RawBlock { body, span, .. } => {
@@ -492,6 +501,45 @@ impl Blocks<'_> {
             bindings,
             body,
         })
+    }
+
+    /// `{% capture NAME %}BODY{% endcapture %}TAIL` → an inline def holding BODY + a forward
+    /// `{% local NAME = (render "@cap$k") %}TAIL{% endlocal %}` (ADR-25 / docs/18, mirroring the
+    /// oracle's `Kernel.SetSugar.liftSet`). The sibling tail becomes the local's body (forward
+    /// scope); `(render "@cap$k")` renders BODY to a `Safe` value in the surrounding context.
+    /// Pushes the two nodes onto `nodes` and returns the tail's `Stop` (the enclosing close).
+    fn capture_desugar(
+        &mut self,
+        span: crate::span::Span,
+        interior: &str,
+        scope: &Scope,
+        nodes: &mut Vec<Node>,
+    ) -> Result<Stop, ParseError> {
+        let rest = interior[head_word(interior).len()..].trim();
+        let (name, _) = read_ident(rest).ok_or_else(|| ParseError {
+            message: "{% capture %} needs a binding name".into(),
+            at: span.start,
+        })?;
+        let name = name.to_string();
+        self.pos += 1; // consume the `{% capture %}` open tag
+        let (body, stop) = self.parse_until(scope)?;
+        expect_close(&stop, "capture", span.start)?;
+        // A hygienic, collision-free synthetic partial name (the source offset) — `@`-prefixed
+        // so it is unreachable from author syntax and `render` stays internal (ADR-25 §4).
+        let cap = format!("@cap${}", span.start);
+        nodes.push(Node::Inline {
+            span,
+            name: cap.clone(),
+            params: Vec::new(),
+            body,
+        });
+        let (tail, tail_stop) = self.parse_until(&scope.with(name.as_str()))?;
+        nodes.push(Node::Let {
+            span,
+            bindings: vec![(name, Expr::App("render".to_string(), vec![Expr::str(&cap)]))],
+            body: tail,
+        });
+        Ok(tail_stop)
     }
 
     fn inline_block(

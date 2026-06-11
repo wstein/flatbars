@@ -1447,6 +1447,43 @@ mod tests {
         assert!(render(r#"{{ render "nav" }}"#, Value::Null).is_err());
     }
 
+    /// `{% capture %}` (ADR-25 stage 3) — renders its body once into a `Safe` value bound
+    /// forward, reused without re-rendering and emitted verbatim (no double-escape). Desugars
+    /// to an `@cap$` inline + a `{% local %}` over the sibling tail.
+    #[test]
+    fn capture_block() {
+        // build-once-use-many; the body escapes its interpolation, the Safe reuse does not.
+        let d = obj(&[("author", s("<b>A</b>")), ("vip", Value::Bool(true))]);
+        assert_eq!(
+            render(
+                r#"{% capture by %}{{author}}{% if vip %} ★{% endif %}{% endcapture %}<h>{{by}}</h><f>{{by}}</f>"#,
+                d
+            )
+            .unwrap(),
+            "<h>&lt;b&gt;A&lt;/b&gt; ★</h><f>&lt;b&gt;A&lt;/b&gt; ★</f>"
+        );
+        // forward scope: the binding is live in the sibling tail but dies at the block close.
+        let d2 = obj(&[("x", s("hi"))]);
+        assert_eq!(
+            render(
+                r#"{% if x %}{% capture c %}[{{x}}]{% endcapture %}{{c}}{% endif %}{{c}}"#,
+                d2
+            )
+            .unwrap(),
+            "[hi]"
+        );
+        // capture inside a loop sees the current element (the body renders in-scope).
+        let d3 = obj(&[("xs", arr(&[s("a"), s("b")]))]);
+        assert_eq!(
+            render(
+                r#"{% for xs %}{% capture c %}<{{this}}>{% endcapture %}{{c}}{{c}}{% endfor %}"#,
+                d3
+            )
+            .unwrap(),
+            "<a><a><b><b>"
+        );
+    }
+
     /// `Value::Safe` (docs/25) — a pre-escaped value: `{{ x }}` emits it verbatim (no
     /// double-escape, unlike `Str`), it's truthy iff non-empty, and string ops treat it
     /// like `Str` (coerced via `raw_text`, or the `Safe`-aware direct-match arms).

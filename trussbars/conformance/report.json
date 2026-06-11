@@ -1,19 +1,14 @@
 {
   "profile": "perf (ecma-float, default)",
-  "total": 87,
+  "total": 91,
   "positive": {
-    "count": 75,
-    "byte_matched": 75,
+    "count": 80,
+    "byte_matched": 80,
     "mismatched": 0
   },
   "excluded": {
-    "count": 1,
-    "cases": [
-      {
-        "id": "include-hash-no-sig",
-        "reason": "unsupported: partial with a hash or a dynamic name"
-      }
-    ]
+    "count": 0,
+    "cases": []
   },
   "oracle_drift": 0
 }
