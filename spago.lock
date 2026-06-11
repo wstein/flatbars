@@ -41,6 +41,7 @@
             "flatbars",
             "flatbars-compile",
             "foldable-traversable",
+            "kernel",
             "ordered-collections",
             "prelude",
             "tuples"
@@ -270,11 +271,11 @@
             "foldable-traversable",
             "integers",
             "kernel",
+            "lists",
             "maybe",
             "ordered-collections",
             "prelude",
             "strings",
-            "transformers",
             "tuples"
           ]
         },
