@@ -80,10 +80,10 @@ MaxBars adds two literal *atoms* — a `[…]` list and a `{k: v}` dict — usab
 anywhere an expression is (loop subjects, arguments, pipe sources, nested):
 
 ```maxbars
-{% for [1, 2, 3] %}{{this}} {% endfor %}            {{!-- ⇒ (list 1 2 3) --}}
-{% for [first, n + 1, {tag: x}] %}…{% endfor %}     {{!-- elements are full expressions --}}
-{% scope {name: who, age: 30} %}{{name}}{% endscope %} {{!-- ⇒ (dict "name" who "age" 30) --}}
-{{{ json {"full name": who} }}}                     {{!-- a string key, for spaces --}}
+{% for [1, 2, 3] %}{{this}} {% endfor %}            {# ⇒ (list 1 2 3) #}
+{% for [first, n + 1, {tag: x}] %}…{% endfor %}     {# elements are full expressions #}
+{% scope {name: who, age: 30} %}{{name}}{% endscope %} {# ⇒ (dict "name" who "age" 30) #}
+{{ json {"full name": who} | safe }}                {# a string key, for spaces #}
 ```
 
 They are pure sugar: `[e1, …]` desugars to the prelude `list` helper and
@@ -98,7 +98,7 @@ The lexer carves `[` `]` `{` `}` `,` as their own punctuation only in MaxBars
 town]` path-bracket — is untouched; only a **leading** `[` opens a list. The
 structural scanner is *brace-aware* under the same flag: it balances `{ }` and
 skips string literals, so a dict's own `}` is consumed before the tag close and
-`{% scope {a: 1} %}` (or `{{{json {x: 1}}}}`) needs **no** disambiguating space — a
+`{% scope {a: 1} %}` (or `{{ json {x: 1} | safe }}`) needs **no** disambiguating space — a
 `}}` inside a dict-value string is not a tag close either.
 
 ## Collection filters
@@ -108,10 +108,10 @@ The shared prelude carries five **key-based** filter operations
 other collection op, no new surface:
 
 ```maxbars
-{% for row in (rows | where "active") %}…{% endfor %}     {{!-- key is truthy --}}
-{% for u in (users | where "tier" "gold") %}…{% endfor %} {{!-- key == value --}}
-{% for u in (users | reject "archived") %}…{% endfor %}   {{!-- complement of where --}}
-{{ users | find "role" "admin" | json }}                  {{!-- first match, else null --}}
+{% for row in (rows | where "active") %}…{% endfor %}     {# key is truthy #}
+{% for u in (users | where "tier" "gold") %}…{% endfor %} {# key == value #}
+{% for u in (users | reject "archived") %}…{% endfor %}   {# complement of where #}
+{{ users | find "role" "admin" | json }}                  {# first match, else null #}
 {% if (orders | some "open") %}You have open orders.{% endif %}
 {% if (rows | every "valid") %}All valid.{% endif %}
 ```
@@ -186,9 +186,8 @@ operation, reached one way per dialect:
 | RawBars | `{{{yield}}}` (the raw output of the `yield` op — RawBars keeps the op-name surface) |
 | Handlebars / ClassicBars | `{{> @partial-block}}` |
 
-The body is already-rendered, escape-safe output (a `VSafe` value), so MaxBars'
-`{{ }}` auto-escape is a no-op on it — `{{yield}}` and
-`{{{yield}}}` emit identical bytes.
+The body is already-rendered, escape-safe output (a `VSafe` value), so escaping it is a
+no-op — in RawBars the escaped `{{yield}}` and the raw `{{{yield}}}` emit identical bytes.
 
 `yield` is reserved like `this`/`loop`/`root`/`parent`: a same-named data field is
 shadowed (read it with an explicit `{{lookup this "yield"}}`), and a loop
@@ -238,7 +237,7 @@ A block *open* parses its head as the helper name followed by arguments, each a
 full infix expression — so a condition needs no parentheses:
 
 ```handlebars
-{% if x > 0 && x < 10 %}in range{% endif %}      {{!-- = {% if (and (gt x 0) (lt x 10)) %} --}}
+{% if x > 0 && x < 10 %}in range{% endif %}      {# = {% if (and (gt x 0) (lt x 10)) %} #}
 {% unless a || b %}neither{% endunless %}
 ```
 

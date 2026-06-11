@@ -77,7 +77,7 @@ maxOptions =
     -- Django-style `{% … %}` statement tags (docs-19): control flow / separators move
     -- to `{% %}`, with `{{ }}` for output. Enabled additively here (the `{{ }}` forms
     -- still parse); the breaking "reject the old `{{#…}}`" hardening is a follow-up.
-    , lexConfig = defaultLexConfig { statementTags = true }
+    , lexConfig = defaultLexConfig { statementTags = true, bracesOutputOnly = true }
     -- Set delimiters are NOT enabled (per ADR-015 amendment): `{{=<% %>=}}` is
     -- a Mustache feature reserved for MinBars. RawBars / MaxBars / ClassicBars all
     -- reject it so the dialect ladder has one consistent answer to "does

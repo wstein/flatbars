@@ -2,7 +2,7 @@
 -- | surface desugaring to ClassicBars/core, rendered through the reused engine, and
 -- | a compile-shape check.
 -- |
--- | Infix works in output expressions (`{{ a && b }}` / `{{{ … }}}`), pipes, and
+-- | Infix works in output expressions (`{{ a && b }}` / `{{ x | safe }}`), pipes, and
 -- | — via the core `parseHead` seam — bare block conditions (`{{#if a && b}}`) and
 -- | the Liquid-style loop bindings (`{{#each a i j in xs}}`: element, index,
 -- | 1-based index; `with` keeps a drop-pipes `as p`). The head ladder omits the
@@ -139,15 +139,16 @@ main = do
   assert' "reject: case else not last"
     (isLeft (renderMax "{% case s %}{% else %}x{% when 1 %}y{% endcase %}" (obj [])))
 
-  -- pipes: `a | f` ⇒ (f a); the piped value is the first argument.
-  expectM "pipe-json" "{{{ o | json }}}" (obj [ Tuple "o" (obj [ Tuple "a" (num 1.0) ]) ])
+  -- pipes: `a | f` ⇒ (f a); the piped value is the first argument. (Unescaped output is
+  -- the `safe` final pipe — ADR-039 item 8; MaxBars has no `{{{ }}}` raw sigil.)
+  expectM "pipe-json" "{{ o | json | safe }}" (obj [ Tuple "o" (obj [ Tuple "a" (num 1.0) ]) ])
     "{\"a\":1}"
-  expectM "pipe-arg" "{{{ xs | lookup 0 }}}"
+  expectM "pipe-arg" "{{ xs | lookup 0 | safe }}"
     (obj [ Tuple "xs" (VArray [ VString "a", VString "b" ]) ])
     "a"
   -- pipe chain is left-assoc: not(not(0)) = false.
   -- MaxBars uses the `nonEmpty` rule: 0 is truthy, so not·not 0 = true.
-  expectM "pipe-chain" "{{{ n | not | not }}}" (obj [ Tuple "n" (num 0.0) ]) "true"
+  expectM "pipe-chain" "{{ n | not | not | safe }}" (obj [ Tuple "n" (num 0.0) ]) "true"
 
   -- arithmetic operators (desugar to add/subtract/multiply/divide/modulo).
   expectM "arith-add" "{{ a + b }}" (obj [ Tuple "a" (num 2.0), Tuple "b" (num 3.0) ]) "5"
@@ -622,16 +623,15 @@ main = do
     (Array.null (warnNames "{{ pick (a || b) }}"))
 
   -- ── Set delimiters (ADR-015 amendment): MinBars-exclusive ─────────────────
-  -- MaxBars REJECTS set-delim. The inline `{{=A B=}}` form is a hard parse
-  -- error; the `{{! @delimiters: …}}` long-comment form parses as a normal
-  -- comment and the directive inside is silently ignored (no delimiter switch
-  -- happens, so `<%name%>` reads as plain content). The dialect ladder has
-  -- one consistent answer to "does delimiter switching work here?" — yes only
-  -- on the Mustache surface.
+  -- MaxBars REJECTS set-delim. The inline `{{=A B=}}` form is a hard parse error, and
+  -- the Handlebars `{{! @delimiters: …}}` directive form is rejected too — `{{!` is no
+  -- longer a comment in MaxBars (`bracesOutputOnly`, ADR-039), so it lexes as output and
+  -- the `@`-path interior fails to parse. The dialect ladder has one consistent answer
+  -- to "does delimiter switching work here?" — yes only on the Mustache surface.
   assert' "set-delim: inline `{{=A B=}}` is rejected"
     (isLeft (renderMax "{{=<% %>=}}<%name%>" (obj [])))
-  assert' "set-delim: `{{! @delimiters: …}}` directive is ignored — `<%name%>` stays content"
-    (renderMax "{{! @delimiters: <% %> }}<%name%>" (obj []) == Right "<%name%>")
+  assert' "set-delim: `{{! @delimiters: …}}` is rejected (`{{!` is not a comment in MaxBars)"
+    (isLeft (renderMax "{{! @delimiters: <% %> }}<%name%>" (obj [])))
 
   -- range (the Liquid-inspired counted-loop helper).
   expectM "range: inclusive integer range as an array"

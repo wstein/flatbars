@@ -1,1 +1,1 @@
-Total{{! dropped }}: {{total}}{{!-- not shown: }} --}}
+Total{# dropped #}: {{total}}{# not shown #}

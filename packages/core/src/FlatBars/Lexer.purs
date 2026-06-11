@@ -302,10 +302,18 @@ type LexConfig =
   , mustacheDelims :: Boolean
   , keepLongComments :: Boolean
   , statementTags :: Boolean
+  -- | `{{ … }}` is OUTPUT-ONLY (ADR-039): no Handlebars `{{{ … }}}` raw sigil (unescaped
+  -- | output is `{{ x | safe }}`) and no `{{! … }}` / `{{!-- --}}` comments (a comment is
+  -- | `{# … #}`). On for the pure native surface (MaxBars/Trussbars), so a `{{{` is a lex
+  -- | error and a `{{!` lexes as ordinary output (`! x` ⇒ `not x`), matching Trussbars.
+  -- | Off (the default) keeps the full Handlebars grammar — ClassicBars/MinBars and the
+  -- | desugared-core RawBars surface (which still spells raw output `{{{op}}}`).
+  , bracesOutputOnly :: Boolean
   }
 
 -- | Default template-lexer config: `{{`/`}}`, no set-delimiter switching, long
--- | comments dropped (the render/compile default), no `{% %}` statement tags.
+-- | comments dropped (the render/compile default), no `{% %}` statement tags, the full
+-- | Handlebars output/comment grammar (`bracesOutputOnly` off).
 defaultLexConfig :: LexConfig
 defaultLexConfig =
   { open: "{{"
@@ -313,6 +321,7 @@ defaultLexConfig =
   , mustacheDelims: false
   , keepLongComments: false
   , statementTags: false
+  , bracesOutputOnly: false
   }
 
 type TagResult = { mtok :: Maybe RawTok, next :: Int, trimL :: Boolean, trimR :: Boolean }
@@ -628,13 +637,24 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
   readTag i
     | matchAt cs i "{{{{#" = readRaw i 5 -- `{{{{#name}}}}` (FlatBars/back-compat)
     | matchAt cs i "{{{{" = readRaw i 4 -- `{{{{name}}}}` (Handlebars raw block)
-    | matchAt cs i "{{~!--" = readLongComment i "{{~!--"
-    | matchAt cs i "{{!--" = readLongComment i "{{!--"
+    -- `bracesOutputOnly` (MaxBars/Trussbars, ADR-039): the Handlebars comments
+    -- `{{! }}` / `{{!-- --}}` are not recognized (the comment is `{# … #}`), so they fall
+    -- through to `{{` output (`! x` ⇒ `not x`); a glued `{{{` is rejected (unescaped
+    -- output is `{{ x | safe }}`). RawBars keeps the Handlebars forms (`bracesOutputOnly`
+    -- off) — it still spells raw output `{{{op}}}`.
+    | not cfg.bracesOutputOnly && matchAt cs i "{{~!--" = readLongComment i "{{~!--"
+    | not cfg.bracesOutputOnly && matchAt cs i "{{!--" = readLongComment i "{{!--"
+    | cfg.bracesOutputOnly && matchAt cs i "{{{" =
+        Left
+          ( LexError
+              "`{{{ … }}}` is not a tag here — unescaped output is `{{ x | safe }}`, a verbatim region is `{% raw %}`"
+              i
+          )
     | matchAt cs i "{{{^" = readBlockOpen i "{{{^" Inverse "}}}"
     | matchAt cs i "{{{/" = readClose i "{{{/" "}}}"
     | matchAt cs i "{{{" = readOutput i
-    | matchAt cs i "{{~!" = readShortComment i "{{~!"
-    | matchAt cs i "{{!" = readShortComment i "{{!"
+    | not cfg.bracesOutputOnly && matchAt cs i "{{~!" = readShortComment i "{{~!"
+    | not cfg.bracesOutputOnly && matchAt cs i "{{!" = readShortComment i "{{!"
     -- `{{#*name}}` (inline-partial decorator) and `{{#>name}}` (partial block) are
     -- distinct openers — matched before bare `{{#}}` so the `*`/`>` is consumed as
     -- part of the opener, not folded into the head.

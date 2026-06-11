@@ -250,6 +250,7 @@ main = do
           , mustacheDelims: true
           , keepLongComments: false
           , statementTags: false
+          , bracesOutputOnly: false
           }
       }
   -- `{{=<% %>=}}` swaps the active delimiters; it renders nothing, and a following

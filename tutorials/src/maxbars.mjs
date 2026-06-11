@@ -64,16 +64,19 @@ export const examples = {
   escaping: {
     engine: "maxbars",
     label: "Simple — Escaping (markup in data)",
-    // {{x}} HTML-escapes (the safe default); {{{x}}} emits raw — identical to ClassicBars.
+    // {{x}} HTML-escapes (the safe default); the `safe` final pipe emits raw output —
+    // MaxBars has no Handlebars {{{x}}} sigil (ADR-039 item 8).
     // The markup is in the DATA; shown as plain text so the entities are visible.
-    template: "escaped: {{html}}\nraw:     {{{html}}}",
+    template: "escaped: {{html}}\nraw:     {{ html | safe }}",
     data: { html: "<b>bold & bright</b>" },
   },
 
   comment: {
     engine: "maxbars",
     label: "Simple — Comments",
-    template: "Total{{! dropped }}: {{total}}{{!-- not shown: }} --}}",
+    // Comments are Django/Jinja {# … #} (ADR-039 item 1) — dropped from the output. The
+    // Handlebars {{! … }} / {{!-- --}} forms are not comments in MaxBars.
+    template: "Total{# dropped #}: {{total}}{# not shown #}",
     data: { total: 99 },
   },
 
@@ -376,7 +379,7 @@ Subtotal {{subtotal}} + tax {{tax}} = {{total}}`,
       "  safe('<ul>' + items.map((p, i) => o.fn(p, { blockParams: [p, i] })).join('') + '</ul>'));",
     template:
       `{{loud name}}
-{{{link "Home" url="/home"}}}
+{{ (link "Home" url="/home") | safe }}
 {% list people as p i %}<li>{{i}}: {{p.name}}</li>{% endlist %}`,
     data: { name: "ada", people: [{ name: "Ada" }, { name: "Lin" }] },
   },

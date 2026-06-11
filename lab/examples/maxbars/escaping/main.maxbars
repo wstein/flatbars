@@ -1,2 +1,2 @@
 escaped: {{html}}
-raw:     {{{html}}}
+raw:     {{ html | safe }}
