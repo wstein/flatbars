@@ -420,23 +420,24 @@ pub fn tera_teams(tera: &tera::Tera, ctx: &Teams) -> String {
     tera.render("teams", &c).expect("tera teams renders")
 }
 
-// ─── 6. Trussbars VM (dynamic backend, docs/11) ───────────────────────────────
+// ─── 6. Trussbars interpreter (dynamic backend, docs/11) ──────────────────────
 // The SAME MaxBars language as the AOT column, run through the dynamic tree-walk
-// interpreter instead of compiled to Rust. Like handlebars, the template is parsed
+// INTERPRETER instead of compiled to Rust. Like handlebars, the template is parsed
 // ONCE (out of the timed loop) and the data is a pre-built `Value`, so the bench
 // measures the interpret loop — the dynamic peer to handlebars, the AOT peer to the
-// `trussbars` column above. (The VM spike is lenient; these templates are within its
-// covered subset.)
+// `trussbars` column above. The interpreter is the always-correct dynamic backend; the
+// bytecode VM in §6b optimizes against it (its target: ≥2× this column).
 
 use std::rc::Rc;
 
-use trussbars_vm::{Template as VmTemplate, Value as VmValue};
+use trussbars_interp::{Template as VmTemplate, Value as VmValue};
 
 fn vm_num(n: i64) -> VmValue {
     VmValue::Num(n as f64)
 }
 
-/// `BigTable` → the VM's dynamic `Value` (`{ table: [[i64]] }`).
+/// `BigTable` → the dynamic `Value` (`{ table: [[i64]] }`), shared by both dynamic
+/// backends (interpreter + VM) so they render identical input.
 pub fn big_table_value(ctx: &BigTable) -> VmValue {
     let table: Vec<VmValue> = ctx
         .table
@@ -476,59 +477,60 @@ pub fn teams_value(ctx: &Teams) -> VmValue {
     ))
 }
 
-/// The big-table template in current MaxBars surface, parsed once.
-pub fn vm_big_table_template() -> VmTemplate {
+/// The big-table template in current MaxBars surface, parsed once (interpreter).
+pub fn interp_big_table_template() -> VmTemplate {
     VmTemplate::parse(
         "<table>{% for table %}<tr>{% for this %}<td>{{this}}</td>{% endfor %}</tr>{% endfor %}</table>",
     )
-    .expect("vm big-table parses")
+    .expect("interp big-table parses")
 }
 
-pub fn vm_big_table(tmpl: &VmTemplate, data: &VmValue) -> String {
-    tmpl.render(data).expect("vm big-table renders")
+pub fn interp_big_table(tmpl: &VmTemplate, data: &VmValue) -> String {
+    tmpl.render(data).expect("interp big-table renders")
 }
 
-/// The teams template in current MaxBars surface, parsed once.
-pub fn vm_teams_template() -> VmTemplate {
+/// The teams template in current MaxBars surface, parsed once (interpreter).
+pub fn interp_teams_template() -> VmTemplate {
     VmTemplate::parse(
         "<html><head><title>{{year}}</title></head><body><h1>CSL {{year}}</h1><ul>\
          {% for teams %}<li class=\"{% if loop.first %}champion{% endif %}\"><b>{{this.name}}</b>: {{this.score}}</li>{% endfor %}\
          </ul></body></html>",
     )
-    .expect("vm teams parses")
+    .expect("interp teams parses")
 }
 
-pub fn vm_teams(tmpl: &VmTemplate, data: &VmValue) -> String {
-    tmpl.render(data).expect("vm teams renders")
+pub fn interp_teams(tmpl: &VmTemplate, data: &VmValue) -> String {
+    tmpl.render(data).expect("interp teams renders")
 }
 
-// ── 6b. Trussbars VM — BYTECODE backend (the experiment, docs/11 §4) ───────────
-// The same workloads compiled to bytecode and run by the stack machine, to measure
-// bytecode vs the tree-walk. Compiled once (out of the timed loop), like the others.
+// ── 6b. Trussbars VM — the BYTECODE backend (docs/11 §4) ───────────────────────
+// The same workloads compiled to bytecode (the separate `trussbars-vm` crate) and run
+// by the borrow-based machine, to measure the VM vs the tree-walk interpreter above.
+// Compiled once (out of the timed loop), like the others. Goal: ≥2× the interpreter.
 
-use trussbars_vm::bytecode::Program;
+use trussbars_vm::Program;
 
-pub fn vm_bc_big_table_program() -> Program {
+pub fn vm_big_table_program() -> Program {
     Program::compile(
         "<table>{% for table %}<tr>{% for this %}<td>{{this}}</td>{% endfor %}</tr>{% endfor %}</table>",
     )
-    .expect("bytecode big-table compiles")
+    .expect("vm big-table compiles")
 }
 
-pub fn vm_bc_big_table(p: &Program, data: &VmValue) -> String {
+pub fn vm_big_table(p: &Program, data: &VmValue) -> String {
     p.render(data)
 }
 
-pub fn vm_bc_teams_program() -> Program {
+pub fn vm_teams_program() -> Program {
     Program::compile(
         "<html><head><title>{{year}}</title></head><body><h1>CSL {{year}}</h1><ul>\
          {% for teams %}<li class=\"{% if loop.first %}champion{% endif %}\"><b>{{this.name}}</b>: {{this.score}}</li>{% endfor %}\
          </ul></body></html>",
     )
-    .expect("bytecode teams compiles")
+    .expect("vm teams compiles")
 }
 
-pub fn vm_bc_teams(p: &Program, data: &VmValue) -> String {
+pub fn vm_teams(p: &Program, data: &VmValue) -> String {
     p.render(data)
 }
 

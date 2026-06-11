@@ -1,9 +1,14 @@
 //! Comparative render benchmark: the two canonical `template-benchmarks-rs`
-//! workloads (big-table, teams) rendered by the Trussbars-emitted Rust, a
+//! workloads (big-table, teams) rendered by the Trussbars-emitted Rust (AOT), a
 //! hand-written `write!` baseline (the zero-overhead ceiling), Sailfish (fastest
 //! reference), Askama (typed safe peer), and the dynamic interpreters handlebars
 //! and liquid (the runtime engine the Rust ecosystem reaches for — the honest
 //! "vs. what you'd otherwise use" column).
+//!
+//! The three **Trussbars** columns are the three execution strategies, fastest to
+//! slowest: `trussbars` (AOT — compiled straight-line Rust), `trussbars-vm` (the
+//! bytecode VM), and `trussbars-interp` (the always-correct tree-walk interpreter the
+//! VM optimizes against — its target is ≥2× this column).
 //! All engines emit byte-identical output (see `tests/output_equality.rs`).
 //!
 //! ```sh
@@ -16,11 +21,12 @@ use std::hint::black_box;
 use criterion::{Criterion, criterion_group, criterion_main};
 use trussbars_benchmarks::{
     askama_big_table, askama_teams, big_table_data, big_table_value, handlebars_big_table,
-    handlebars_big_table_registry, handlebars_teams, handlebars_teams_registry, liquid_big_table,
+    handlebars_big_table_registry, handlebars_teams, handlebars_teams_registry, interp_big_table,
+    interp_big_table_template, interp_teams, interp_teams_template, liquid_big_table,
     liquid_big_table_template, liquid_teams, liquid_teams_template, sailfish_big_table,
     sailfish_teams, teams_data, teams_value, tera_big_table, tera_engine, tera_teams,
-    trussbars_big_table, trussbars_teams, vm_big_table, vm_big_table_template, vm_teams,
-    vm_teams_template, vy_big_table, vy_teams, write_big_table, write_teams,
+    trussbars_big_table, trussbars_teams, vm_big_table, vm_big_table_program, vm_teams,
+    vm_teams_program, vy_big_table, vy_teams, write_big_table, write_teams,
 };
 
 fn big_table(c: &mut Criterion) {
@@ -28,7 +34,8 @@ fn big_table(c: &mut Criterion) {
     let hb = handlebars_big_table_registry();
     let lq = liquid_big_table_template();
     let tera = tera_engine();
-    let vm_tmpl = vm_big_table_template();
+    let interp_tmpl = interp_big_table_template();
+    let vm_prog = vm_big_table_program();
     let vm_data = big_table_value(&ctx);
 
     let mut g = c.benchmark_group("big-table");
@@ -36,7 +43,10 @@ fn big_table(c: &mut Criterion) {
         b.iter(|| trussbars_big_table(black_box(&ctx)))
     });
     g.bench_function("trussbars-vm", |b| {
-        b.iter(|| vm_big_table(&vm_tmpl, black_box(&vm_data)))
+        b.iter(|| vm_big_table(&vm_prog, black_box(&vm_data)))
+    });
+    g.bench_function("trussbars-interp", |b| {
+        b.iter(|| interp_big_table(&interp_tmpl, black_box(&vm_data)))
     });
     g.bench_function("write", |b| b.iter(|| write_big_table(black_box(&ctx))));
     g.bench_function("sailfish", |b| {
@@ -62,13 +72,17 @@ fn teams(c: &mut Criterion) {
     let lq = liquid_teams_template();
     let tera = tera_engine();
 
-    let vm_tmpl = vm_teams_template();
+    let interp_tmpl = interp_teams_template();
+    let vm_prog = vm_teams_program();
     let vm_data = teams_value(&ctx);
 
     let mut g = c.benchmark_group("teams");
     g.bench_function("trussbars", |b| b.iter(|| trussbars_teams(black_box(&ctx))));
     g.bench_function("trussbars-vm", |b| {
-        b.iter(|| vm_teams(&vm_tmpl, black_box(&vm_data)))
+        b.iter(|| vm_teams(&vm_prog, black_box(&vm_data)))
+    });
+    g.bench_function("trussbars-interp", |b| {
+        b.iter(|| interp_teams(&interp_tmpl, black_box(&vm_data)))
     });
     g.bench_function("write", |b| b.iter(|| write_teams(black_box(&ctx))));
     g.bench_function("sailfish", |b| b.iter(|| sailfish_teams(black_box(&ctx))));

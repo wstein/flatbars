@@ -2,12 +2,16 @@
 //! invariants — measured in the same run, so a slow CI box doesn't matter — for
 //! BOTH canonical workloads (big-table, teams):
 //!
-//!   * Trussbars ≤ Askama        — we beat the safe typed peer;
-//!   * Trussbars × 5 ≤ handlebars — we stay far below the dynamic interpreter.
+//!   * Trussbars (AOT) ≤ Askama        — we beat the safe typed peer;
+//!   * Trussbars (AOT) × 5 ≤ handlebars — we stay far below the dynamic interpreter;
+//!   * AOT ≤ VM ≤ interpreter ≤ handlebars — the three Trussbars backends stay ordered
+//!     (compiled fastest, then bytecode VM, then the tree-walk interpreter), and even
+//!     the slowest of them clears handlebars;
+//!   * **VM × 2 ≤ interpreter** — the bytecode VM's reason to exist: at least 2× the
+//!     tree-walk it optimizes against (docs/11 §4).
 //!
-//! Observed margins are comfortable (Trussbars is ~2.5–2.8× Askama and ~8–55×
-//! handlebars), so the thresholds won't flake. We deliberately do NOT gate
-//! against Sailfish (faster — it embeds raw Rust, the boundary we won't cross)
+//! Observed margins are comfortable, so the thresholds won't flake. We deliberately do
+//! NOT gate against Sailfish (faster — it embeds raw Rust, the boundary we won't cross)
 //! nor the naive `write!` baseline (the codegen engines beat it, but `core::fmt`
 //! timing is too variable to ratchet on).
 //!
@@ -19,10 +23,10 @@ use std::time::{Duration, Instant};
 
 use trussbars_benchmarks::{
     askama_big_table, askama_teams, big_table_data, big_table_value, handlebars_big_table,
-    handlebars_big_table_registry, handlebars_teams, handlebars_teams_registry, teams_data,
-    teams_value, trussbars_big_table, trussbars_teams, vm_bc_big_table, vm_bc_big_table_program,
-    vm_bc_teams, vm_bc_teams_program, vm_big_table, vm_big_table_template, vm_teams,
-    vm_teams_template, vy_big_table, vy_teams,
+    handlebars_big_table_registry, handlebars_teams, handlebars_teams_registry, interp_big_table,
+    interp_big_table_template, interp_teams, interp_teams_template, teams_data, teams_value,
+    trussbars_big_table, trussbars_teams, vm_big_table, vm_big_table_program, vm_teams,
+    vm_teams_program, vy_big_table, vy_teams,
 };
 
 /// The minimum render time over `n` runs (the min is the most noise-stable metric).
@@ -44,13 +48,14 @@ fn assert_invariants(
     name: &str,
     tb: Duration,
     vm: Duration,
-    bc: Duration,
+    interp: Duration,
     vy: Duration,
     ak: Duration,
     hb: Duration,
 ) {
     eprintln!(
-        "{name}: trussbars(AOT)={tb:?}  vm-tree-walk={vm:?}  vm-bytecode={bc:?}  vy={vy:?}  askama={ak:?}  handlebars={hb:?}"
+        "{name}: trussbars(AOT)={tb:?}  vm-bytecode={vm:?}  interpreter={interp:?}  vy={vy:?}  askama={ak:?}  handlebars={hb:?}  (VM is {:.1}× the interpreter)",
+        interp.as_secs_f64() / vm.as_secs_f64()
     );
     assert!(
         tb <= ak,
@@ -60,20 +65,30 @@ fn assert_invariants(
         tb * 5 <= hb,
         "[{name}] perf regression: trussbars {tb:?} ×5 should be <= handlebars {hb:?}"
     );
-    // The AOT backend must stay faster than the dynamic VM (compiled beats tree-walk);
-    // and the lean VM must stay at or below the heavier handlebars interpreter.
+    // The three Trussbars backends stay ordered: AOT (compiled) ≤ the bytecode VM ≤ the
+    // tree-walk interpreter, and the slowest of them still clears handlebars.
     assert!(
         tb <= vm,
         "[{name}] perf regression: trussbars AOT {tb:?} should be <= the VM {vm:?}"
     );
     assert!(
-        vm <= hb,
-        "[{name}] perf regression: trussbars-vm {vm:?} should be <= handlebars {hb:?}"
+        vm <= interp,
+        "[{name}] perf regression: the bytecode VM {vm:?} should be <= the interpreter {interp:?}"
+    );
+    assert!(
+        interp <= hb,
+        "[{name}] perf regression: the interpreter {interp:?} should be <= handlebars {hb:?}"
+    );
+    // The headline: the bytecode VM must be at least 2× the tree-walk interpreter — its
+    // whole reason to exist (docs/11 §4). The observed margin is wider, so 2× won't flake.
+    assert!(
+        vm * 2 <= interp,
+        "[{name}] perf regression: the bytecode VM {vm:?} ×2 should be <= the interpreter {interp:?} (the ≥2× goal)"
     );
 }
 
 #[test]
-fn trussbars_beats_askama_and_crushes_handlebars() {
+fn trussbars_backends_ordered_and_vm_doubles_interpreter() {
     if cfg!(debug_assertions) {
         eprintln!("perf gate skipped in debug; run `cargo test --release`");
         return;
@@ -83,33 +98,33 @@ fn trussbars_beats_askama_and_crushes_handlebars() {
     {
         let ctx = big_table_data();
         let hb = handlebars_big_table_registry();
-        let vm_tmpl = vm_big_table_template();
+        let interp_tmpl = interp_big_table_template();
         let vm_data = big_table_value(&ctx);
         let n = 200;
-        let bc_prog = vm_bc_big_table_program();
+        let vm_prog = vm_big_table_program();
         let tb = min_time(n, || trussbars_big_table(&ctx));
-        let vm = min_time(n, || vm_big_table(&vm_tmpl, &vm_data));
-        let bc = min_time(n, || vm_bc_big_table(&bc_prog, &vm_data));
+        let vm = min_time(n, || vm_big_table(&vm_prog, &vm_data));
+        let interp = min_time(n, || interp_big_table(&interp_tmpl, &vm_data));
         let vy = min_time(n, || vy_big_table(&ctx));
         let ak = min_time(n, || askama_big_table(&ctx));
         let hbt = min_time(n, || handlebars_big_table(&hb, &ctx));
-        assert_invariants("big-table", tb, vm, bc, vy, ak, hbt);
+        assert_invariants("big-table", tb, vm, interp, vy, ak, hbt);
     }
 
     // teams — each render is ~100 ns, so use many samples.
     {
         let ctx = teams_data();
         let hb = handlebars_teams_registry();
-        let vm_tmpl = vm_teams_template();
+        let interp_tmpl = interp_teams_template();
         let vm_data = teams_value(&ctx);
         let n = 5000;
-        let bc_prog = vm_bc_teams_program();
+        let vm_prog = vm_teams_program();
         let tb = min_time(n, || trussbars_teams(&ctx));
-        let vm = min_time(n, || vm_teams(&vm_tmpl, &vm_data));
-        let bc = min_time(n, || vm_bc_teams(&bc_prog, &vm_data));
+        let vm = min_time(n, || vm_teams(&vm_prog, &vm_data));
+        let interp = min_time(n, || interp_teams(&interp_tmpl, &vm_data));
         let vy = min_time(n, || vy_teams(&ctx));
         let ak = min_time(n, || askama_teams(&ctx));
         let hbt = min_time(n, || handlebars_teams(&hb, &ctx));
-        assert_invariants("teams", tb, vm, bc, vy, ak, hbt);
+        assert_invariants("teams", tb, vm, interp, vy, ak, hbt);
     }
 }

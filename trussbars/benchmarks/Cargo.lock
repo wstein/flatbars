@@ -1402,6 +1402,7 @@ dependencies = [
  "serde",
  "tera",
  "trussbars-core",
+ "trussbars-interp",
  "trussbars-std",
  "trussbars-vm",
  "vy",
@@ -1413,6 +1414,16 @@ version = "0.1.0"
 dependencies = [
  "dragonbox_ecma",
  "itoa",
+]
+
+[[package]]
+name = "trussbars-interp"
+version = "0.1.0"
+dependencies = [
+ "libm",
+ "serde_json",
+ "trussbars-core",
+ "trussbars-template",
 ]
 
 [[package]]
@@ -1430,9 +1441,7 @@ version = "0.1.0"
 name = "trussbars-vm"
 version = "0.1.0"
 dependencies = [
- "libm",
- "serde_json",
- "trussbars-core",
+ "trussbars-interp",
  "trussbars-template",
 ]
 

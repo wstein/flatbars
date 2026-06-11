@@ -10,6 +10,9 @@ publish = false
 [dependencies]
 trussbars-core = { path = "../crates/trussbars-core" }
 trussbars-std = { path = "../crates/trussbars-std" }
+# The two dynamic backends: the tree-walk interpreter (always-correct) and the bytecode
+# VM (a subset — the optimization path, docs/11 §4).
+trussbars-interp = { path = "../crates/trussbars-interp" }
 trussbars-vm = { path = "../crates/trussbars-vm" }
 serde = { version = "1", features = ["derive"] }
 # Peers: the dynamic interpreter baselines (handlebars; liquid — the engine the

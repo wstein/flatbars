@@ -24,15 +24,26 @@ cargo +1.96.0 bench --manifest-path trussbars/benchmarks/Cargo.toml
   first-item `{{#if loop.first}}` branch: control flow + escaping + fixed
   per-render overhead.
 
-The columns: **Trussbars (AOT)** (verbatim `compileMaxRust` output) and **Trussbars (VM)**
-(the *same* MaxBars language run through the dynamic tree-walk interpreter, docs/11);
-**Sailfish** and **vy** (the fastest references — raw-Rust / macro DSLs); **Askama** (the
-typed safe peer); and the dynamic interpreters **Tera**, **liquid**, and **handlebars** —
-the engines the Rust ecosystem reaches for when templates are runtime / user-authored, and
-the named incumbents of the northstar targets (**Tera** is Zola's, **liquid** is cobalt's,
-**handlebars** is mdBook's). They are included so the headline reads "vs. what you'd
-otherwise use," and so the VM column gives the apples-to-apples *dynamic* comparison the AOT
-column can't. **`write`** is a naive hand-written `write!` baseline (see the note below).
+The columns. The **three Trussbars execution strategies** for the *same* MaxBars language
+(docs/11), fastest to slowest: **Trussbars (AOT)** (verbatim `compileMaxRust` output —
+compiled straight-line Rust), **Trussbars (VM)** (the **bytecode VM**, `trussbars-vm` — a
+flat instruction array run by a borrow-based machine; covers a subset), and **Trussbars
+(interpreter)** (the **tree-walk interpreter**, `trussbars-interp` — the always-correct
+dynamic backend the VM optimizes against). Then the peers: **Sailfish** and **vy** (the
+fastest references — raw-Rust / macro DSLs); **Askama** (the typed safe peer); and the
+dynamic interpreters **Tera**, **liquid**, and **handlebars** — the engines the Rust
+ecosystem reaches for when templates are runtime / user-authored, and the named incumbents
+of the northstar targets (**Tera** is Zola's, **liquid** is cobalt's, **handlebars** is
+mdBook's). They are included so the headline reads "vs. what you'd otherwise use," and so
+the dynamic columns give the apples-to-apples comparison the AOT column can't. **`write`**
+is a naive hand-written `write!` baseline (see the note below).
+
+> **Honesty note (the dynamic columns).** The interpreter's `Template` used to silently run
+> the bytecode fast path for the covered subset, so the old single "VM" column was secretly
+> *bytecode* — and a tree-walk row measured against it came out tied. That fast path is
+> **removed**: `trussbars-interp` is a pure tree-walker, and the two dynamic columns now
+> measure what they say. The VM is **~3.5× the interpreter**; the perf gate
+> (`tests/perf_gate.rs`) ratchets `VM × 2 ≤ interpreter` on both workloads.
 
 ## Results
 
@@ -51,26 +62,28 @@ comparison; the table below for the *shape* of the result.
 | **Sailfish** | ~17.8 µs | **0.49×** (≈2.0× faster) | raw Rust + `unsafe` buffer — no injection boundary |
 | **vy** | ~20.0 µs | **0.55×** (≈1.8× faster) | compile-time HTML macro DSL, pre-sized |
 | **Trussbars (AOT)** | ~36.3 µs | 1.0× | typed + injection-safe codegen, `#![forbid(unsafe_code)]` |
-| **Askama** | ~129 µs | 3.6× slower | typed, safe codegen |
-| `write` | ~187 µs | 5.1× slower | naive hand-written `write!` |
-| **Trussbars (VM)** | ~392 µs | 10.8× slower | the SAME language, dynamic tree-walk (runtime templates) |
-| **Tera** | ~617 µs | **17× slower** | runtime interpreter (Zola's engine) |
-| **liquid** | ~2.34 ms | **64× slower** | runtime interpreter (cobalt's engine) |
-| **handlebars** | ~2.68 ms | **74× slower** | runtime interpreter (mdBook's engine) |
+| **Askama** | ~136 µs | 3.8× slower | typed, safe codegen |
+| `write` | ~198 µs | 5.5× slower | naive hand-written `write!` |
+| **Trussbars (VM)** | ~326 µs | 9.0× slower | the SAME language, **bytecode VM** (runtime templates) |
+| **Tera** | ~585 µs | **16× slower** | runtime interpreter (Zola's engine) |
+| **Trussbars (interpreter)** | ~1.14 ms | 31× slower | the SAME language, **tree-walk** (the VM's always-correct fallback; ~3.5× the VM) |
+| **liquid** | ~2.35 ms | **65× slower** | runtime interpreter (cobalt's engine) |
+| **handlebars** | ~2.67 ms | **74× slower** | runtime interpreter (mdBook's engine) |
 
 ### teams (small page)
 
 | Engine | Time | vs Trussbars AOT | Model |
 | --- | --- | --- | --- |
-| **Sailfish** | ~64.8 ns | **0.75×** (≈1.3× faster) | raw Rust + `unsafe` buffer |
-| **Trussbars (AOT)** | ~86.9 ns | 1.0× | typed + injection-safe codegen |
-| **vy** | ~143 ns | 1.6× slower | compile-time HTML macro DSL |
-| `write` | ~219 ns | 2.5× slower | naive hand-written `write!` |
-| **Askama** | ~241 ns | 2.8× slower | typed, safe codegen |
-| **Trussbars (VM)** | ~824 ns | 9.5× slower | the SAME language, dynamic tree-walk |
-| **Tera** | ~2.54 µs | **29× slower** | runtime interpreter (Zola's engine) |
-| **handlebars** | ~4.13 µs | **47× slower** | runtime interpreter (mdBook's engine) |
-| **liquid** | ~4.23 µs | **49× slower** | runtime interpreter (cobalt's engine) |
+| **Sailfish** | ~63.2 ns | **0.72×** (≈1.4× faster) | raw Rust + `unsafe` buffer |
+| **Trussbars (AOT)** | ~88.0 ns | 1.0× | typed + injection-safe codegen |
+| **vy** | ~137 ns | 1.6× slower | compile-time HTML macro DSL |
+| **Askama** | ~242 ns | 2.7× slower | typed, safe codegen |
+| `write` | ~233 ns | 2.6× slower | naive hand-written `write!` |
+| **Trussbars (VM)** | ~403 ns | 4.6× slower | the SAME language, **bytecode VM** |
+| **Trussbars (interpreter)** | ~1.43 µs | 16× slower | the SAME language, **tree-walk** (~3.5× the VM) |
+| **Tera** | ~2.50 µs | **28× slower** | runtime interpreter (Zola's engine) |
+| **handlebars** | ~4.03 µs | **46× slower** | runtime interpreter (mdBook's engine) |
+| **liquid** | ~4.17 µs | **47× slower** | runtime interpreter (cobalt's engine) |
 
 ## Takeaways
 
@@ -87,11 +100,16 @@ comparison; the table below for the *shape* of the result.
   the other two), so it is the toughest interpreter comparison, and Trussbars still wins
   by an order of magnitude. These are the engines you'd reach for if you needed the
   runtime / user-authored templates the AOT model gives up.
-- **Even the VM beats the interpreters.** The Trussbars **VM** (the same language, dynamic
-  tree-walk — the runtime/user-authored use case) renders ~**1.6–3.1× faster than Tera**
-  and ~5–6× faster than liquid/handlebars. So you get the runtime flexibility of an
-  interpreter *and* beat the interpreter you'd otherwise use — with the AOT backend a
-  further ~11× below the VM when you can compile.
+- **The bytecode VM beats every other interpreter; the tree-walk is the honest fallback.**
+  The Trussbars **VM** (the same language, bytecode — the runtime/user-authored use case)
+  renders ~**1.8× faster than Tera** (the fastest peer interpreter) and ~6–10× faster than
+  liquid/handlebars on big-table. The **tree-walk interpreter** — the always-correct
+  backend the VM optimizes against and falls back to outside its subset — is ~**3.5× slower
+  than the VM** (so ~1.14 ms / ~1.43 µs); it still clears handlebars (~2.3×) but, being a
+  pointer-chasing tree-walk, lands *slower* than Tera's tuned interpreter. The lesson is the
+  ordering: compile (AOT) when you can; run the VM for dynamic templates in its subset; the
+  tree-walk guarantees a correct render for everything else. The perf gate ratchets
+  `AOT ≤ VM ≤ interpreter ≤ handlebars` **and** `VM × 2 ≤ interpreter`.
 - **Beats the naive `write!` baseline.** Surprising but well-known (and visible in
   the upstream suite too): `core::fmt` integer formatting plus per-call
   format-argument parsing is slower than emitting `itoa`-class digits and
@@ -107,8 +125,11 @@ comparison; the table below for the *shape* of the result.
 ## Notes
 
 - The engine setups live in `src/lib.rs` (shared by the bench, the perf gate, and
-  the equality test); the Trussbars columns are the **verbatim** output of
-  `compileMaxRust`, only the `render` fn header renamed.
+  the equality test); the Trussbars **AOT** column is the **verbatim** output of
+  `compileMaxRust`, only the `render` fn header renamed. The **VM** (`trussbars-vm`) and
+  **interpreter** (`trussbars-interp`) columns parse/compile the template **once** outside
+  the timed loop (like the dynamic peers) and render a pre-built `Value`, so only the
+  render is measured — the apples-to-apples dynamic comparison.
 - **Two perf changes drove the latest numbers** (both shipped in the engine, not
   the bench): `#[inline]` on the `trussbars-core` hot path — `esc` / `ToText` /
   `escape_html` / `Loop::at` / `Each` — so they inline into the host crate even
@@ -127,8 +148,10 @@ comparison; the table below for the *shape* of the result.
   suffix-gated auto-escape is off for the un-suffixed template names — but the workloads
   carry no HTML-special data, so all outputs match byte-for-byte.
 - **Perf-regression gate:** `tests/perf_gate.rs` asserts the machine-independent
-  relative invariants (Trussbars ≤ Askama, Trussbars × 5 ≤ handlebars) for both
-  workloads, measured in one run so a slow CI box doesn't matter; meaningful only
-  in release, so it self-skips in debug. Run both with `cargo +1.96.0 test
-  --release --manifest-path trussbars/benchmarks/Cargo.toml`; CI runs them as the
-  `benchmarks` job in `trussbars.yml`.
+  relative invariants for both workloads, measured in one run so a slow CI box doesn't
+  matter: Trussbars (AOT) ≤ Askama; Trussbars (AOT) × 5 ≤ handlebars; the three Trussbars
+  backends stay ordered `AOT ≤ VM ≤ interpreter ≤ handlebars`; and the headline
+  **`VM × 2 ≤ interpreter`** (the bytecode VM's ≥2× reason to exist, docs/11 §4). Meaningful
+  only in release, so it self-skips in debug. Run both with `cargo +1.96.0 test --release
+  --manifest-path trussbars/benchmarks/Cargo.toml`; CI runs them as the `benchmarks` job in
+  `trussbars.yml`.
