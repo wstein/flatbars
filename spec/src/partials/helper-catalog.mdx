@@ -19,6 +19,7 @@
 | `depth` | value | 0 | scoped | The 1-based loop-nesting level (outermost loop = 1; a directly nested loop = 2). |
 | `dict` | value | any | registered | Builds an object from alternating key/value arguments (the hash target). |
 | `divide` | value | 2 | registered | Divides the first number by the second — the `/` operator's helper. |
+| `divisibleBy` | value | 2 | registered | True when the first number is divisible by the second. |
 | `downcase` | value | 1 | alias of `lowercase` | Lowercases its argument. |
 | `each` | block | ≥1 | registered | Iterates an array or object, installing the loop's scoped variables per item. |
 | `elif` | value | 1–2 | registered | An else-if clause the enclosing if evaluates; renders nothing on its own. |
@@ -27,6 +28,7 @@
 | `eq` | value | 2 | registered | True when its two arguments are equal. |
 | `escapeHtml` | value | 1 | registered | HTML-escapes its argument and marks it safe; idempotent on already-safe values. |
 | `escapeJson` | value | 1–2 | registered | Serializes its argument as JSON and HTML-escapes it, for safe embedding in HTML. |
+| `even` | value | 1 | registered | True when the number is even. |
 | `every` | value | 2–4 | registered | True when every array item's key is truthy, equals, or compares to a value. |
 | `false` | value | 0 | registered | The boolean literal false. |
 | `find` | value | 2–4 | registered | The first array item whose key is truthy, equals, or compares to a value (else null). |
@@ -63,6 +65,7 @@
 | `not` | value | 1 | registered | Logical negation of its argument's truthiness. |
 | `null` | value | 0 | registered | The null literal. |
 | `number` | value | ≥1 | registered | Formats a number for the host's locale (Intl.NumberFormat); returns the number's plain text when no host formatter is registered (ADR-029). |
+| `odd` | value | 1 | registered | True when the number is odd. |
 | `or` | value | any | registered | True when any argument is truthy. |
 | `parent` | value | 0–1 | scoped | The enclosing block's context (chainable). |
 | `partial` | value | 1–3 | registered | Renders a registered partial; the context defaults to the current one, options are an optional hash, and a block body is the fallback. |

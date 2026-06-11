@@ -273,6 +273,14 @@ coreOperationDefs =
   , valDef "modulo"
       "The remainder of dividing the first number by the second — the `%` operator's helper."
       (binary (arith jsMod))
+  -- numeric parity / divisibility predicates (ADR-042): typed value operations,
+  -- `Number -> Bool`. `even`/`odd` are defined against the same `jsMod` as
+  -- `modulo` (so `even n ≡ eq (modulo n 2) 0` bit-for-bit), and `odd` is `not
+  -- even` so the two can never disagree. Callable `(even n)` or piped `n | even`.
+  , valDef "even" "True when the number is even." (unary evenH)
+  , valDef "odd" "True when the number is odd." (unary oddH)
+  , valDef "divisibleBy" "True when the first number is divisible by the second."
+      (binary divisibleByH)
   -- handlebars-helpers aliases: render identically to the canonical helpers
   -- (`add`/`subtract`/`multiply`); marked as aliases so the catalog flags them,
   -- the alias lint warns, and the lift normalises them to the `+ - *` operators.
@@ -693,6 +701,28 @@ asNum = case _ of
 -- | so it matches the runtime's `Math.trunc`-based modulo bit-for-bit.
 jsMod :: Number -> Number -> Number
 jsMod a b = a - b * Number.trunc (a / b)
+
+-- | `even n` → `VBool` — `True` when `n mod 2 == 0`. Numeric-only (a non-number
+-- | is a `TypeError`, like the arithmetic helpers); shares `jsMod` with `modulo`
+-- | so the parity test agrees with `(eq (modulo n 2) 0)` on every backend (ADR-042).
+evenH :: forall m. MonadThrow Error m => Value -> m Value
+evenH v = do
+  n <- asNum v
+  pure (VBool (jsMod n 2.0 == 0.0))
+
+-- | `odd n` → `VBool` — the negation of `even`, so the two can never drift.
+oddH :: forall m. MonadThrow Error m => Value -> m Value
+oddH v = do
+  n <- asNum v
+  pure (VBool (jsMod n 2.0 /= 0.0))
+
+-- | `divisibleBy n d` → `VBool` — `True` when `n mod d == 0`. Follows `modulo`'s
+-- | existing `d = 0` behaviour (no new edge rule).
+divisibleByH :: forall m. MonadThrow Error m => Value -> Value -> m Value
+divisibleByH a b = do
+  n <- asNum a
+  d <- asNum b
+  pure (VBool (jsMod n d == 0.0))
 
 -- | `coalesce a b …`: the first non-`VNull` argument, else `VNull`. The desugar
 -- | target of the MaxBars `??` operator (null-coalescing, *not* truthiness — so

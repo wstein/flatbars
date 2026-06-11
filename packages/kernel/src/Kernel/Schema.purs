@@ -231,6 +231,11 @@ numberPack = Set.fromFoldable
   , "multiply"
   , "divide"
   , "modulo"
+  -- numeric predicates (ADR-042): they pin their arg(s) as numbers; the boolean
+  -- result is typed by the guard/output context, not here.
+  , "even"
+  , "odd"
+  , "divisibleBy"
   , "abs"
   , "ceil"
   , "floor"

@@ -171,6 +171,17 @@ main = do
     (obj [ Tuple "price" (obj [ Tuple "net" (num 10.0) ]), Tuple "qty" (num 3.0) ])
     "30"
 
+  -- numeric predicates (ADR-042): even/odd/divisibleBy → Bool. Output position
+  -- takes a bare application or a pipe; a block head parenthesises the application.
+  expectM "even-true" "{{ even n }}" (obj [ Tuple "n" (num 6.0) ]) "true"
+  expectM "even-false" "{{ even n }}" (obj [ Tuple "n" (num 7.0) ]) "false"
+  expectM "odd-pipe" "{{ n | odd }}" (obj [ Tuple "n" (num 7.0) ]) "true"
+  expectM "even-guard" "{% if (n | even) %}even{% else %}odd{% endif %}"
+    (obj [ Tuple "n" (num 4.0) ]) "even"
+  expectM "divisibleBy-call" "{% if (divisibleBy n 3) %}fizz{% endif %}"
+    (obj [ Tuple "n" (num 9.0) ]) "fizz"
+  expectM "divisibleBy-pipe" "{{ n | divisibleBy 4 }}" (obj [ Tuple "n" (num 10.0) ]) "false"
+
   -- null-coalescing `??` (desugars to coalesce): first non-null, NOT truthiness.
   expectM "coalesce-null" "{{ a ?? b }}" (obj [ Tuple "a" VNull, Tuple "b" (VString "fb") ]) "fb"
   expectM "coalesce-zero" "{{ a ?? b }}" (obj [ Tuple "a" (num 0.0), Tuple "b" (VString "fb") ]) "0"

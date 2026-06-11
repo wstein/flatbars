@@ -17,6 +17,23 @@ pub fn abs(n: f64) -> f64 {
     n.abs()
 }
 
+/// `even` — true when `n` is even, via the same truncated-division `modulo`
+/// the `%` operator uses (so `even(n) == (modulo(n, 2.0) == 0.0)`).
+pub fn even(n: f64) -> bool {
+    modulo(n, 2.0) == 0.0
+}
+
+/// `odd` — the negation of [`even`], so the two can never disagree.
+pub fn odd(n: f64) -> bool {
+    !even(n)
+}
+
+/// `divisibleBy` — true when `a` is divisible by `b` (`modulo(a, b) == 0`).
+/// Follows `modulo`'s `b == 0` behaviour (no special edge rule).
+pub fn divisible_by(a: f64, b: f64) -> bool {
+    modulo(a, b) == 0.0
+}
+
 /// Round toward negative infinity (`floor`).
 pub fn floor(n: f64) -> f64 {
     n.floor()
@@ -80,6 +97,16 @@ mod tests {
         assert_eq!(abs(-3.5), 3.5);
         assert_eq!(floor(2.9), 2.0);
         assert_eq!(ceil(2.1), 3.0);
+    }
+
+    #[test]
+    fn numeric_predicates() {
+        assert!(even(6.0) && !even(7.0) && even(0.0));
+        assert!(odd(7.0) && !odd(6.0));
+        // parity is sign-independent (the `== 0` test, like the oracle's jsMod).
+        assert!(even(-4.0) && odd(-3.0));
+        assert!(divisible_by(15.0, 3.0) && divisible_by(15.0, 5.0));
+        assert!(!divisible_by(10.0, 3.0));
     }
 
     #[test]

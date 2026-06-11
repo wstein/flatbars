@@ -39,6 +39,30 @@ export const cases = [
     data: { a: 1, b: 8 },
   },
 
+  // ── numeric predicates (ADR-042) ─────────────────────────────────────────────
+  // In a block head a helper application is parenthesised (a bare pipe collides
+  // with block-param syntax); output position needs no parens.
+  {
+    id: "even-guard",
+    template: "{% if (n | even) %}even{% else %}odd{% endif %}",
+    data: { n: 4 },
+  },
+  {
+    id: "odd-guard",
+    template: "{% if (n | odd) %}odd{% else %}even{% endif %}",
+    data: { n: 7 },
+  },
+  {
+    id: "even-call",
+    template: "{{ even n }}/{{ odd n }}",
+    data: { n: 6 },
+  },
+  {
+    id: "divisible-by",
+    template: "{% if (divisibleBy n 3) %}fizz{% endif %}{% if (divisibleBy n 5) %}buzz{% endif %}",
+    data: { n: 15 },
+  },
+
   // ── string helpers & pipes ───────────────────────────────────────────────────
   { id: "uppercase", template: "{{name | uppercase}}", data: { name: "ann" } },
   {

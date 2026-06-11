@@ -130,6 +130,14 @@
       "doc": "Divides the first number by the second — the `/` operator's helper."
     },
     {
+      "name": "divisibleBy",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null,
+      "doc": "True when the first number is divisible by the second."
+    },
+    {
       "name": "downcase",
       "kind": "inline",
       "arity": "1",
@@ -192,6 +200,14 @@
       "source": "registered",
       "canonical": null,
       "doc": "Serializes its argument as JSON and HTML-escapes it, for safe embedding in HTML."
+    },
+    {
+      "name": "even",
+      "kind": "inline",
+      "arity": "1",
+      "source": "registered",
+      "canonical": null,
+      "doc": "True when the number is even."
     },
     {
       "name": "every",
@@ -480,6 +496,14 @@
       "source": "registered",
       "canonical": null,
       "doc": "Formats a number for the host's locale (Intl.NumberFormat); returns the number's plain text when no host formatter is registered (ADR-029)."
+    },
+    {
+      "name": "odd",
+      "kind": "inline",
+      "arity": "1",
+      "source": "registered",
+      "canonical": null,
+      "doc": "True when the number is odd."
     },
     {
       "name": "or",

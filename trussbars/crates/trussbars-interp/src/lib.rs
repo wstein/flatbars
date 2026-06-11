@@ -737,6 +737,12 @@ fn eval_expr(env: &Env, e: &Expr) -> Result<Value, String> {
         ("multiply", [a, b]) => num_op(env, a, b, |x, y| x * y),
         ("divide", [a, b]) => num_op(env, a, b, |x, y| x / y),
         ("modulo", [a, b]) => num_op(env, a, b, rem_euclid),
+        // numeric predicates (ADR-042). The `== 0` parity/divisibility test is
+        // sign-independent, so `rem_euclid` agrees with the oracle's truncated
+        // `jsMod` here; `odd` is the negation of `even`.
+        ("even", [n]) => Ok(Value::Bool(rem_euclid(eval_expr(env, n)?.as_num()?, 2.0) == 0.0)),
+        ("odd", [n]) => Ok(Value::Bool(rem_euclid(eval_expr(env, n)?.as_num()?, 2.0) != 0.0)),
+        ("divisibleBy", [a, b]) => num_cmp(env, a, b, |x, y| rem_euclid(x, y) == 0.0),
         ("ternary", [c, a, b]) => {
             if truthy_at(env, &eval_expr(env, c)?) {
                 eval_expr(env, a)
