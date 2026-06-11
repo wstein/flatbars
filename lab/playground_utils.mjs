@@ -589,6 +589,14 @@ export function analyseDataAccess(astsByFile, data, locals = new Set()) {
         case "scope":
         case "partial_scope":
           walkNodes(n.body, file, true); break;
+        case "inline":
+          // `{{#*inline "name"}}body{{/inline}}` DEFINES an inline partial. Its body
+          // renders with the caller's context when the partial is invoked, so it is a
+          // partial scope — walk it `scoped` (bare lookups resolve against the
+          // invocation context, not the root dictionary). The hoisted inline partial
+          // is NOT a separate entry in astsByFile, so without this its reads (e.g.
+          // `{{name}}` here) would be invisible in the Data Access panel.
+          walkNodes(n.body, file, true); break;
         case "case":
           // `{% case subject %}{% when v %}…{% endcase %}` (docs/12): the subject
           // (`args[0].value`) is read in the current scope; each `when` arm's values

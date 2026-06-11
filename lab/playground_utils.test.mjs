@@ -272,6 +272,24 @@ test("analyseDataAccess marks loop-body lookups as scoped", () => {
   assert.equal(rows.find((r) => r.path === "label").status, "scoped");
 });
 
+test("analyseDataAccess walks `{{#*inline}}` partial bodies (scoped, not invisible)", () => {
+  // `{{#*inline "hi"}}Hi {{name}}!{{/inline}}` defines an inline partial. The
+  // hoisted partial is not a separate astsByFile entry, so its `{{name}}` read was
+  // previously skipped entirely. It must surface as a partial-scope read.
+  const asts = {
+    main: [{
+      t: "inline",
+      name: "hi",
+      body: [{ t: "emit", expr: { t: "path", segments: ["name"] }, src: span(20, 28) }],
+      src: span(0, 17),
+    }],
+  };
+  const rows = analyseDataAccess(asts, { name: "Ada" });
+  const nameRow = rows.find((r) => r.path === "name");
+  assert.ok(nameRow, "the inline-partial body's `name` read is reported, not missing");
+  assert.equal(nameRow.status, "scoped"); // invocation context is unknown statically
+});
+
 test("analyseDataAccess treats a partial body as a partial-scope, not root", () => {
   // A partial (here `card`, mounted inside `{{#each people}}`) is analysed as
   // its own file. Its bare `name`/`role` are element fields, absent from the
