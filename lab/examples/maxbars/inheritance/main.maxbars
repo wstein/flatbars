@@ -1,0 +1,2 @@
+{% inline "page" %}<h1>{% block title %}Site{% endblock %}</h1>
+<main>{% block body %}{% endblock %}</main>{% endinline %}{% extends "page" %}{% block title %}{% super %} — {{name}}{% endblock %}{% block body %}Hello {{name}}{% endblock %}

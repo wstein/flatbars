@@ -203,14 +203,12 @@ generalization is **template inheritance** (ADR-040): a base defines named
 `{% super %}` splices the parent block's body into an override.
 
 ```maxbars
-{% inline "base" %}
-<title>{% block title %}Site{% endblock %}</title>
-<main>{% block content %}{% endblock %}</main>
-{% endinline %}
-{% extends "base" %}
-{% block title %}Welcome — {% super %}{% endblock %}   {# → Welcome — Site #}
-{% block content %}<h1>Hi</h1>{% endblock %}          {# title's default is overridden, kept otherwise #}
+{% inline "base" %}<title>{% block title %}Site{% endblock %}</title><main>{% block content %}{% endblock %}</main>{% endinline %}{% extends "base" %}{% block title %}Welcome — {% super %}{% endblock %}{% block content %}<h1>Hi</h1>{% endblock %}
 ```
+
+The child overrides `title` (splicing the base's default via `{% super %}` → `Welcome —
+Site`) and `content`; an un-overridden block keeps its default. (A child may hold only
+`{% block %}` definitions — text or a `{# … #}` between them is stray content.)
 
 Inheritance is **resolved statically at compile time** — a lower-phase flatten
 (`Kernel.Inherit`, mirrored in Rust by `trussbars_template::inherit`) that walks the

@@ -82,7 +82,7 @@
   },
   {
     "id": "conditionals",
-    "label": "Intermediate — If / else if / unless (infix, {% %} tags)",
+    "label": "Intermediate — If / elif / unless (infix, {% %} tags)",
     "group": "Examples",
     "view": "source",
     "main": "main.maxbars",
@@ -203,6 +203,15 @@
   {
     "id": "layoutPartials",
     "label": "Advanced — Layout partials ({% yield %})",
+    "group": "Examples",
+    "view": "source",
+    "main": "main.maxbars",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "inheritance",
+    "label": "Advanced — Template inheritance ({% extends %} / {% block %} / {% super %})",
     "group": "Examples",
     "view": "source",
     "main": "main.maxbars",
