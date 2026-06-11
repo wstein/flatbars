@@ -12,8 +12,7 @@
 -- | the `classicbars` package — its dependency closure is ClassicBars-free (see ADR-008).
 -- | It exists so the three dialects are symmetric packages over one engine.
 module RawBars
-  ( coreOptions
-  , render
+  ( render
   , renderDiag
   , renderValue
   , renderWithOperations
@@ -42,8 +41,7 @@ import Effect.Aff (Aff)
 import FlatBars.Compile (compile) as Driver
 import FlatBars.Compile.Emit (coreEmit, metaFor)
 import FlatBars.Error (Error(ParseFailure), ParseError(DisallowedShape), renderParseErrorsAt)
-import FlatBars.Lexer (defaultLexConfig)
-import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
+import FlatBars.Parser (ParseOptions, parseWith)
 import FlatBars.Syntax (Directive, Template)
 import FlatBars.Value (Value)
 import Kernel.CaseSugar (braceControlViolation, caseLeadingViolation)
@@ -62,33 +60,6 @@ import RawBars.Parser as RawParser
 --------------------------------------------------------------------------------
 -- Rendering (core syntax + the ClassicBars engine)
 --------------------------------------------------------------------------------
-
--- | RawBars is the austere dialect: it rejects the Handlebars-only tag shapes
--- | (`{{{{…}}}}` raw blocks, `{{^…}}` inverse, `{{&…}}` unescaped) — `extras`
--- | off. Front-end knobs like standalone trimming still pass through.
--- |
--- | Set delimiters are NOT enabled (per ADR-015 amendment): `{{=<% %>=}}` is a
--- | Mustache feature and only MinBars accepts it. RawBars, MaxBars, and ClassicBars
--- | all reject set-delim directives — the dialect ladder treats set-delim as
--- | MinBars-exclusive so the four surfaces have a single, consistent answer to
--- | "does delimiter switching work here?" instead of three yeses and one no.
-coreOptions :: ParseOptions
-coreOptions = defaultParseOptions
-  { extras = false
-  , decorators = false
-  , partialBlocks = false
-  -- RawBars uses the FlatBars `{{{{#name}}}}` raw-block spelling, not the
-  -- Handlebars bare `{{{{name}}}}` form.
-  , rawBlockHbs = false
-  , rawBlockHash = true
-  -- `{{when}}` is the clause separator of `{{#case}}` (like `else`/`elif` of `if`), so
-  -- its standalone lines are trimmed too — keeping RawBars byte-identical to MaxBars
-  -- (`check:parity`) on a `case` block.
-  , standaloneSeps = [ "else", "elif", "when" ]
-  -- Django-style `{% … %}` statement tags (docs-19), enabled additively (keeps RawBars ≡
-  -- MaxBars for `check:parity`); the `{{ }}` control forms still parse for now.
-  , lexConfig = defaultLexConfig { statementTags = true }
-  }
 
 -- | Parse core source, enforcing the one `{{#case}}` surface rule the parser can't: only
 -- | whitespace may precede the first `{{when}}` arm (docs/12). `case` itself is a first-class
@@ -130,10 +101,11 @@ parseRaw src = checkCore true src (RawParser.parse src)
 
 -- | Parse with explicit `ParseOptions` through the *shared* parser — the configurable
 -- | path the CLI uses for core syntax with custom `--delimiters` (RawBars-the-dialect
--- | has no set delimiters, but the CLI may set the initial pair). `statementTags`
--- | follows the supplied options.
+-- | has no set delimiters, but the CLI may set the initial pair). The shared parser is
+-- | never a `{% %}` statement-tag surface (ADR-041), so the strict checks run in their
+-- | non-statementTags form.
 parseCore :: ParseOptions -> String -> Either (NEA.NonEmptyArray ParseError) Parsed
-parseCore opts src = checkCore opts.lexConfig.statementTags src (parseWith opts src)
+parseCore opts src = checkCore false src (parseWith opts src)
 
 -- | Build a pure renderer from a parsed template (the engine's fixed `nonEmpty`
 -- | truthiness rule applies; ADR-022).

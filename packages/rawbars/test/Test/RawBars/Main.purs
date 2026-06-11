@@ -10,10 +10,8 @@ import Data.String (Pattern(..), contains)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
-import FlatBars.Parser (parseWith)
 import FlatBars.Value (Value(..))
-import RawBars (compileJs, coreOptions, render, renderWithOperations)
-import RawBars.Parser as RawParser
+import RawBars (compileJs, render, renderWithOperations)
 import Test.Assert (assert')
 
 obj :: Array (Tuple String Value) -> Value
@@ -167,20 +165,20 @@ main = do
     Right js -> assert' ("compileJs: expected a module\n" <> js)
       (contains (Pattern "rt.scope(data") js && contains (Pattern "rt.out(c0.ctx)") js)
 
-  -- ADR-041: the owned `RawBars.Parser` must be byte-identical to the shared parser
-  -- driven with `coreOptions` (same `Template` AND errors) — the equivalence gate that
-  -- pins the fork to the reference until the shared `{% %}` machinery is removed.
-  let
-    parseEquiv name src = assert' ("parse-equiv " <> name)
-      (show (RawParser.parse src) == show (parseWith coreOptions src))
-  parseEquiv "output" "Hi {{ name }}!"
-  parseEquiv "raw-output" "{{{ html }}}"
-  parseEquiv "statement-if" "{% if x %}A{% elif y %}B{% else %}C{% endif %}"
-  parseEquiv "for-set" "{% for i in xs %}{% set n = i %}{{ n }}{% endfor %}"
-  parseEquiv "comment" "a {# note #} b {{! also }} c"
-  parseEquiv "raw-block" "{{{{#raw}}}}verbatim {{x}}{{{{/raw}}}}"
-  parseEquiv "standalone" "  {% if a %}\n  x\n  {% endif %}\n"
-  parseEquiv "reject-amp" "{{&x}}"
-  parseEquiv "reject-rawblock-hbs" "{{{{r}}}}b{{{{/r}}}}"
+  -- ADR-041: the owned `RawBars.Lexer`/`RawBars.Parser` — the native `{% %}` control
+  -- surface, while keeping the Handlebars `{{{ }}}` raw output and `{{! }}` comment
+  -- forms RawBars retains. (The shared `{% %}` machinery was removed once RawBars owned
+  -- its front-end; the full conformance suite covers the render path.)
+  assert' "render: {% if %} control flow"
+    ( render "{% if (lookup this \"x\") %}Y{% else %}N{% endif %}" (obj [ Tuple "x" (VBool true) ])
+        == Right "Y"
+    )
+  assert' "render: {{{ }}} raw output is kept (bracesOutputOnly off)"
+    (render "{{{ lookup this \"html\" }}}" (obj [ Tuple "html" (VString "<b>") ]) == Right "<b>")
+  assert' "render: {# … #} inline comment is dropped"
+    (render "a {# note #} b" (obj []) == Right "a  b")
+  assert' "render: {{! … }} short comment is dropped (RawBars keeps it)"
+    (render "x {{! hi }}y" (obj []) == Right "x y")
+  assert' "render: {{&x}} (unescaped) is rejected — extras off" (isLeft (render "{{&x}}" (obj [])))
 
   log "all RawBars tests passed"

@@ -26,7 +26,7 @@ import Data.List as List
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.String (Pattern(..))
 import Data.String.CodeUnits as SCU
-import Data.String.Common (joinWith, trim)
+import Data.String.Common (joinWith)
 import FlatBars.Error (ParseError(..))
 import FlatBars.Span (Span)
 import FlatBars.Syntax (Sigil(..))
@@ -126,22 +126,6 @@ trimStartWs s = SCU.fromCharArray (Array.dropWhile isSpace (SCU.toCharArray s))
 trimEndWs :: String -> String
 trimEndWs s =
   SCU.fromCharArray (Array.reverse (Array.dropWhile isSpace (Array.reverse (SCU.toCharArray s))))
-
--- | The first whitespace-delimited word of a string (leading whitespace skipped) — the
--- | head keyword of a `{% … %}` statement tag. `""` for an all-whitespace string.
-firstWord :: String -> String
-firstWord s =
-  SCU.fromCharArray
-    (Array.takeWhile (not <<< isSpace) (Array.dropWhile isSpace (SCU.toCharArray s)))
-
--- | A `{% endX %}` close head (`endif`, `endeach`, …): `end` + a non-empty block name.
-isStmtClose :: String -> Boolean
-isStmtClose h = SCU.take 3 h == "end" && SCU.length h > 3
-
--- | A `{% %}` clause separator head — splits the enclosing block (docs-19), the `{% %}`
--- | analogue of the bare `{{else}}` / `{{when}}` / `{{elif}}`.
-isStmtSep :: String -> Boolean
-isStmtSep h = h == "else" || h == "elif" || h == "when"
 
 --------------------------------------------------------------------------------
 -- Standalone whitespace removal (Handlebars-style)
@@ -289,39 +273,26 @@ dropTrailingIndent s = case nlIndex false s of
 -- | span-only `RLongComment` tokens instead of dropping them; only the syntax
 -- | highlighter sets it (rendering/compilation leave it off, so their token
 -- | stream — and output — is unchanged).
--- | `statementTags` enables the Django-style `{% … %}` statement surface (ADR/docs-19,
--- | RawBars/MaxBars/Trussbars): when on, a `{% … %}` tag lexes into the *same* structural
--- | tokens its `{{ … }}` counterpart would — `{% if %}`/`{% each %}`/… → `ROpen Section`,
--- | `{% endX %}` → `RClose X`, `{% else %}`/`{% elif %}`/`{% when %}` → `RSep` — so the
--- | parser, engine, and every backend are unchanged (docs-19 §3). Off (the default) the
--- | `{%` opener is ordinary content, byte-identical to before; ClassicBars/MinBars keep it
--- | off.
+-- |
+-- | This is the **Handlebars/Mustache** template scanner (ClassicBars + MinBars).
+-- | The native `{% %}` statement-tag family (RawBars/MaxBars/Trussbars) owns its own
+-- | lexers (`RawBars.Lexer` / `MaxBars.Lexer`, ADR-041), so the `statementTags` and
+-- | `bracesOutputOnly` knobs that gated that surface are gone from here.
 type LexConfig =
   { open :: String
   , close :: String
   , mustacheDelims :: Boolean
   , keepLongComments :: Boolean
-  , statementTags :: Boolean
-  -- | `{{ … }}` is OUTPUT-ONLY (ADR-039): no Handlebars `{{{ … }}}` raw sigil (unescaped
-  -- | output is `{{ x | safe }}`) and no `{{! … }}` / `{{!-- --}}` comments (a comment is
-  -- | `{# … #}`). On for the pure native surface (MaxBars/Trussbars), so a `{{{` is a lex
-  -- | error and a `{{!` lexes as ordinary output (`! x` ⇒ `not x`), matching Trussbars.
-  -- | Off (the default) keeps the full Handlebars grammar — ClassicBars/MinBars and the
-  -- | desugared-core RawBars surface (which still spells raw output `{{{op}}}`).
-  , bracesOutputOnly :: Boolean
   }
 
 -- | Default template-lexer config: `{{`/`}}`, no set-delimiter switching, long
--- | comments dropped (the render/compile default), no `{% %}` statement tags, the full
--- | Handlebars output/comment grammar (`bracesOutputOnly` off).
+-- | comments dropped (the render/compile default).
 defaultLexConfig :: LexConfig
 defaultLexConfig =
   { open: "{{"
   , close: "}}"
   , mustacheDelims: false
   , keepLongComments: false
-  , statementTags: false
-  , bracesOutputOnly: false
   }
 
 type TagResult = { mtok :: Maybe RawTok, next :: Int, trimL :: Boolean, trimR :: Boolean }
@@ -399,33 +370,6 @@ tokenizeTemplate cfg src = map finalize (go 0 cfg.open cfg.close 0 [] Nil false)
                     sd.trimL
                 in
                   go sd.next sd.open sd.close sd.next [] (sd.tok : acc1) sd.trimR
-          -- A Django-style statement tag `{% … %}` (docs-19; gated on `statementTags`).
-          -- Checked before the `{{` opener probe; it re-delimits the same structural tokens
-          -- (`ROpen`/`RClose`/`RSep`) so the parser is unchanged. It never switches delimiters.
-          | cfg.statementTags && matchAt cs i "{%" -> case readStatementTag i of
-              Left e -> recoverFrom i e segStart frags acc pend open close
-              Right res ->
-                let
-                  acc2 = consTok res.mtok
-                    ( flush { start: segStart, end: i } (contentTo segStart frags i) acc pend
-                        res.trimL
-                    )
-                in
-                  go res.next open close res.next [] acc2 res.trimR
-          -- A Django/Jinja inline comment `{# … #}` (ADR-039 item 1; gated on
-          -- `statementTags`, replacing the Handlebars `{{! … }}` in those dialects). It
-          -- renders nothing — emitted as an `RComment` the parser drops. Checked before
-          -- the `{{` opener probe so a leading `{#` is never read as a dict literal.
-          | cfg.statementTags && matchAt cs i "{#" -> case readInlineComment i of
-              Left e -> recoverFrom i e segStart frags acc pend open close
-              Right res ->
-                let
-                  acc2 = consTok res.mtok
-                    ( flush { start: segStart, end: i } (contentTo segStart frags i) acc pend
-                        res.trimL
-                    )
-                in
-                  go res.next open close res.next [] acc2 res.trimR
           -- Default delimiters `{{`/`}}`: the full Handlebars-flavored grammar,
           -- byte-identical to the fixed-delimiter lexer (backslash escapes, triple,
           -- raw blocks, long comments, `~`). The opener probe is gated on `{`, so
@@ -606,24 +550,13 @@ tokenizeTemplate cfg src = map finalize (go 0 cfg.open cfg.close 0 [] Nil false)
   readTag i
     | matchAt cs i "{{{{#" = readRaw i 5 -- `{{{{#name}}}}` (FlatBars/back-compat)
     | matchAt cs i "{{{{" = readRaw i 4 -- `{{{{name}}}}` (Handlebars raw block)
-    -- `bracesOutputOnly` (MaxBars/Trussbars, ADR-039): the Handlebars comments
-    -- `{{! }}` / `{{!-- --}}` are not recognized (the comment is `{# … #}`), so they fall
-    -- through to `{{` output (`! x` ⇒ `not x`); a glued `{{{` is rejected (unescaped
-    -- output is `{{ x | safe }}`). RawBars keeps the Handlebars forms (`bracesOutputOnly`
-    -- off) — it still spells raw output `{{{op}}}`.
-    | not cfg.bracesOutputOnly && matchAt cs i "{{~!--" = readLongComment i "{{~!--"
-    | not cfg.bracesOutputOnly && matchAt cs i "{{!--" = readLongComment i "{{!--"
-    | cfg.bracesOutputOnly && matchAt cs i "{{{" =
-        Left
-          ( LexError
-              "`{{{ … }}}` is not a tag here — unescaped output is `{{ x | safe }}`, a verbatim region is `{% raw %}`"
-              i
-          )
+    | matchAt cs i "{{~!--" = readLongComment i "{{~!--"
+    | matchAt cs i "{{!--" = readLongComment i "{{!--"
     | matchAt cs i "{{{^" = readBlockOpen i "{{{^" Inverse "}}}"
     | matchAt cs i "{{{/" = readClose i "{{{/" "}}}"
     | matchAt cs i "{{{" = readOutput i
-    | not cfg.bracesOutputOnly && matchAt cs i "{{~!" = readShortComment i "{{~!"
-    | not cfg.bracesOutputOnly && matchAt cs i "{{!" = readShortComment i "{{!"
+    | matchAt cs i "{{~!" = readShortComment i "{{~!"
+    | matchAt cs i "{{!" = readShortComment i "{{!"
     -- `{{#*name}}` (inline-partial decorator) and `{{#>name}}` (partial block) are
     -- distinct openers — matched before bare `{{#}}` so the `*`/`>` is consumed as
     -- part of the opener, not folded into the head.
@@ -646,14 +579,10 @@ tokenizeTemplate cfg src = map finalize (go 0 cfg.open cfg.close 0 [] Nil false)
     | matchAt cs i "{{" = readSeparator i
     | otherwise = Left (LexError "internal: no opener" i)
 
-  -- The explicit whitespace-control marker. The Handlebars family spells it `~`
-  -- (`{{~ … ~}}`); the Django/Jinja/Liquid `{% %}` family spells it `-`
-  -- (`{%- … -%}` / `{{- … -}}`, ADR-039 item 3). The two are mutually exclusive by
-  -- dialect — `statementTags` selects which one the scanner trims on — so the `~`
-  -- spelling is simply inert in the statement-tag dialects (the ADR's "`~` not
-  -- adopted"), and `-` is inert (an ordinary operator char) everywhere else.
+  -- The explicit whitespace-control marker — the Handlebars `~` (`{{~ … ~}}`). (The
+  -- Django/Jinja `-` marker belongs to the `{% %}` family, which owns its own lexers.)
   trimMark :: String
-  trimMark = if cfg.statementTags then "-" else "~"
+  trimMark = "~"
 
   -- A left-trim marker may sit immediately after the braces, before the sigil.
   leadTrimAt :: Int -> Boolean
@@ -775,106 +704,6 @@ tokenizeTemplate cfg src = map finalize (go 0 cfg.open cfg.close 0 [] Nil false)
               , trimR: t.trimR
               }
 
-  -- A Django-style statement tag `{% [~] head args [~] %}` (docs-19), lexed into the
-  -- structural token its `{{ }}` counterpart would yield, so the parser/engine never see
-  -- `{% %}`: `{% endX %}` → `RClose X`; `{% else %}` / `{% elif … %}` / `{% when … %}` → a
-  -- clause `RSep`; anything else (`{% if … %}`, `{% each … %}`, host block heads) →
-  -- `ROpen Section`. The leading/trailing `~` trim works as for any tag.
-  readStatementTag :: Int -> Either ParseError TagResult
-  readStatementTag i =
-    let
-      start = if leadTrimAt i then i + 3 else i + 2
-    in
-      case closeFrom start "%}" of
-        Nothing -> Left (UnterminatedTag i)
-        Just q ->
-          let
-            t = splitTrims (slice cs start q)
-            core = t.core
-            headWord = firstWord core
-            span = { start: i, end: q + 2 }
-            mk tok = Right
-              { mtok: Just tok, next: q + 2, trimL: leadTrimAt i || t.trimL, trimR: t.trimR }
-          in
-            if headWord == "" then Left (LexError "empty statement tag '{% %}'" i)
-            -- The verbatim region `{% raw %}…{% endraw %}` (ADR-039 item 2). It is NOT a
-            -- section open: the body is captured untouched (to the matching `{% endraw %}`),
-            -- reusing the very `RRaw`/`RawBlock "raw"` pipeline the `{{{{#raw}}}}` spelling
-            -- feeds — pure surface sugar. Only the bare head `raw` (no args) opens a region.
-            else if trim core == "raw" then readRawBody i start (q + 2)
-            else if isStmtClose headWord then
-              let
-                name = SCU.drop 3 headWord
-              in
-                mk (RClose span start name (interiorAt start name))
-            -- a clause separator (`else`/`elif`/`when`) OR a block-LESS statement that
-            -- lexes to a name-agnostic `RSep` (no `{% end… %}` to pair): the forward
-            -- binding `{% set … %}` (docs-17, reparented by `Kernel.SetSugar`), the
-            -- block-partial placeholder `{% yield %}` (ADR-039 item 5 — the surface
-            -- outputs the scoped `yield` op, exactly as the retired `{{yield}}`), and the
-            -- inheritance parent-body splice `{% super %}` (ADR-040 — the named-block
-            -- sibling of `{% yield %}`, consumed by `Kernel.Inherit`).
-            else if
-              isStmtSep headWord || headWord == "set" || trim core == "yield"
-                || trim core == "super" then
-              mk (RSep span start core (interiorAt start core))
-            -- the inheritance directive `{% extends "base" %}` (ADR-040): a block-LESS
-            -- statement (no `{% endextends %}`) consumed by the `Kernel.Inherit` flatten
-            -- pre-pass; it never reaches the engine. Lexed to a name-agnostic `RSep` whose
-            -- name is `extends` and whose one argument is the base name (a string literal).
-            else if headWord == "extends" then
-              mk (RSep span start core (interiorAt start core))
-            -- the partial include `{% include "name" [ctx] [k=v] %}` (ADR-039 item 5).
-            -- It lexes to the SAME `>`-prefixed `RSep` the retired `{{> name …}}` does —
-            -- pure surface sugar, reusing the existing partial reinterpretation — by
-            -- prefixing a `> ` to the args *as they sit in the source*: the interior is
-            -- lexed with the args' real source offset so its spans stay accurate (a
-            -- synthetic offset mis-resolves the partial name).
-            else if headWord == "include" then
-              let
-                skipSp j =
-                  if j < q && maybe false isSpace (Array.index cs j) then skipSp (j + 1) else j
-                argsOff = skipSp (skipSp start + SCU.length headWord)
-                pcore = "> " <> slice cs argsOff q
-              in
-                mk (RSep span start pcore (interiorAt (argsOff - 2) pcore))
-            else
-              mk (ROpen span Section start core (interiorAt start core))
-
-  -- Capture a `{% raw %}…{% endraw %}` body verbatim (ADR-039 item 2): from the
-  -- opening tag's close (`bodyStart`) to the matching `{% endraw %}`. Emits the same
-  -- `RRaw` the FlatBars `{{{{#raw}}}}` spelling does (`isHash` = `true`, so it clears
-  -- the statement-tag dialects' `rawBlockHash` gate) → `RawBlock "raw"` → `rawH`.
-  readRawBody :: Int -> Int -> Int -> Either ParseError TagResult
-  readRawBody i headStart bodyStart = case findEndrawFrom bodyStart of
-    Nothing -> Left (UnterminatedRaw i)
-    Just close -> Right
-      { mtok: Just
-          ( RRaw { start: i, end: close.tagEnd } true headStart "raw"
-              (interiorAt headStart "raw")
-              (slice cs bodyStart close.tagStart)
-          )
-      , next: close.tagEnd
-      , trimL: leadTrimAt i
-      , trimR: false
-      }
-
-  -- Scan for the first `{% endraw %}` from `j0`. A `{% … %}` that is not `endraw`
-  -- (and a `{%` with no `%}` close) is verbatim body, scanned past — `{% raw %}` does
-  -- not nest, exactly as Liquid: the first `{% endraw %}` closes the region.
-  findEndrawFrom :: Int -> Maybe { tagStart :: Int, tagEnd :: Int }
-  findEndrawFrom = scan
-    where
-    scan j
-      | j >= len = Nothing
-      | matchAt cs j "{%" = case closeFrom (j + 2) "%}" of
-          Just q
-            | firstWord (splitTrims (slice cs (j + 2) q)).core == "endraw" ->
-                Just { tagStart: j, tagEnd: q + 2 }
-            | otherwise -> scan (q + 2)
-          Nothing -> scan (j + 1)
-      | otherwise = scan (j + 1)
-
   -- A short comment `{{! [~] … [~] }}` is *kept* as an `RComment` carrying its
   -- interior (trailing `~` stripped) and offset, so the parser can lift any
   -- `@key` directives from it. It still produces no output — the parser drops it
@@ -899,25 +728,6 @@ tokenizeTemplate cfg src = map finalize (go 0 cfg.open cfg.close 0 [] Nil false)
               , trimL: leadTrimAt i
               , trimR
               }
-
-  -- A Django/Jinja inline comment `{# … #}` (ADR-039 item 1). The body runs verbatim to
-  -- the first `#}` (never brace-aware, like `{{! }}` — a stray `{`/`}` must not swallow
-  -- the close); it renders nothing (an `RComment` the parser drops) and lifts no
-  -- directive. No `~` trims (the `{%- -%}` markers are statement-tag-only).
-  readInlineComment :: Int -> Either ParseError TagResult
-  readInlineComment i =
-    let
-      start = i + 2
-    in
-      case findFrom cs start "#}" of
-        Nothing -> Left (UnterminatedComment i)
-        Just q ->
-          Right
-            { mtok: Just (RComment { start: i, end: q + 2 } start (slice cs start q))
-            , next: q + 2
-            , trimL: false
-            , trimR: false
-            }
 
   -- A long comment `{{!-- … --}}` renders nothing and carries no directive, so
   -- it is dropped (`mtok: Nothing`) — except under `keepLongComments`, where it

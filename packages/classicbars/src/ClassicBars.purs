@@ -102,12 +102,14 @@ type SurfaceParse =
   , partialBlocks :: Boolean
   }
 
--- | The `ParseOptions`-driven `SurfaceParse` — the adapter for callers still on the
--- | shared parser (ClassicBars's own entries, the CLI's per-dialect options).
+-- | The `ParseOptions`-driven `SurfaceParse` — the adapter for callers on the shared
+-- | parser (ClassicBars's own entries, the CLI's per-dialect options). The shared
+-- | parser is never a `{% %}` statement-tag surface (those dialects own their
+-- | front-ends, ADR-041), so `statementTags` is always `false` here.
 surfaceParseOf :: ParseOptions -> SurfaceParse
 surfaceParseOf opts =
   { parse: parseWith opts
-  , statementTags: opts.lexConfig.statementTags
+  , statementTags: false
   , partialBlocks: opts.partialBlocks
   }
 

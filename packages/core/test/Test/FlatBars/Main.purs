@@ -235,8 +235,6 @@ main = do
           , close: "}}"
           , mustacheDelims: true
           , keepLongComments: false
-          , statementTags: false
-          , bracesOutputOnly: false
           }
       }
   -- `{{=<% %>=}}` swaps the active delimiters; it renders nothing, and a following
@@ -272,28 +270,8 @@ main = do
       (not (Array.any isSepX nodes))
     Left _ -> pure unit -- a parse error is also fine: the point is `<%x%>` is not a tag
 
-  -- ── Statement tags (docs-19): gated `{% %}` re-delimits the SAME Block/Sep skeleton ──
-  -- When `statementTags` is on, `{% if %}`/`{% each %}` lex to `ROpen Section`, `{% endX %}`
-  -- to `RClose X`, and `{% else %}` to a clause `RSep` — so the parser produces exactly the
-  -- tree the `{{#if}}…{{else}}…{{/if}}` form would, and output `{{ }}` is untouched.
-  let
-    stmtOpts = defaultParseOptions { lexConfig = defaultLexConfig { statementTags = true } }
-  case parseWith stmtOpts "{% if c %}t{% else %}f{% endif %}" of
-    Right { nodes: [ Block _ Section "if" _ [ Content _ "t", Sep _ "else" [], Content _ "f" ] ] } ->
-      pure unit
-    other -> assert' ("stmt-tag if/else/endif " <> show other) false
-  case parseWith stmtOpts "{% each xs %}{{this}}{% endeach %}" of
-    Right { nodes: [ Block _ Section "each" _ [ Sep _ "this" [] ] ] } -> pure unit
-    other -> assert' ("stmt-tag each + untouched output " <> show other) false
-  -- OFF by default: `{% if %}` is ordinary content, so a default parse never sees a Block.
-  let
-    isBlock = case _ of
-      Block _ _ _ _ _ -> true
-      _ -> false
-  case parse "{% if c %}x{% endif %}" of
-    Right { nodes } -> assert' "stmt-tag: inert when statementTags is off"
-      (not (Array.any isBlock nodes))
-    Left _ -> pure unit
+  -- (The `{% %}` statement-tag surface moved to the native family's own lexers —
+  -- `RawBars.Lexer` / `MaxBars.Lexer`, ADR-041 — and is tested in those suites.)
 
   -- ADR-001 crown jewel: the core parser does NOT special-case `{{else}}`. It is
   -- a plain `Sep` node, structurally identical to any user separator — the name
