@@ -1,0 +1,30 @@
+[package]
+name = "wasm-example"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Own workspace, independent of the trussbars/ workspace (like the other examples).
+[workspace]
+
+[lib]
+name = "trussbars_wasm"
+# cdylib → a `.wasm` module a host (Spin, Cloudflare, a browser, wasmtime) instantiates;
+# rlib → the same render logic is unit-tested natively (`cargo test`), so CI proves both.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# The bytecode VM, built `no_std + alloc + forbid(unsafe)` (default features off). This is the
+# whole point: no mainstream Rust engine (Askama / Sailfish / minijinja) compiles to a no_std
+# wasm target — they all pull `std`. Trussbars renders here with no interpreter to initialize.
+trussbars-vm = { path = "../../crates/trussbars-vm", default-features = false }
+trussbars-interp = { path = "../../crates/trussbars-interp", default-features = false }
+
+# A global allocator for the bare `wasm32-unknown-unknown` target (no_std has none). Only pulled
+# for that target — the native `cargo test` build uses std's allocator.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+dlmalloc = { version = "0.2", features = ["global"] }
+
+[profile.release]
+opt-level = "s"  # small modules — the embedded/edge priority
+lto = true

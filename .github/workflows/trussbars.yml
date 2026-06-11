@@ -95,6 +95,36 @@ jobs:
       - name: Build no_std (bytecode VM)
         run: cargo build -p trussbars-vm --lib --no-default-features --target thumbv7em-none-eabi
 
+  # The N1 portability proof (docs/24): the no_std bytecode VM renders inside a bare
+  # `wasm32-unknown-unknown` module — the empty room no std-pulling engine (Askama/minijinja)
+  # competes in. Its own workspace (pulls a wasm allocator), so neither `check` nor `examples`
+  # covers it. Builds the wasm target AND runs the native render-logic + injection-law tests.
+  wasm:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: trussbars/examples/wasm
+    steps:
+      - uses: actions/checkout@v6
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            trussbars/examples/wasm/target
+          key: trussbars-wasm-${{ runner.os }}-${{ hashFiles('trussbars/examples/wasm/Cargo.lock') }}
+      - name: Toolchain + wasm target
+        run: rustup show && rustup target add wasm32-unknown-unknown
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Test (native render logic + injection-law-in-wasm)
+        run: cargo test
+      - name: Build the no_std wasm module
+        run: cargo build --target wasm32-unknown-unknown --release
+
   # The perf-regression ratchet: a separate workspace (it pulls handlebars/askama/
   # sailfish/liquid), run in release. The `Perf-regression gate` step asserts the
   # machine-independent relative invariants (Trussbars <= Askama, << handlebars); the
