@@ -49,7 +49,9 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::cell::Cell;
 
-use trussbars_interp::{Env, Helpers, TruthMode, Value, eval_expr, eval_nodes, hoist, write_escaped};
+use trussbars_interp::{
+    Env, Helpers, TruthMode, Value, eval_expr, eval_nodes, hoist, write_escaped,
+};
 use trussbars_template::{Expr, Node, Value as Lit, parse};
 
 /// Where a fast-path resolves from: the current `this`, or the render `root`. Fixed at
@@ -317,8 +319,12 @@ impl Program {
         let mut out = String::with_capacity(self.cap.get().max(16));
         // The Env stack mirrors scope nesting: index 0 is the render root; a loop pushes a
         // child Env (with its loop frame), popped when the loop ends. The top is `this`.
-        let mut envs: Vec<Env> =
-            Vec::from([Env::root(data, Rc::clone(&self.partials), mode, Rc::clone(helpers))]);
+        let mut envs: Vec<Env> = Vec::from([Env::root(
+            data,
+            Rc::clone(&self.partials),
+            mode,
+            Rc::clone(helpers),
+        )]);
         let mut loops: Vec<LoopState> = Vec::new();
         let mut pc = 0;
         while pc < self.ops.len() {
@@ -534,7 +540,14 @@ fn resolve_fast<'a>(
 /// clone. `is_first` is the enclosing iteration's first-element flag (for `loop.first`). A
 /// nested `Loop` recurses with each element as the new `this`, so the whole nest stays on the
 /// borrow machine. Infallible: fast ops never evaluate a fallible expression.
-fn run_fast(plan: &[Fast], this: &Value, root: &Value, is_first: bool, out: &mut String, mode: TruthMode) {
+fn run_fast(
+    plan: &[Fast],
+    this: &Value,
+    root: &Value,
+    is_first: bool,
+    out: &mut String,
+    mode: TruthMode,
+) {
     for f in plan {
         match f {
             Fast::Text(s) => out.push_str(s),
@@ -569,21 +582,23 @@ fn run_fast(plan: &[Fast], this: &Value, root: &Value, is_first: bool, out: &mut
                     run_fast(else_, this, root, is_first, out, mode);
                 }
             }
-            Fast::Loop { subject, body, empty } => {
-                match resolve_fast(subject.0, &subject.1, this, root) {
-                    Some(Value::Array(a)) if !a.is_empty() => {
-                        for (j, elem) in a.iter().enumerate() {
-                            run_fast(body, elem, root, j == 0, out, mode);
-                        }
+            Fast::Loop {
+                subject,
+                body,
+                empty,
+            } => match resolve_fast(subject.0, &subject.1, this, root) {
+                Some(Value::Array(a)) if !a.is_empty() => {
+                    for (j, elem) in a.iter().enumerate() {
+                        run_fast(body, elem, root, j == 0, out, mode);
                     }
-                    Some(Value::Object(o)) if !o.is_empty() => {
-                        for (j, (_, v)) in o.iter().enumerate() {
-                            run_fast(body, v, root, j == 0, out, mode);
-                        }
-                    }
-                    _ => run_fast(empty, this, root, is_first, out, mode),
                 }
-            }
+                Some(Value::Object(o)) if !o.is_empty() => {
+                    for (j, (_, v)) in o.iter().enumerate() {
+                        run_fast(body, v, root, j == 0, out, mode);
+                    }
+                }
+                _ => run_fast(empty, this, root, is_first, out, mode),
+            },
         }
     }
 }
@@ -603,7 +618,9 @@ fn patch(ops: &mut [Op], at: usize, to: usize) {
         | Op::JumpUnlessPath { target, .. }
         | Op::JumpUnlessFirst(target)
         | Op::Jump(target)
-        | Op::ScopeStart { otherwise: target, .. }
+        | Op::ScopeStart {
+            otherwise: target, ..
+        }
         | Op::ScopeEnd(target)
         | Op::EachStart { empty: target, .. } => {
             *target = to;
@@ -686,9 +703,7 @@ fn fast_plan(nodes: &[Node]) -> Option<Vec<Fast>> {
             }
             // A nested loop is fast only with no bindings (the element is `this`) and a
             // this/root collection path (resolvable from the borrow frame).
-            Node::For(e)
-                if e.item.is_none() && e.index.is_none() && e.label.is_none() =>
-            {
+            Node::For(e) if e.item.is_none() && e.index.is_none() && e.label.is_none() => {
                 plan.push(Fast::Loop {
                     subject: classify_path(&e.subject)?,
                     body: fast_plan(&e.body)?,
@@ -717,9 +732,7 @@ fn push_jump_unless(ops: &mut Vec<Op>, cond: &Expr, negate: bool) -> usize {
     let at = ops.len();
     if !negate && is_loop_first(cond) {
         ops.push(Op::JumpUnlessFirst(0));
-    } else if !negate
-        && let Some((base, keys)) = classify_path(cond)
-    {
+    } else if !negate && let Some((base, keys)) = classify_path(cond) {
         ops.push(Op::JumpUnlessPath {
             base,
             keys,
@@ -904,29 +917,63 @@ mod tests {
             // operators / helpers / literals in output (were `vm subset: expr unsupported`).
             ("{{ 2 | add 3 }}", Value::Null),
             ("{{ name | uppercase }}", obj(&[("name", s("ann"))])),
-            ("{% if n > 2 %}big{% elif n > 0 %}mid{% else %}small{% endif %}", obj(&[("n", Value::Num(1.0))])),
+            (
+                "{% if n > 2 %}big{% elif n > 0 %}mid{% else %}small{% endif %}",
+                obj(&[("n", Value::Num(1.0))]),
+            ),
             // unless (negated cond).
-            ("{% if not done %}todo{% endif %}", obj(&[("done", Value::Bool(false))])),
+            (
+                "{% if not done %}todo{% endif %}",
+                obj(&[("done", Value::Bool(false))]),
+            ),
             // each bindings + index + else; loop metadata in output.
-            ("{% for x i in xs %}{{i}}:{{x}}/{{loop.last}} {% else %}none{% endfor %}", obj(&[("xs", arr(&[s("a"), s("b")]))])),
-            ("{% for xs %}x{% else %}EMPTY{% endfor %}", obj(&[("xs", arr(&[]))])),
+            (
+                "{% for x i in xs %}{{i}}:{{x}}/{{loop.last}} {% else %}none{% endfor %}",
+                obj(&[("xs", arr(&[s("a"), s("b")]))]),
+            ),
+            (
+                "{% for xs %}x{% else %}EMPTY{% endfor %}",
+                obj(&[("xs", arr(&[]))]),
+            ),
             // with / scope (re-root, native ScopeStart/ScopeEnd) — truthy body + falsy else.
-            ("{% scope p %}{{n}}{% endscope %}", obj(&[("p", obj(&[("n", s("Z"))]))])),
-            ("{% scope p %}{{n}}{% else %}NO:{{n}}{% endscope %}", obj(&[("p", Value::Null), ("n", s("R"))])),
+            (
+                "{% scope p %}{{n}}{% endscope %}",
+                obj(&[("p", obj(&[("n", s("Z"))]))]),
+            ),
+            (
+                "{% scope p %}{{n}}{% else %}NO:{{n}}{% endscope %}",
+                obj(&[("p", Value::Null), ("n", s("R"))]),
+            ),
             // let / local (native LocalStart/LocalEnd) — single + sequential (b sees a).
-            ("{% local t=(multiply n 2) %}{{t}}{% endlocal %}", obj(&[("n", Value::Num(3.0))])),
-            ("{% local a=(n) b=(add a 1) %}{{a}}-{{b}}{% endlocal %}", obj(&[("n", Value::Num(5.0))])),
+            (
+                "{% local t=(multiply n 2) %}{{t}}{% endlocal %}",
+                obj(&[("n", Value::Num(3.0))]),
+            ),
+            (
+                "{% local a=(n) b=(add a 1) %}{{a}}-{{b}}{% endlocal %}",
+                obj(&[("n", Value::Num(5.0))]),
+            ),
             // case.
-            ("{% case s %}{% when \"a\" %}A{% when \"b\" %}B{% else %}Z{% endcase %}", obj(&[("s", s("b"))])),
+            (
+                "{% case s %}{% when \"a\" %}A{% when \"b\" %}B{% else %}Z{% endcase %}",
+                obj(&[("s", s("b"))]),
+            ),
             // inline partial + yield.
-            (r#"{% inline "card" %}<{% yield %}>{% endinline %}{% partial "card" %}hi{% endpartial %}"#, Value::Null),
+            (
+                r#"{% inline "card" %}<{% yield %}>{% endinline %}{% partial "card" %}hi{% endpartial %}"#,
+                Value::Null,
+            ),
             // a parent-chain path inside a loop + collection op.
-            ("{% for xs %}{{parent.t}}:{{this}} {% endfor %}", obj(&[("t", s("T")), ("xs", arr(&[s("a")]))])),
+            (
+                "{% for xs %}{{parent.t}}:{{this}} {% endfor %}",
+                obj(&[("t", s("T")), ("xs", arr(&[s("a")]))]),
+            ),
         ];
         for (tpl, data) in cases {
             let prog = Program::compile(tpl).unwrap_or_else(|e| panic!("compile {tpl}: {e}"));
             assert_eq!(
-                prog.render(data).unwrap_or_else(|e| panic!("render {tpl}: {e}")),
+                prog.render(data)
+                    .unwrap_or_else(|e| panic!("render {tpl}: {e}")),
                 render(tpl, data.clone()).unwrap(),
                 "{tpl}"
             );
@@ -942,25 +989,49 @@ mod tests {
     fn fast_loop_matches_interpreter() {
         let cases: &[(&str, Value)] = &[
             // negated cond (`{% unless path %}`) inside a fast body.
-            ("{% for xs %}{% unless this.hide %}{{this.n}} {% endunless %}{% endfor %}",
-             obj(&[("xs", arr(&[obj(&[("n", s("a"))]), obj(&[("hide", Value::Bool(true)), ("n", s("b"))])]))])),
+            (
+                "{% for xs %}{% unless this.hide %}{{this.n}} {% endunless %}{% endfor %}",
+                obj(&[(
+                    "xs",
+                    arr(&[
+                        obj(&[("n", s("a"))]),
+                        obj(&[("hide", Value::Bool(true)), ("n", s("b"))]),
+                    ]),
+                )]),
+            ),
             // elif chain, every test a path; `else` arm too.
-            ("{% for xs %}{% if this.a %}A{% elif this.b %}B{% else %}Z{% endif %}{% endfor %}",
-             obj(&[("xs", arr(&[obj(&[("a", Value::Bool(true))]), obj(&[("b", Value::Bool(true))]), obj(&[])]))])),
+            (
+                "{% for xs %}{% if this.a %}A{% elif this.b %}B{% else %}Z{% endif %}{% endfor %}",
+                obj(&[(
+                    "xs",
+                    arr(&[
+                        obj(&[("a", Value::Bool(true))]),
+                        obj(&[("b", Value::Bool(true))]),
+                        obj(&[]),
+                    ]),
+                )]),
+            ),
             // nested fast loop whose inner collection is empty → inner `else` in element scope.
-            ("{% for rows %}[{% for this %}{{this}}{% else %}-{% endfor %}]{% endfor %}",
-             obj(&[("rows", arr(&[arr(&[s("x"), s("y")]), arr(&[])]))])),
+            (
+                "{% for rows %}[{% for this %}{{this}}{% else %}-{% endfor %}]{% endfor %}",
+                obj(&[("rows", arr(&[arr(&[s("x"), s("y")]), arr(&[])]))]),
+            ),
             // object iteration (values become `this`) + loop.first + a root path.
-            ("{% for m %}{% if loop.first %}*{% endif %}{{root.tag}}{{this}};{% endfor %}",
-             obj(&[("tag", s("T")), ("m", obj(&[("a", s("1")), ("b", s("2"))]))])),
+            (
+                "{% for m %}{% if loop.first %}*{% endif %}{{root.tag}}{{this}};{% endfor %}",
+                obj(&[("tag", s("T")), ("m", obj(&[("a", s("1")), ("b", s("2"))]))]),
+            ),
             // top-level empty collection → fast `else` runs in the parent scope.
-            ("{% for xs %}{{this}}{% else %}none:{{tag}}{% endfor %}",
-             obj(&[("tag", s("Z")), ("xs", arr(&[]))])),
+            (
+                "{% for xs %}{{this}}{% else %}none:{{tag}}{% endfor %}",
+                obj(&[("tag", s("Z")), ("xs", arr(&[]))]),
+            ),
         ];
         for (tpl, data) in cases {
             let prog = Program::compile(tpl).unwrap_or_else(|e| panic!("compile {tpl}: {e}"));
             assert_eq!(
-                prog.render(data).unwrap_or_else(|e| panic!("render {tpl}: {e}")),
+                prog.render(data)
+                    .unwrap_or_else(|e| panic!("render {tpl}: {e}")),
                 render(tpl, data.clone()).unwrap(),
                 "{tpl}"
             );
