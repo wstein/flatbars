@@ -53,7 +53,7 @@ already implements it, so existing String callers keep working.
   doesn't use it (the documented trade: zero-alloc, but no adaptive pre-size).
 
 **Output is byte-identical** (same chars, same order, into a different sink), so the v2
-conformance gate must stay **71/71** — but it is a hard re-gate requirement, and the emitted
+conformance gate must stay **87/87** — but it is a hard re-gate requirement, and the emitted
 *code shape* changes, so emit unit tests that assert code substrings (`out.push_str(…)`) must
 be updated to the `write_str`/`?` shape. (Expression substrings — `truthy_in::<…>`, `NumLit(…)`,
 `(in partial '…')` — are unaffected.)
@@ -132,7 +132,7 @@ docs/09 examples) + a v2 conformance re-gate.
 
 ## 6. Test / gate plan
 
-- v2 conformance re-gate **71/71, 0 drift** (output identical; the contract for this refactor).
+- v2 conformance re-gate **87/87, 0 drift** (output identical; the contract for this refactor).
 - Update emit unit tests that assert `push_str`-shape codegen → `write_str`/`?` shape.
 - `trussbars-core` tests for the now-generic `esc`/`ToText` over a non-`String` `fmt::Write`
   sink (e.g. a counting writer) to prove the generic path.

@@ -135,14 +135,19 @@ two dynamic backends stay byte-identical, asserted in the equality gate), and ad
 instruction array run by a **borrow-based machine**: output and control ops carry a
 pre-resolved path, the evaluator resolves it to a `&Value` and writes straight to the
 buffer, so the render hot loop does **zero `Value` clones and keeps no value stack** (only
-an `Rc` refcount bump per loop entry). It covers the benchmark subset and errors on the
-rest. Criterion medians (release; the perf-gate min-of-N agrees within noise):
+an `Rc` refcount bump per loop entry). At this stage it covered the benchmark subset and
+errored on the rest — **§4.3 below supersedes this**, promoting the VM to full coverage.
+Criterion medians for that *subset* VM (release; the perf-gate min-of-N agrees within noise):
 
 ```text
               AOT     vy(unsafe)  BYTECODE-VM   interpreter   Tera     handlebars
 big-table     36 µs   20 µs       329 µs        502 µs        585 µs   2.67 ms    VM ~1.5× the interpreter
 teams         88 ns   137 ns      420 ns        1.20 µs       2.50 µs  4.03 µs    VM ~2.9× the interpreter
 ```
+
+*Pre-promotion (subset-VM) snapshot. The full-coverage VM + the §4.3 specialization pass
+supersede these: big-table VM ~316 µs, teams VM ~516 ns (vs the interpreter's ~497 µs /
+~1.20 µs) — VM ~1.6× (big-table) to ~2.3× (teams) the interpreter.*
 
 > **Two honest re-measurements.** (1) The original figures showed the tree-walk at
 > ~1.14 ms / ~1.25 µs but the *benchmark column* at ~371 µs — because the interpreter's
@@ -239,7 +244,7 @@ structure to bytecode driving an `Env` stack, routes every expression through th
 `eval_expr`, and renders the rarer blocks (`with`/`scope`, `let`/`local`, `case`, partials,
 host block helpers, raw) through a `Delegate` op → `eval_nodes`. There is no subset and no
 fallback — `Program::compile` accepts every valid template. The `truss-vm` CLI + the
-`harness.mjs --vm` axis prove it: **75/75 rendered corpus cases byte-match the oracle**,
+`harness.mjs --vm` axis prove it: **76/76 rendered corpus cases byte-match the oracle**,
 identical to `--interp`.
 
 **Status — specialized (perf-gated).** The full-coverage rewrite initially routed *every*
@@ -247,7 +252,7 @@ expression through the shared `eval_expr`, which clones the leaf + pays dispatch
 lost its lead and the perf gate failed (`teams`: VM 1.17 µs > interpreter 1.08 µs). The
 specialization pass restored `VM ≤ interpreter` by promoting the hot constructs to native
 borrow-based / zero-eval ops, each landed only when the benchmark justified it and each kept
-byte-identical (`--vm` stays 75/75):
+byte-identical (`--vm` stays 76/76):
 
 - **`OutPath` / `JumpUnlessPath`** — a `this`/`root` field path resolves to a leaf `&Value`
   and is written / truth-tested directly (zero clone, no `eval_expr`). The dominant output
@@ -386,13 +391,14 @@ then just a set of host helpers (a follow-up that needs no engine change).
 
 ## 9. Conformance — the third axis
 
-The project's safety net extends cleanly. Today: **interpreter (oracle) ≡ AOT**
-(71/71, `docs/04`). Add **VM ≡ oracle**, reusing the *same corpus and harness shape*:
-render each case through the VM, assert byte-equality against the committed golden —
-exactly as `harness.mjs` does for AOT (a `--interp` flag beside `--v2`). Then **VM ≡ AOT**
-follows transitively on the shared subset.
+The project's safety net extends cleanly, and now does. **interpreter (oracle) ≡ AOT**
+(87/87, `docs/04`/`report.json`). The **VM ≡ oracle** axis is delivered, reusing the *same
+corpus and harness shape*: each case renders through the VM and asserts byte-equality
+against the committed golden — exactly as `harness.mjs` does for AOT (`--vm`/`--interp`
+beside `--v2`), currently **76/76** covered (the 11 oracle-error cases skipped, of 87).
+**VM ≡ AOT** follows transitively on the shared subset.
 
-Crucially, the VM can run the corpus cases **AOT cannot** (dynamic-data / runtime
+Crucially, the VM runs the corpus cases **AOT cannot** (dynamic-data / runtime
 templates) — those get their own oracle (the PureScript engine renders them too, since
 it's also dynamic), so the VM is gated everywhere, with **no silent gaps**.
 
@@ -408,7 +414,7 @@ AOT-compat *reject* oracle.
 ```text
         MaxBars oracle (PureScript, reference)
           ║                         ║
-          ║ 71/71 (done)            ║ NEW: --interp gate, same corpus + the dynamic-only cases
+          ║ 87/87 (report.json)     ║ --interp / --vm gate: 76/76 + the dynamic-only cases
           ▼                         ▼
         AOT  ───────── ≡ ───────── VM        (transitive on the shared subset)
 ```

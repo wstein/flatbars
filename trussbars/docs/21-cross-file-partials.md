@@ -6,7 +6,7 @@
 > error**; cross-file **layouts + nesting in scope**. **Built in:** `trussbars-template`
 > (`PartialDef` registry + `emit_with_partials` + per-source `inline_partial`),
 > `trussbars-macros` (`partials = […]` clause parse + per-file read & dep-track). Gate: v2
-> conformance **71/71, 0 drift** (in-source partials unchanged); cross-file behaviour covered by
+> conformance **87/87, 0 drift** (in-source partials unchanged); cross-file behaviour covered by
 > `trussbars-macros` render tests + `trussbars-template` emit-layer error tests.
 > **Audience:** the `truss!` proc-macro (`trussbars-macros`) and the v2 emitter
 > (`trussbars-template`). **Resolves:** the "every `truss!` is a closed island" limitation

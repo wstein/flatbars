@@ -135,7 +135,7 @@ construction**, exactly like custom helpers (`docs/01` §11). They are gated ins
   load-time setting (the dynamic backend's home for a runtime-swappable rule), the single
   `truthy_at` decision point applies it, and the numeric AOT-compat rejection fires only under
   `NonEmpty`. A non-default policy renders via the tree-walk, not the `NonEmpty` bytecode fast
-  path. `truss-interp --truthiness=<Mode>` exposes it; `harness.mjs --interp`/`--vm-compat` stay 71/71.
+  path. `truss-interp --truthiness=<Mode>` exposes it; `harness.mjs --interp`/`--vm` stay 76/76.
 - **Friendlier diagnostic — DONE.** `TruthyIn` carries `#[diagnostic::on_unimplemented]`, so a
   numeric (or otherwise un-impl'd) condition reports *"`i64` is not truthy under the `NonEmpty`
   policy"* with notes to write a comparison, select a policy, or impl `TruthyIn` — and `rustc`

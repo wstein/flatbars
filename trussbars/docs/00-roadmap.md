@@ -32,7 +32,7 @@ v2 is built against a settled language, not a moving one.**
    literals, collection filters (`where`/`reject`/`find`/`some`/`every`), and enum
    context types are all IN; `dict` literals + data-enum dispatch are the two
    type-aware items deliberately → v2.
-2. **Corpus hardened (56/56 at freeze; now 71/71 — `conformance/report.json`).** `ctxgen`
+2. **Corpus hardened (56/56 at freeze; now 87/87 — `conformance/report.json`).** `ctxgen`
    synthesizes enums (S4 conformance-gated); escaping-heavy + deep-nesting edges added. The
    corpus has since grown to 71 cases (dict-nested et al. added during v2); the gate score
    is the committed `report.json`, not this freeze-time milestone.
@@ -182,11 +182,11 @@ strict-native direction:
 - `20-numeric-literal-coercion.md` — **DONE** (F2). A numeric literal in operator position emits
   as `trussbars_core::NumLit`, coercing against any numeric field type (`views: i64` works with
   `> 100`) by widening to the f64 model; string ordering untouched, string-vs-number a compile
-  error. v2-conformance 71/71, 0 drift.
+  error. v2-conformance 87/87, 0 drift.
 - `21-cross-file-partials.md` — **DONE** (#4). `truss!(…, partials = [name = "file.truss"])`
   imports partials from other files (shared header/footer, sub-context partials, `{{yield}}`
   layouts), resolved by the inline mechanism. Per-source error spans (`(in partial 'name')`);
-  duplicate name = compile error. v2-conformance 71/71, 0 drift.
+  duplicate name = compile error. v2-conformance 87/87, 0 drift.
 - `22-derive-template.md` — **PROPOSED** (#5) `#[derive(Template)]` — a struct owns its template
   (`#[template(source|path=…, helpers/truthiness/partials=…)]`), fields are the context; generates
   the `Template` trait (`render`/`render_into`) + `Display`. Reuses the emitter; surface-agnostic.

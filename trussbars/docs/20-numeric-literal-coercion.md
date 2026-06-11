@@ -12,7 +12,7 @@
 > helper args, and `trussbars_std` calls are untouched (no broad literal-emission change, no
 > `Display`/`From` plumbing needed). The accepted consequences: `i64_field + 1` is `f64`
 > (the §8 model), and `name > 100` (string vs number) is a compile error. Verified
-> byte-identical by the v2 conformance gate (`test:trussbars-v2`, 71/71, 0 drift).
+> byte-identical by the v2 conformance gate (`test:trussbars-v2`, 87/87, 0 drift).
 
 ## 1. The problem
 
@@ -92,7 +92,7 @@ impl PartialOrd<NumLit> for i64 { … as f64 … }   impl PartialOrd<i64> for Nu
   one, consistent with §5.1/§5.3.
 - **Conformance:** `f64` fields compare/arith against `NumLit` bit-identically to today's
   `f64` literal (`f64 op NumLit` widens nothing), so output is unchanged. Re-run as the
-  acceptance gate: `npm run test:trussbars-v2` → **71/71, 0 drift** (and the default
+  acceptance gate: `npm run test:trussbars-v2` → **87/87, 0 drift** (and the default
   PureScript-emitter path is untouched, since `NumLit` is a v2-emitter concern).
 
 **Costs / accepted consequences:**
@@ -137,7 +137,7 @@ surface. The three judgement calls were resolved as:
   runtime `false` without runtime dispatch, and the stricter caught error is the better
   failure mode in a typed setting.
 
-The conformance re-run was part of the gate: `test:trussbars-v2` is **71/71, 0 drift**.
+The conformance re-run was part of the gate: `test:trussbars-v2` is **87/87, 0 drift**.
 
 **Implemented in:** `trussbars-core` (`numlit.rs`, the `NumLit` type + macro-generated impls),
 `trussbars-template` (`emit::emit_operand`, wrapping numeric-literal `bin_op` operands).
