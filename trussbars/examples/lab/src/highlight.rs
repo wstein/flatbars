@@ -31,8 +31,10 @@ pub fn apply(ta: &mut TextArea<'static>, text: &str) {
 
 fn sigil_style(sigil: Sigil) -> Style {
     match sigil {
-        Sigil::Output | Sigil::Raw => Style::new().fg(Color::Cyan),
-        Sigil::Open | Sigil::Close => Style::new().fg(Color::Magenta),
+        // Escaped output `{{ x }}` (raw output is `{{ x | safe }}` now — same Output sigil).
+        Sigil::Output => Style::new().fg(Color::Cyan),
+        // Block opens/closes and clause separators (`{% else %}`/`{% elif %}`/`{% when %}`).
+        Sigil::Open | Sigil::Close | Sigil::Clause => Style::new().fg(Color::Magenta),
         Sigil::Partial => Style::new().fg(Color::Blue),
         Sigil::Comment => Style::new().fg(Color::DarkGray),
     }
@@ -92,19 +94,20 @@ mod tests {
     fn each_sigil_keeps_its_colour() {
         // The per-sigil contract (a colour regression would otherwise pass silently).
         assert_eq!(sigil_style(Sigil::Output).fg, Some(Color::Cyan));
-        assert_eq!(sigil_style(Sigil::Raw).fg, Some(Color::Cyan));
         assert_eq!(sigil_style(Sigil::Open).fg, Some(Color::Magenta));
         assert_eq!(sigil_style(Sigil::Close).fg, Some(Color::Magenta));
+        assert_eq!(sigil_style(Sigil::Clause).fg, Some(Color::Magenta));
         assert_eq!(sigil_style(Sigil::Partial).fg, Some(Color::Blue));
         assert_eq!(sigil_style(Sigil::Comment).fg, Some(Color::DarkGray));
     }
 
     #[test]
     fn apply_highlights_without_panicking() {
-        // Multibyte content + a recovered lex are both fine.
+        // Multibyte content + a recovered lex are both fine. The block uses the current
+        // `{% for … %}` grammar (ADR-039), so it exercises the Open/Close sigils too.
         let mut ta = TextArea::new(vec![
             "== {{t \"x\"}} ==".into(),
-            "{{#each xs}}{{/each}}".into(),
+            "{% for xs %}{{x}}{% endfor %}".into(),
         ]);
         let text = ta.lines().join("\n");
         apply(&mut ta, &text);
