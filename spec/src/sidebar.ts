@@ -183,6 +183,10 @@ export const sidebar = [
         "link": "/adr/adr-0041-per-surface-lexer-parser/"
       },
       {
+        "label": "ADR-042: numeric predicates, ~concat, typed inline",
+        "link": "/adr/adr-0042-numeric-predicates-plus-concat-typed-inline/"
+      },
+      {
         "label": "Final ADR review (2026-06-01)",
         "link": "/adr/adr-final-review/"
       }
