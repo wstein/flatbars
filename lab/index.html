@@ -3013,9 +3013,9 @@
           lastSegments: [],
           lastData: null,    // the post-transform data the template rendered (Render Data view)
           lastProgram: null, // the compiled wire program, for the Bytecode view
+          lastSegViews: [],  // [{from,to,file,kind,start,end}] — segment char ranges in the output editor
         },
       };
-      let lastSegViews = []; // [{from,to,file,kind,start,end}] — segment char ranges in the output editor
       let lastUsedTransformers = []; // ADR-0013 report: transformer names called by the compiled program
       let dockProblems = []; // diagnostics for the Problems tab, refreshed each run()
       let hadProblems = false; // tracks the 0->>0 transition so the dock auto-opens once
@@ -3203,7 +3203,7 @@
       // language, with the source-map provenance as decorations.
       function paintTextView() {
         if (outputView === "bytecode") {
-          lastSegViews = [];
+          ctx.caches.lastSegViews = [];
           setOutputDoc(ctx.caches.lastProgram ? disassemble(ctx.caches.lastProgram) : "", Decoration.none);
         } else if (outputView === "data") {
           let text = "";
@@ -3211,13 +3211,13 @@
             try { text = dumpYaml(ctx.caches.lastData, { indent: 2, lineWidth: -1, noRefs: true }); }
             catch { text = String(ctx.caches.lastData); }
           }
-          lastSegViews = [];
+          ctx.caches.lastSegViews = [];
           setOutputDoc(text, Decoration.none);
         } else if (outputView === "compiled") {
           // The template compiled to a JS module (the `compile-js` engine
           // extension). Errors come back as a `// …` comment so the pane stays
           // valid-looking JS.
-          lastSegViews = [];
+          ctx.caches.lastSegViews = [];
           let text = "// this engine has no compiler";
           if (typeof renderer.compileToJs === "function") {
             const r = renderer.compileToJs(templateSourceFor("main"), partialsMap(), { compat: minbarsCompat });
@@ -3229,7 +3229,7 @@
           // `migrate` engine extension). Residuals the migrator could not safely
           // rewrite are surfaced as leading `{{! … }}` MaxBars comments, so the
           // pane stays valid MaxBars and a clean migration shows pure source.
-          lastSegViews = [];
+          ctx.caches.lastSegViews = [];
           let text = "{{! this engine has no migrator }}";
           if (typeof renderer.migrate === "function") {
             const r = renderer.migrate(templateSourceFor("main"));
@@ -3245,7 +3245,7 @@
           setOutputDoc(text, Decoration.none);
         } else {
           const { segViews, deco } = buildProvenance(ctx.caches.lastOutput, ctx.caches.lastSegments);
-          lastSegViews = segViews;
+          ctx.caches.lastSegViews = segViews;
           setOutputDoc(ctx.caches.lastOutput, deco);
         }
         updateOutLang();
@@ -3341,7 +3341,7 @@
       // output offsets are UTF-16 code units (JS string indices), so `segmentRanges`
       // uses them directly — NO byte↔char conversion (which drifts every mark after a
       // multibyte char, the misalignment bug). Each mark carries its index in
-      // lastSegViews via data-i so hover/click can recover the segment.
+      // ctx.caches.lastSegViews via data-i so hover/click can recover the segment.
       function buildProvenance(output, segments) {
         if (!segments.length) return { segViews: [], deco: Decoration.none };
         const segViews = segmentRanges(output, segments);
@@ -3944,7 +3944,7 @@
         if (key === caretLinkKey) return;
         caretLinkKey = key;
         const ranges = [];
-        for (const sv of lastSegViews) {
+        for (const sv of ctx.caches.lastSegViews) {
           const hit = partial
             ? sv.file === partial
             : (sv.file === file && sv.start !== null && sv.start <= pos && pos < sv.end);
@@ -3971,22 +3971,22 @@
       // Keyboard parity: Enter on the output editor jumps from the run under the
       // cursor to its source (arrows/Home/End navigate via the default keymap).
       function jumpToSourceAtCursor(view) {
-        if (outputView !== "source" || !lastSegViews.length)
+        if (outputView !== "source" || !ctx.caches.lastSegViews.length)
           return false;
         const pos = view.state.selection.main.head;
-        const sv = lastSegViews.find((s) => pos >= s.from && pos < s.to)
-          || lastSegViews.find((s) => pos === s.to);
+        const sv = ctx.caches.lastSegViews.find((s) => pos >= s.from && pos < s.to)
+          || ctx.caches.lastSegViews.find((s) => pos === s.to);
         if (!sv) return false;
         openSourceLocation(sv.file, sv.start, sv.end);
         return true;
       }
 
       // Hover/click on the output editor's runs. The provenance marks render as
-      // `.seg` spans carrying data-i (index into lastSegViews); event delegation
+      // `.seg` spans carrying data-i (index into ctx.caches.lastSegViews); event delegation
       // on the stable contentDOM survives CM's viewport re-rendering.
       (() => {
         const content = outputEditor.contentDOM;
-        const svOf = (el) => { const s = el?.closest?.(".seg"); return s ? lastSegViews[Number(s.dataset.i)] : null; };
+        const svOf = (el) => { const s = el?.closest?.(".seg"); return s ? ctx.caches.lastSegViews[Number(s.dataset.i)] : null; };
         // Debounce hover so sweeping the pointer across many runs only shows the
         // tooltip + link-highlight for the run the pointer settles on.
         let hoverTimer = null;
