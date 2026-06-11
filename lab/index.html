@@ -1721,6 +1721,7 @@
       import { renderTruthiness } from "./app/dock/truthiness.mjs?v=1";
       import { renderLint } from "./app/dock/lint.mjs?v=1";
       import { renderProblems } from "./app/dock/problems.mjs?v=1";
+      import { renderContext } from "./app/dock/context.mjs?v=1";
       import { TRANSFORMER_RISK } from "./app/transformer-risk.mjs?v=1";
       import { EditorState, Annotation, StateField, StateEffect, Compartment } from "https://esm.sh/@codemirror/state@6.5.2/es2022/state.mjs";
       import {
@@ -5023,10 +5024,7 @@
 
       // A source slice can be a long, multi-line literal (e.g. a whole <style>
       // block); collapse it to one trimmed line for compact inspector labels.
-      const oneLineLabel = (text, max = 60) => {
-        const flat = text.replace(/\s+/g, " ").trim();
-        return flat.length > max ? flat.slice(0, max) + "…" : flat;
-      };
+      // oneLineLabel moved into ./app/dock/context.mjs (its only consumer).
 
       function dockVisible() { return !byId("dock").hidden; }
 
@@ -5165,7 +5163,8 @@
         // not analyses with a count — `noBadge` suppresses the badge — and follow
         // the active file / last render (re-rendered by renderDock after each run).
         { id: "context", label: "Context Inspector", noBadge: true, requires: ["context-inspect"],
-          count: () => 0, badge: () => "", render: renderContext },
+          count: () => 0, badge: () => "", render: (body) => renderContext(body,
+            { ctxTarget, program: lastProgram, data: lastData, inspectAt: renderer.inspectAt, minbarsCompat }) },
         { id: "ast", label: "Syntax Tree", noBadge: true,
           count: () => 0, badge: () => "", render: renderAst },
       ];
@@ -5368,90 +5367,11 @@
       // Context Inspector: snapshots of the render context at the last-clicked
       // output span, from the engine's `inspect_at` — one card per execution
       // (loop bodies yield one per iteration).
-      function renderContext(body) {
-        const pane = makeEl("div", { class: "ctx-pane" });
-        // Context Inspector reads render-time scope at a Stem source span.
-        if (!ctxTarget || !lastProgram) {
-          pane.append(makeEl("div", { class: "ctx-hint" },
-            "Click an expression in the Plain Text output to inspect its scope here. " +
-            "Loop bodies produce one snapshot per iteration."));
-          body.append(pane);
-          return;
-        }
-        let snaps;
-        try {
-          snaps = renderer.inspectAt(
-            lastProgram, lastData,
-            { file: ctxTarget.file, start: ctxTarget.start, end: ctxTarget.end },
-            // MinBars only: the inspector rule must match the source map that produced
-            // the clicked target (the Lab's MinBars default is mustache.js-compat).
-            // FlatBars dialects ignore the opts argument.
-            { compat: minbarsCompat }
-          );
-        } catch (err) {
-          pane.append(makeEl("div", { class: "ctx-hint" }, "inspect error: " + err.message));
-          body.append(pane);
-          return;
-        }
-        pane.append(makeEl("div", { class: "ctx-hint" },
-          `${snaps.length} snapshot${snaps.length === 1 ? "" : "s"} at \`${oneLineLabel(ctxTarget.label)}\`` +
-          " · re-execute-on-demand, no live trace"));
-        snaps.forEach((s, i) => pane.append(renderSnap(s, i)));
-        if (!snaps.length) {
-          pane.append(makeEl("div", { style: "padding:8px 2px;color:var(--fg-muted);font-size:12px" },
-            "This span was never reached during render."));
-        }
-        body.append(pane);
-      }
+      // Context Inspector (renderContext + the snapTitle/renderSnap/ctxSnippet/
+      // ctxType/oneLineLabel helpers) now lives in ./app/dock/context.mjs — it
+      // takes ctxTarget, the lastProgram/lastData caches, renderer.inspectAt, and
+      // the MinBars compat flag (the descriptor above passes them).
 
-      // Title a snapshot by its iteration when it comes from a loop body — the
-      // engine hoists @index/@key onto each snapshot — so 50 cards read as
-      // "@index 0 · @key …" rather than an anonymous "#1..#50" flip-book.
-      function snapTitle(snap, i) {
-        if (snap.index === null || snap.index === undefined) return "#" + (i + 1);
-        const key = snap.key === null || snap.key === undefined
-          ? ""
-          : " · @key " + (typeof snap.key === "string" ? snap.key : String(snap.key));
-        return "@index " + snap.index + key;
-      }
-
-      function renderSnap(snap, i) {
-        const head = makeEl("div", { class: "ctx-snap-head" }, [
-          makeEl("span", { class: "ix" }, snapTitle(snap, i)),
-          makeEl("span", { class: "src" }, oneLineLabel(ctxTarget.label)),
-        ]);
-        const rows = [
-          ["@this", snap.this], ["@parent", snap.parent], ["@root", snap.root],
-          ["@index", snap.index], ["@index1", snap.index1], ["@key", snap.key],
-          ["@first", snap.first], ["@last", snap.last],
-        ].filter(([, v]) => v !== null && v !== undefined);
-        for (const [k, v] of Object.entries(snap.locals || {})) rows.push([k, v]);
-        const table = makeEl("div", { class: "ctx-snap-table" });
-        for (const [k, v] of rows) {
-          table.append(makeEl("span", { class: "key" }, k));
-          table.append(makeEl("span", { class: "val" }, [
-            ctxSnippet(v),
-            makeEl("span", { class: "ty" }, ctxType(v)),
-          ]));
-        }
-        return makeEl("div", { class: "ctx-snap" }, [head, table]);
-      }
-      // The Context Inspector exists to *see* the scope, so show the value in
-      // full — pretty-printed for objects/arrays — and let the cell wrap (and
-      // scroll past a bounded height). Truncating here defeated the purpose.
-      function ctxSnippet(v) {
-        if (v === null || v === undefined) return "—";
-        if (typeof v === "object") {
-          try { return JSON.stringify(v, null, 2); } catch { return "[object]"; }
-        }
-        if (typeof v === "string") return JSON.stringify(v);
-        return String(v);
-      }
-      function ctxType(v) {
-        if (v === null) return "null";
-        if (Array.isArray(v)) return `array(${v.length})`;
-        return typeof v;
-      }
 
       // Point the Context Inspector at a clicked output segment (emit/expr runs
       // only; literal text has no inspectable scope). Opens the Context tab when
