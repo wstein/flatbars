@@ -59,7 +59,6 @@ import FlatBars.Error (ParseError)
 import FlatBars.Lexer (RawTok(..), defaultLexConfig, tokenizeTemplate)
 import FlatBars.Span (Span)
 import FlatBars.Syntax (Sigil(..))
-import FlatBars.Token (defaultLexOptions)
 import Kernel.Prelude (blockHelperNames, loopFieldCanonical)
 
 -- | One flagged construct the migrator could not (or should not) rewrite
@@ -98,7 +97,7 @@ migrateToMaxBars src = do
   -- interior tokens `tokenizeTemplate` populates are unused here (it has no
   -- structure-only mode). Wasted work, but the migrator is a rare offline tool —
   -- not a bug to "fix" by dropping the interior.
-  toks <- tokenizeTemplate defaultLexConfig defaultLexOptions src
+  toks <- tokenizeTemplate defaultLexConfig src
   let
     delimResiduals = scanSetDelimiters src
     walk = rewrite src toks

@@ -52,7 +52,7 @@ import Data.String.CodeUnits as SCU
 import FlatBars.Lexer (LexConfig, RawTok(..), tokenizeTemplate)
 import FlatBars.Span (Span)
 import FlatBars.Syntax (Sigil(..))
-import FlatBars.Token (Interior, LexOptions, Token(..))
+import FlatBars.Token (Interior, Token(..))
 
 -- | A positioned highlight span: UTF-16 offsets `[from, to)` into the source and
 -- | a stable `kind` tag the presenter maps to a CSS class. Every span is one
@@ -77,9 +77,9 @@ type TSpan = { from :: Int, to :: Int, kind :: String, role :: String }
 -- | `mustacheDelims` for the `{{=A B=}}` set-delimiter tag); `clauseSeps` is the
 -- | dialect's clause-separator names, so `{{else}}` / `{{elif …}}` are coloured as
 -- | statements only where the dialect treats them as separators (empty for
--- | MinBars, where `else` is a variable); `lexOptions` is the *interior* lexer's
--- | dialect seam (`operatorChars`), so a dialect that lists `+`/`-`/`*`/`/`…
--- | tokenizes them as operators while the others keep them path punctuation.
+-- | MinBars, where `else` is a variable). (The interior expression grammar is the
+-- | shared path/name-only one — the infix-operator interior is MaxBars-only and
+-- | runs through `MaxBars.Highlight`, not this config.)
 -- |
 -- | `extras` and `inheritance` are the parser's own dialect gates (the same
 -- | fields `ParseOptions` carries): when off, the structurally-valid shapes the
@@ -91,7 +91,6 @@ type TSpan = { from :: Int, to :: Int, kind :: String, role :: String }
 type HighlightConfig =
   { lexConfig :: LexConfig
   , clauseSeps :: Array String
-  , lexOptions :: LexOptions
   , extras :: Boolean
   , inheritance :: Boolean
   -- the two raw-block spellings, gated separately (mirrors `ParseOptions`):
@@ -106,7 +105,7 @@ type HighlightConfig =
 -- | where the engine would have stopped — the highlighter never disagrees with the
 -- | lexer.
 tokenizeSpans :: HighlightConfig -> String -> Array TSpan
-tokenizeSpans cfg src = case tokenizeTemplate cfg.lexConfig cfg.lexOptions src of
+tokenizeSpans cfg src = case tokenizeTemplate cfg.lexConfig src of
   Left _ -> []
   Right toks -> Array.concatMap spansOf toks
   where

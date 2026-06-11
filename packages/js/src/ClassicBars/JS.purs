@@ -88,7 +88,6 @@ import FlatBars.Highlight (HSpan, HighlightConfig, TSpan, highlightSpans, tokeni
 import FlatBars.Json (fromJson, toJson)
 import FlatBars.Lexer (defaultLexConfig)
 import FlatBars.Span (Span, lineColumn, spanText)
-import FlatBars.Token (defaultLexOptions)
 import FlatBars.Value (Value(..))
 import Foreign.Object as FO
 import Kernel.Analyse (Finding, PathSchema) as Analyse
@@ -795,16 +794,13 @@ diagnostics = mkFn2 \src dialect ->
 
 -- | Map a dialect name to its highlight seams, mirroring each dialect's own parse
 -- | settings (the single source of truth — drift is caught by `check:highlight`):
--- | RawBars/MaxBars/MinBars enable the `{{=A B=}}` set-delimiter tag
--- | (`mustacheDelims`), ClassicBars does not; the kernel dialects treat
--- | `else`/`elif` as clause separators, MinBars (Mustache) treats none; only
--- | MaxBars enables the infix-arithmetic interior lexer (`lexOptions.operatorChars`),
--- | so `+`/`-`/`*`/`/` carve as `operator` spans there and stay path punctuation
--- | elsewhere (`tokenize`'s interior axis, ADR-017). `extras`
--- | / `inheritance` mirror each dialect's parse gates, so a shape the dialect
--- | rejects is coloured `error` rather than painted valid: RawBars/MaxBars set
--- | `extras = false`; only MinBars enables `inheritance` (the Mustache
--- | `{{<}}`/`{{$}}` shapes).
+-- | RawBars/MinBars enable the `{{=A B=}}` set-delimiter tag (`mustacheDelims`),
+-- | ClassicBars does not; the kernel dialects treat `else`/`elif` as clause
+-- | separators, MinBars (Mustache) treats none. `extras` / `inheritance` mirror each
+-- | dialect's parse gates, so a shape the dialect rejects is coloured `error` rather
+-- | than painted valid: RawBars sets `extras = false`; only MinBars enables
+-- | `inheritance` (the Mustache `{{<}}`/`{{$}}` shapes). The interior grammar is the
+-- | shared path/name one (`+`/`-`/`*`/`/` stay path punctuation).
 -- | (MaxBars is not here — it owns its highlighter, `MaxBars.Highlight`, ADR-041.)
 highlightConfig :: String -> Highlight.HighlightConfig
 highlightConfig = case _ of
@@ -818,7 +814,6 @@ highlightConfig = case _ of
     -- statement tags (docs-19, `statementTags` on for RawBars) highlight too.
     { lexConfig: RawBars.coreOptions.lexConfig { keepLongComments = true }
     , clauseSeps: RawBars.coreOptions.standaloneSeps
-    , lexOptions: defaultLexOptions
     , extras: false
     , inheritance: false
     , rawBlockHbs: false
@@ -827,7 +822,6 @@ highlightConfig = case _ of
   "minbars" ->
     { lexConfig: withSetDelims
     , clauseSeps: []
-    , lexOptions: defaultLexOptions
     , extras: true
     , inheritance: true
     -- Mustache has no raw blocks: neither spelling.
@@ -837,7 +831,6 @@ highlightConfig = case _ of
   _ ->
     { lexConfig: defaultLexConfig { keepLongComments = true }
     , clauseSeps: kernelClauses
-    , lexOptions: defaultLexOptions
     , extras: true
     , inheritance: false
     -- ClassicBars is Handlebars-faithful: the bare `{{{{name}}}}` only.

@@ -106,12 +106,12 @@ parseMin = parseMinWith minLexConfig
 parseMinWith
   :: LexConfig -> String -> Either ParseError { directives :: Array Directive, nodes :: Template }
 parseMinWith cfg src = do
-  toks <- tokenizeTemplate cfg minOptions.lexOptions src
+  toks <- tokenizeTemplate cfg src
   directives <- collectDirectives toks
   -- buildFromTokens reports all errors (NonEmptyArray); parseMinWith keeps the
   -- simpler `ParseError`, so take the first.
   nodes <- lmap NEA.head
-    (buildFromTokens minOptions (mustacheStandalone minOptions.lexOptions toks))
+    (buildFromTokens minOptions (mustacheStandalone toks))
   pure { directives, nodes }
 
 -- | One-shot pure render of MinBars (Mustache) source against root data.

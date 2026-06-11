@@ -20,7 +20,7 @@ import Effect.Console (log)
 import FlatBars (Expr(..), Node(..), ParseError(..), Sigil(..), Value(..), defaultParseOptions, parse, parseErrorAt, parseRecovering, parseWith, spanText)
 import FlatBars.Highlight (HighlightConfig, highlightSpans, tokenizeSpans)
 import FlatBars.Lexer (RawTok(..), defaultLexConfig, tokenizeTemplate)
-import FlatBars.Token (LexOptions, Token(..), defaultLexOptions, infixOperatorChars, tokenizeInterior)
+import FlatBars.Token (Token(..), tokenizeInterior)
 import Kernel.ToValue (toValue)
 import Kernel.Walk (Arity(..), foldExpr, foldTemplate, splitClause, splitClauses, validate)
 import Test.Assert (assert')
@@ -49,18 +49,18 @@ interiorTokens = case _ of
   _ -> Nothing
 
 -- P2 invariant: a tag's carried interior is *exactly* `tokenizeInterior` of its
--- own (base, string) — under the same `LexOptions` it was built with. Catches a
--- construction site pairing the wrong base/string (e.g. RRaw's body slipping into
--- the interior slot) or a future mutation that rewrites the string but forgets to
--- re-lex. (RRaw carries its HEAD interior; the body is verbatim.)
-interiorMatches :: LexOptions -> RawTok -> Boolean
-interiorMatches lx = case _ of
-  ROutput _ base s int -> int == tokenizeInterior lx base s
-  RAmp _ base s int -> int == tokenizeInterior lx base s
-  ROpen _ _ base s int -> int == tokenizeInterior lx base s
-  RClose _ base s int -> int == tokenizeInterior lx base s
-  RSep _ base s int -> int == tokenizeInterior lx base s
-  RRaw _ _ base head int _ -> int == tokenizeInterior lx base head
+-- own (base, string). Catches a construction site pairing the wrong base/string
+-- (e.g. RRaw's body slipping into the interior slot) or a future mutation that
+-- rewrites the string but forgets to re-lex. (RRaw carries its HEAD interior; the
+-- body is verbatim.)
+interiorMatches :: RawTok -> Boolean
+interiorMatches = case _ of
+  ROutput _ base s int -> int == tokenizeInterior base s
+  RAmp _ base s int -> int == tokenizeInterior base s
+  ROpen _ _ base s int -> int == tokenizeInterior base s
+  RClose _ base s int -> int == tokenizeInterior base s
+  RSep _ base s int -> int == tokenizeInterior base s
+  RRaw _ _ base head int _ -> int == tokenizeInterior base head
   _ -> true
 
 -- foldTemplate node counter (descends into block bodies).
@@ -85,7 +85,6 @@ hlKernel :: HighlightConfig
 hlKernel =
   { lexConfig: defaultLexConfig { keepLongComments = true }
   , clauseSeps: [ "else", "elif" ]
-  , lexOptions: defaultLexOptions
   , extras: true
   , inheritance: false
   , rawBlockHbs: true -- ClassicBars: the bare `{{{{name}}}}` (Handlebars)
@@ -96,28 +95,15 @@ hlMustache :: HighlightConfig
 hlMustache =
   { lexConfig: defaultLexConfig { mustacheDelims = true, keepLongComments = true }
   , clauseSeps: []
-  , lexOptions: defaultLexOptions
   , extras: true
   , inheritance: true
   , rawBlockHbs: false -- Mustache has no raw blocks: neither spelling
   , rawBlockHash: false
   }
 
--- MaxBars-like: extras off (so `{{&}}`/`{{^}}`/`{{{{…}}}}` are disallowed shapes),
--- inheritance off, and the infix-arithmetic interior lexer on. The tag-role view
--- (`highlightSpans`) still colours the whole tag by its head's meaning; the
--- interior-role view (`tokenizeSpans`, ADR-017) additionally carves operators and
--- literals into their own spans.
-hlMax :: HighlightConfig
-hlMax =
-  { lexConfig: defaultLexConfig { keepLongComments = true }
-  , clauseSeps: [ "else", "elif" ]
-  , lexOptions: { operatorChars: infixOperatorChars, rangeOperator: true, collectionLiterals: true }
-  , extras: false
-  , inheritance: false
-  , rawBlockHbs: false -- MaxBars: the `{{{{#name}}}}` FlatBars spelling only
-  , rawBlockHash: true
-  }
+-- (The MaxBars-config highlighter — extras off, the infix interior lexer — moved to
+-- `MaxBars.Highlight` with the front-end fork, ADR-041; it is pinned by the maxbars
+-- highlight golden, `check:highlight`.)
 
 kinds :: HighlightConfig -> String -> Array String
 kinds cfg src = map _.kind (highlightSpans cfg src)
@@ -547,23 +533,15 @@ main = do
     )
 
   -- Dialect gates (ADR-014): a structurally-valid shape the dialect REJECTS is
-  -- coloured `error`, never painted valid. `extras = false` (MaxBars) disallows
-  -- `{{&}}` (unescaped), `{{^}}` (inverse), and `{{{{…}}}}` (raw block).
-  assert' "highlight: extras-off disallows {{&x}} → error"
-    (kinds hlMax "{{&x}}" == [ "error" ])
-  assert' "highlight: extras-off disallows {{^x}} (inverse) → error, close stays block-close"
-    (kinds hlMax "{{^x}}b{{/x}}" == [ "error", "block-close" ])
+  -- coloured `error`, never painted valid. (The `extras = false` MaxBars cases —
+  -- `{{&}}`/`{{^}}` → error — live in the maxbars highlight golden now.)
   -- Raw blocks have two spellings gated separately. ClassicBars accepts the bare
-  -- Handlebars `{{{{r}}}}` and rejects the FlatBars `{{{{#r}}}}`; MaxBars/RawBars
-  -- are the mirror; MinBars rejects both (Mustache has no raw blocks).
+  -- Handlebars `{{{{r}}}}` and rejects the FlatBars `{{{{#r}}}}`; MinBars rejects
+  -- both (Mustache has no raw blocks).
   assert' "highlight: ClassicBars allows the bare {{{{r}}}} raw block"
     (kinds hlKernel "{{{{r}}}}b{{{{/r}}}}" == [ "raw-block" ])
   assert' "highlight: ClassicBars rejects the {{{{#r}}}} FlatBars spelling → error"
     (kinds hlKernel "{{{{#r}}}}b{{{{/r}}}}" == [ "error" ])
-  assert' "highlight: MaxBars rejects the bare {{{{r}}}} → error"
-    (kinds hlMax "{{{{r}}}}b{{{{/r}}}}" == [ "error" ])
-  assert' "highlight: MaxBars allows the {{{{#r}}}} FlatBars spelling"
-    (kinds hlMax "{{{{#r}}}}b{{{{/r}}}}" == [ "raw-block" ])
   assert' "highlight: MinBars (Mustache) rejects raw blocks → error"
     (kinds hlMustache "{{{{#r}}}}b{{{{/r}}}}" == [ "error" ])
   -- …but with extras on (Mustache) the {{^}}/{{&}} shapes are valid kinds.
@@ -575,12 +553,8 @@ main = do
         [ "error", "error", "block-close", "block-close" ]
     )
 
-  -- A tag is ONE span coloured by its head's meaning; interior literals and
-  -- operators carry no colour of their own (they stay the tag's colour).
-  assert' "highlight: a MaxBars tag with an operator is one expr span"
-    (highlightSpans hlMax "{{ a + b }}" == [ { from: 0, to: 11, kind: "expr" } ])
-  assert' "highlight: strings and numbers do not split the tag"
-    (highlightSpans hlMax "{{ x ?? \"y\" }}" == [ { from: 0, to: 14, kind: "expr" } ])
+  -- A tag is ONE span coloured by its head's meaning; interior literals carry no
+  -- colour of their own (they stay the tag's colour).
   assert' "highlight: a simple {{name}} is one chunk"
     (kinds hlKernel "{{name}}" == [ "expr" ])
   assert' "highlight: a numeric literal in a block arg does not punch a number span"
@@ -590,28 +564,15 @@ main = do
   -- tag-role spans `highlightSpans` returns PLUS interior `string`/`number`/
   -- `operator` literals carved at their exact source spans. Each interior span is
   -- nested inside its tag span.
-  assert' "tokenize: a MaxBars operator carves an interior operator span"
-    ( tokenizeSpans hlMax "{{ a + b }}" ==
-        [ { from: 0, to: 11, kind: "expr", role: "tag" }
-        , { from: 5, to: 6, kind: "operator", role: "interior" }
-        ]
-    )
-  assert' "tokenize: strings and numbers carve interior spans, identifiers do not"
-    ( tokenizeSpans hlMax "{{ x ?? \"y\" }}" ==
-        [ { from: 0, to: 14, kind: "expr", role: "tag" }
-        , { from: 5, to: 7, kind: "operator", role: "interior" }
-        , { from: 8, to: 11, kind: "string", role: "interior" }
-        ]
-    )
   assert' "tokenize: a numeric literal in a block arg carves a number span"
     ( tokenizeSpans hlKernel "{{#if (gt x 5)}}" ==
         [ { from: 0, to: 16, kind: "block-open", role: "tag" }
         , { from: 12, to: 13, kind: "number", role: "interior" }
         ]
     )
-  -- Off MaxBars, `+`/`-`/`*`/`/` are path punctuation, not operators — so a kernel
-  -- dialect carves no operator span for them (the interior seam is `lexOptions`).
-  assert' "tokenize: kernel dialect does not treat path punctuation as operators"
+  -- In the shared path/name grammar, `+`/`-`/`*`/`/` are path punctuation, not
+  -- operators — so no operator span is carved (the infix interior is MaxBars-only).
+  assert' "tokenize: shared dialect does not treat path punctuation as operators"
     ( tokenizeSpans hlKernel "{{ a-b }}" ==
         [ { from: 0, to: 9, kind: "expr", role: "tag" } ]
     )
@@ -620,54 +581,48 @@ main = do
     (tokenizeSpans hlKernel "{{> p}}" == [ { from: 0, to: 7, kind: "partial", role: "tag" } ])
   -- `highlightSpans` is exactly the tag-role projection of `tokenizeSpans`.
   assert' "tokenize: highlightSpans is tokenizeSpans filtered to role == tag"
-    ( map _.kind (highlightSpans hlMax "{{ x ?? \"y\" }}")
+    ( map _.kind (highlightSpans hlKernel "{{#if (gt x 5)}}")
         == map _.kind
-          (Array.filter (\s -> s.role == "tag") (tokenizeSpans hlMax "{{ x ?? \"y\" }}"))
+          (Array.filter (\s -> s.role == "tag") (tokenizeSpans hlKernel "{{#if (gt x 5)}}"))
     )
 
   -- ---- The interior `tokenizeTemplate` carries on each RawTok ----
   -- The parser and highlighter both read this pre-lexed interior off the token.
-  -- These pin the two non-trivial properties — raw blocks carry their HEAD
-  -- interior (not the body), and `operatorChars` is threaded through — so the carried
-  -- tokens are exactly what `outputExpr`/`headed` and the highlighter consume.
+  -- These pin the non-trivial property — raw blocks carry their HEAD interior (not
+  -- the body) — and the shared path/name interior grammar (`+` is path punctuation,
+  -- not an operator). (The infix interior is MaxBars-only, `MaxBars.Token`.)
   let
-    interiorToksOf lx src =
-      case tokenizeTemplate defaultLexConfig lx src of
+    interiorToksOf src =
+      case tokenizeTemplate defaultLexConfig src of
         Right toks -> Array.findMap interiorTokens toks
         Left _ -> Nothing
-    lxOn = defaultLexOptions { operatorChars = infixOperatorChars }
   -- A raw block is one RawTok; its interior is the HEAD's tokens, not the body's.
   assert' "tokenizer: a raw block attaches its head tokens (not the verbatim body)"
-    ( interiorToksOf defaultLexOptions "{{{{raw}}}}verbatim {{x}} body{{{{/raw}}}}" == Just
+    ( interiorToksOf "{{{{raw}}}}verbatim {{x}} body{{{{/raw}}}}" == Just
         [ TIdent "raw" ]
     )
-  -- With an empty operator set, `+` is path punctuation, so `a+b` is one ident;
-  -- with the infix operator set it carves into ident/op/ident.
-  assert' "tokenizer: empty operatorChars keeps `a+b` a single ident interior"
-    (interiorToksOf defaultLexOptions "{{ a+b }}" == Just [ TIdent "a+b" ])
-  assert' "tokenizer: infix operatorChars carves `a+b` into ident/op/ident"
-    (interiorToksOf lxOn "{{ a+b }}" == Just [ TIdent "a", TOp "+", TIdent "b" ])
-  -- `=` is an ident-continuation char in both modes (the surface hash splits later).
-  assert' "tokenizer: `key=value` stays one interior ident in both modes"
-    (interiorToksOf lxOn "{{ key=val }}" == Just [ TIdent "key=val" ])
+  -- In the shared grammar `+` is path punctuation, so `a+b` is one ident.
+  assert' "tokenizer: the shared grammar keeps `a+b` a single ident interior"
+    (interiorToksOf "{{ a+b }}" == Just [ TIdent "a+b" ])
+  -- `=` is an ident-continuation char (the surface hash splits later).
+  assert' "tokenizer: `key=value` stays one interior ident"
+    (interiorToksOf "{{ key=val }}" == Just [ TIdent "key=val" ])
 
-  -- P2 + P6: over a multi-tag corpus (every tag, not just the first), under both
-  -- `operatorChars` settings, each tag's carried interior equals `tokenizeInterior`
-  -- of its own (base, string). This is the structural guard the wrapper used to
-  -- give for free; it fails deterministically on a mis-paired base/string or a
-  -- mispositioned RRaw body. (Dialect *mutation* paths — MinBars standalone — are
-  -- guarded in the minbars suite.)
-  for_ [ defaultLexOptions, lxOn ] \lx ->
-    for_
-      [ "{{x}}{{{y}}}{{&z}} {{ a.b c }}"
-      , "{{#each items}}{{this}}{{else}}{{/each}}"
-      , "{{{{raw}}}}body {{x}} more{{{{/raw}}}}"
-      , "pre {{ f 1 \"s\" }} mid {{> p}} post"
-      , "{{ a+b }}{{ c*d }}{{ key=val }}"
-      ]
-      \src -> case tokenizeTemplate defaultLexConfig lx src of
-        Right toks -> assert' ("interior invariant holds on " <> show src)
-          (Array.all (interiorMatches lx) toks)
-        Left _ -> assert' ("invariant corpus should lex: " <> show src) false
+  -- P2 + P6: over a multi-tag corpus (every tag, not just the first), each tag's
+  -- carried interior equals `tokenizeInterior` of its own (base, string). This is
+  -- the structural guard the wrapper used to give for free; it fails
+  -- deterministically on a mis-paired base/string or a mispositioned RRaw body.
+  -- (Dialect *mutation* paths — MinBars standalone — are guarded in the minbars suite.)
+  for_
+    [ "{{x}}{{{y}}}{{&z}} {{ a.b c }}"
+    , "{{#each items}}{{this}}{{else}}{{/each}}"
+    , "{{{{raw}}}}body {{x}} more{{{{/raw}}}}"
+    , "pre {{ f 1 \"s\" }} mid {{> p}} post"
+    , "{{ a+b }}{{ c*d }}{{ key=val }}"
+    ]
+    \src -> case tokenizeTemplate defaultLexConfig src of
+      Right toks -> assert' ("interior invariant holds on " <> show src)
+        (Array.all interiorMatches toks)
+      Left _ -> assert' ("invariant corpus should lex: " <> show src) false
 
   log "all framework tests passed"

@@ -30,7 +30,7 @@ import Data.String.Common (joinWith, trim)
 import FlatBars.Error (ParseError(..))
 import FlatBars.Span (Span)
 import FlatBars.Syntax (Sigil(..))
-import FlatBars.Token (Interior, LexOptions, tokenizeInterior)
+import FlatBars.Token (Interior, tokenizeInterior)
 
 -- | A flat template token. Comments never appear (they are dropped); `~`
 -- | whitespace control has already been applied to the `Content` runs. Each tag
@@ -337,14 +337,12 @@ type SetDelimResult =
   , trimR :: Boolean
   }
 
--- | Scan a template into the flat `RawTok` stream. `LexOptions` (the interior
--- | tokenizer's dialect seam — `operatorChars`) is threaded through so each tag's
--- | interior is lexed *here*, at scan time, and carried on the token. The
--- | structural shape is `LexOptions`-independent (tag boundaries, sigils, spans,
--- | raw bodies, set-delimiter state); `LexOptions` only governs the meaning-free
--- | interior token lexing.
-tokenizeTemplate :: LexConfig -> LexOptions -> String -> Either ParseError (Array RawTok)
-tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Nil false)
+-- | Scan a template into the flat `RawTok` stream. Each tag's interior is lexed
+-- | *here*, at scan time, by the shared path/name-only `tokenizeInterior` and
+-- | carried on the token. The structural shape (tag boundaries, sigils, spans, raw
+-- | bodies, set-delimiter state) is interior-grammar-independent.
+tokenizeTemplate :: LexConfig -> String -> Either ParseError (Array RawTok)
+tokenizeTemplate cfg src = map finalize (go 0 cfg.open cfg.close 0 [] Nil false)
   where
   cs = SCU.toCharArray src
   len = Array.length cs
@@ -352,42 +350,13 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
   -- Lex a tag interior at its source offset — the pre-lexed `Interior` every
   -- expression-bearing `RawTok` carries.
   interiorAt :: Int -> String -> Interior
-  interiorAt base s = tokenizeInterior lexOpts base s
+  interiorAt base s = tokenizeInterior base s
 
-  -- Find a tag's close delimiter from `from`. With collection literals on
-  -- (MaxBars) the scan is *brace-aware*: it balances `{ }` and skips string
-  -- literals, so a dict literal's own `}` is consumed before the tag close and
-  -- `{{#with {a: 1}}}` needs no disambiguating space (ADR-024 width detection).
-  -- Off — every other dialect, where a `{` in a tag interior is a lex error
-  -- anyway — it is the plain first-match `findFrom`, byte-identical to before. The
-  -- brace-aware scan only diverges once a `{` is seen, which those dialects never
-  -- emit, so the structural stream is unchanged for them.
+  -- Find a tag's close delimiter from `from` — the plain first match. (The
+  -- brace-aware close finder for `{k: v}` dict literals is MaxBars-only and lives in
+  -- `MaxBars.Lexer`; the dialects this shared scanner serves have no `{` interior.)
   closeFrom :: Int -> String -> Maybe Int
-  closeFrom from close
-    | lexOpts.collectionLiterals = findClose from close
-    | otherwise = findFrom cs from close
-
-  -- The brace/string-aware close finder: the `close` delimiter at brace depth 0.
-  -- A `{` opens a level, a `}` closes one (a stray `}` at depth 0 is ignored), and
-  -- a quoted string (`"…"`/`'…'`, with `\` escapes) is skipped whole — so a `}}` or
-  -- `{` inside a string never moves the depth nor ends the tag.
-  findClose :: Int -> String -> Maybe Int
-  findClose from close = scan from 0
-    where
-    scan i depth
-      | i >= len = Nothing
-      | depth == 0 && matchAt cs i close = Just i
-      | otherwise = case Array.index cs i of
-          Just '"' -> scan (skipString (i + 1) '"') depth
-          Just '\'' -> scan (skipString (i + 1) '\'') depth
-          Just '{' -> scan (i + 1) (depth + 1)
-          Just '}' -> scan (i + 1) (if depth > 0 then depth - 1 else 0)
-          _ -> scan (i + 1) depth
-    skipString j q
-      | j >= len = j
-      | Array.index cs j == Just '\\' = skipString (j + 2) q
-      | Array.index cs j == Just q = j + 1
-      | otherwise = skipString (j + 1) q
+  closeFrom from close = findFrom cs from close
 
   -- Tokens accumulate in a *reversed* `List` (O(1) prepend) and are reversed
   -- into an `Array` once, for the same O(n²)-avoidance as the content scan.

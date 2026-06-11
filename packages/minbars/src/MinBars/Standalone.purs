@@ -29,7 +29,7 @@ import Data.Maybe (Maybe(..))
 import Data.String.CodeUnits as SCU
 import FlatBars.Lexer (RawTok(..))
 import FlatBars.Syntax (Sigil(..))
-import FlatBars.Token (LexOptions, tokenizeInterior)
+import FlatBars.Token (tokenizeInterior)
 
 isSpaceCU :: Char -> Boolean
 isSpaceCU c = c == ' ' || c == '\t' || c == '\r' || c == '\n'
@@ -100,8 +100,8 @@ isPartialInterior s = case Array.head (dropWs (SCU.toCharArray s)) of
 -- | The Mustache standalone pass. Mirrors the core trim's structure (strip the
 -- | previous tag's trailing line and the following indent around each standalone
 -- | tag), then injects each standalone partial's captured indent.
-mustacheStandalone :: LexOptions -> Array RawTok -> Array RawTok
-mustacheStandalone lx toks0 = Array.mapWithIndex inject trimmed
+mustacheStandalone :: Array RawTok -> Array RawTok
+mustacheStandalone toks0 = Array.mapWithIndex inject trimmed
   where
   trimmed = Array.mapWithIndex trimContent toks0
 
@@ -164,10 +164,9 @@ mustacheStandalone lx toks0 = Array.mapWithIndex inject trimmed
   -- `Parent` open's indent re-applies to the expanded parent template's lines.
   -- Appending the indent rewrites the interior *string*, so its pre-lexed
   -- interior must be recomputed in lockstep (the token now carries an extra
-  -- trailing string literal). `lx` is MinBars' own LexOptions — the same the tree
-  -- builder would have used.
+  -- trailing string literal), through the shared path/name-only interior tokenizer.
   reindent i base s =
-    let s' = s <> " \"" <> indentAt i <> "\"" in { s: s', int: tokenizeInterior lx base s' }
+    let s' = s <> " \"" <> indentAt i <> "\"" in { s: s', int: tokenizeInterior base s' }
 
   inject :: Int -> RawTok -> RawTok
   inject i = case _ of

@@ -35,7 +35,7 @@ import FlatBars.Expr as Expr
 import FlatBars.Lexer (LexConfig, RawTok(..), defaultLexConfig, tokenizeTemplate, trimStandalone)
 import FlatBars.Span (Span)
 import FlatBars.Syntax (Directive, Expr(..), Node(..), Sigil(..), Template)
-import FlatBars.Token (Interior, LexOptions, PosToken, Token(..), defaultLexOptions)
+import FlatBars.Token (Interior, PosToken, Token(..))
 
 -- | Knobs the *front-end* (CLI/host) sets; per-file `@`-directives may override
 -- | them. `trimStandalone` toggles Handlebars-style standalone whitespace
@@ -74,7 +74,6 @@ type ParseOptions =
   , rawBlockHbs :: Boolean
   , rawBlockHash :: Boolean
   , standaloneSeps :: Array String
-  , lexOptions :: LexOptions
   , lexConfig :: LexConfig
   }
 
@@ -94,7 +93,6 @@ defaultParseOptions =
   , rawBlockHbs: true
   , rawBlockHash: false
   , standaloneSeps: [ "else", "elif" ]
-  , lexOptions: defaultLexOptions
   , lexConfig: defaultLexConfig
   }
 
@@ -115,7 +113,7 @@ parse = parseWith defaultParseOptions
 type ParseResult = { directives :: Array Directive, nodes :: Template, errors :: Array ParseError }
 
 parseRecovering :: ParseOptions -> String -> ParseResult
-parseRecovering opts src = case tokenizeTemplate opts.lexConfig opts.lexOptions src of
+parseRecovering opts src = case tokenizeTemplate opts.lexConfig src of
   -- a lex error breaks the token stream itself, so nothing downstream can run.
   Left e -> { directives: [], nodes: [], errors: [ e ] }
   Right toks ->

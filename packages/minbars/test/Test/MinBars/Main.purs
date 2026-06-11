@@ -19,7 +19,7 @@ import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
 import FlatBars.Lexer (RawTok(..), tokenizeTemplate)
-import FlatBars.Token (LexOptions, tokenizeInterior)
+import FlatBars.Token (tokenizeInterior)
 import FlatBars.Value (Value(..))
 import Kernel.Analyse (Finding)
 import MinBars (minOptions, renderMin, renderMinCompat, renderMinDelimsDiag, renderMinWith)
@@ -35,14 +35,14 @@ import Test.Assert (assert')
 -- tag's carried interior equals `tokenizeInterior` of its (rewritten) string — so a
 -- future change that mutates the string but forgets to re-lex fails here, not in a
 -- single render case.
-interiorMatches :: LexOptions -> RawTok -> Boolean
-interiorMatches lx = case _ of
-  ROutput _ base s int -> int == tokenizeInterior lx base s
-  RAmp _ base s int -> int == tokenizeInterior lx base s
-  ROpen _ _ base s int -> int == tokenizeInterior lx base s
-  RClose _ base s int -> int == tokenizeInterior lx base s
-  RSep _ base s int -> int == tokenizeInterior lx base s
-  RRaw _ _ base head int _ -> int == tokenizeInterior lx base head
+interiorMatches :: RawTok -> Boolean
+interiorMatches = case _ of
+  ROutput _ base s int -> int == tokenizeInterior base s
+  RAmp _ base s int -> int == tokenizeInterior base s
+  ROpen _ _ base s int -> int == tokenizeInterior base s
+  RClose _ base s int -> int == tokenizeInterior base s
+  RSep _ base s int -> int == tokenizeInterior base s
+  RRaw _ _ base head int _ -> int == tokenizeInterior base head
   _ -> true
 
 obj :: Array (Tuple String Value) -> Value
@@ -313,16 +313,15 @@ main = do
   -- P2 mutation guard: standalone partials / parents / override-blocks have their
   -- interior string rewritten by mustacheStandalone; the carried interior must be
   -- re-lexed to match. Checked on the post-standalone stream (the real pipeline).
-  let lx = minOptions.lexOptions
   for_
     [ "  {{> p}}\n"
     , "{{#a}}\n  {{> q}}\n{{/a}}\n"
     , "  {{<base}}\n  {{$x}}body{{/x}}\n  {{/base}}\n"
     , "line\n  {{> r}}\n  more {{x}}\n"
     ]
-    \src -> case tokenizeTemplate minOptions.lexConfig lx src of
+    \src -> case tokenizeTemplate minOptions.lexConfig src of
       Right toks -> assert' ("standalone re-lex invariant on " <> show src)
-        (Array.all (interiorMatches lx) (mustacheStandalone lx toks))
+        (Array.all interiorMatches (mustacheStandalone toks))
       Left _ -> assert' ("corpus should lex: " <> show src) false
 
   -- Truthiness analysis (ADR-022, the Mustache-portability story). A section over
