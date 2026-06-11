@@ -34,8 +34,8 @@ instead of re-closing over it.
 | --- | --- | --- | --- |
 | engine resolution (in Bootstrap) | `app/engine-config.mjs` | none (pure) | ✅ |
 | `byId`/`qs` (in Bootstrap) | `app/dom.mjs` | none | ✅ |
-| `showBootError`/`bootFail`/`fetchJson` (Bootstrap) | `app/boot-error.mjs` | none (DOM-only) | 🔜 |
-| State block (1876) | `app/state.mjs` (subscribe store) | **defines** it | 🔜 (unblocks the rest) |
+| `showBootError`/`bootFail` (Bootstrap) | `app/boot-error.mjs` | none (DOM-only) | ✅ (`fetchJson` stays inline → Phase 3 FileProvider) |
+| State block (1876) | `app/state.mjs` (`createAppState` record) | **defines** it | ✅ primitive built + tested; **adoption incremental** (consumers adopt on extraction) |
 | CodeMirror (1986) + Output editor (2288) | `app/editors.mjs` | reads state | ⛔ |
 | Virtual file explorer (2378) | `app/explorer.mjs` | reads/writes tabs | ⛔ |
 | Tabs (2658) + open-editor helpers (2769) | `app/tabs.mjs` | reads/writes tabs | ⛔ |
@@ -56,9 +56,11 @@ instead of re-closing over it.
 
 ## Recommended commit order
 
-1. ✅ `engine-config.mjs` + `dom.mjs` (this commit) — pure leaves, prove the pipeline.
-2. `boot-error.mjs` + `ui-chrome.mjs` (toast/share) — DOM-only leaves, no app state.
-3. `app/state.mjs` — the subscribe store; migrate the State block. **Unblocks all ⛔.**
+1. ✅ `engine-config.mjs` + `dom.mjs` — pure leaves, prove the pipeline.
+2. ✅ `boot-error.mjs` (smoke-covered) + `app/state.mjs` primitive (tested, ready).
+   `ui-chrome.mjs` (toast/share) remains a safe DOM-only leaf for a follow-up.
+3. **Adopt `app/state.mjs`** — the first stateful extraction (`editors.mjs`) imports
+   the record; its readers/writers move WITH it (contained rename, smoke-verified).
 4. `editors.mjs`, then `tabs.mjs`/`explorer.mjs` (they sit on the store).
 5. `examples.mjs` — extracted against a `FileProvider` interface (sets up Phase 3).
 6. `render.mjs` (`run()`), `output.mjs`, dock panels (`dock/*.mjs`).
