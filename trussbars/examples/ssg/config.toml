@@ -1,0 +1,18 @@
+title = "Trussbars × Hyde"
+base_url = "https://example.com"
+description = "A Zola Hyde theme rendered by Trussbars."
+generate_feed = true
+feed_filename = "atom.xml"
+
+[extra]
+hyde_theme = "theme-base-08"
+hyde_reverse = false
+hyde_sticky = true
+
+[[extra.hyde_links]]
+url = "/about/"
+name = "About"
+
+[[extra.hyde_links]]
+url = "https://github.com/getzola/zola"
+name = "Zola"

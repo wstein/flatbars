@@ -1,0 +1,84 @@
+{# NOTE: the base is duplicated here (wrapped in {% inline %}) because a
+   cross-file partial cannot yet be an {% extends %} base — the inheritance
+   flatten runs at parse time, before cross-file partials merge (a tracked
+   engine gap this Hyde port surfaced; see docs/24). render_index uses the
+   standalone templates/hyde_base.truss directly. #}
+{% inline "hyde" %}<!DOCTYPE html>
+<html lang="{{ lang }}">
+    <head>
+      <meta http-equiv="X-UA-Compatible" content="IE=edge">
+      <meta http-equiv="content-type" content="text/html; charset=utf-8">
+
+      <!-- Enable responsiveness on mobile devices-->
+      <!-- viewport-fit=cover is to support iPhone X rounded corners and notch in landscape-->
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
+
+      <title>{% block title %}{{ config.title }}{% endblock %}</title>
+
+      <!-- CSS -->
+      <link rel="stylesheet" href="{{ get_url "print.css" }}" media="print">
+      <link rel="stylesheet" href="{{ get_url "poole.css" }}">
+      <link rel="stylesheet" href="{{ get_url "hyde.css" }}">
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=PT+Sans:400,400italic,700|Abril+Fatface">
+
+      {% if config.generate_feed %}
+        <link rel="alternate" type={% if config.feed_filename == "atom.xml" %}"application/atom+xml"{% else %}"application/rss+xml"{% endif %} title="RSS" href="{{ get_url config.feed_filename }}">
+      {% endif %}
+
+      {% block extra_head %}
+      {% endblock %}
+    </head>
+
+    <body class="{{ config.extra.hyde_theme }} {% if config.extra.hyde_reverse %}layout-reverse{% endif %}">
+        {% block sidebar %}
+            <div class="sidebar">
+                <div class="container {% if config.extra.hyde_sticky %}sidebar-sticky{% endif %}">
+                    <div class="sidebar-about">
+                        {% block sidebar_about %}
+                            <a href="{{ config.base_url }}"><h1>{{ config.title }}</h1></a>
+                            {% if config.description %}
+                            <p class="lead">{{ config.description }}</p>
+                            {% endif %}
+                        {% endblock %}
+                    </div>
+
+                    <ul class="sidebar-nav">
+                        {% block sidebar_nav %}
+                        {% for link in config.extra.hyde_links %}
+                        <li class="sidebar-nav-item"><a href="{{ link.url }}">{{ link.name }}</a></li>
+                        {% endfor %}
+                        {% endblock %}
+                    </ul>
+                </div>
+            </div>
+        {% endblock %}
+
+        <div class="content container">
+            {% block content %}
+                <div class="posts">
+                    {% for page in section.pages %}
+                      <div class="post">
+                        <h1 class="post-title">
+                          <a href="{{ page.permalink }}">
+                            {{ page.title | safe }}
+                          </a>
+                        </h1>
+
+                        <span class="post-date">{{ page.date | date "%Y-%m-%d" }}</span>
+                      </div>
+                    {% endfor %}
+                </div>
+            {% endblock %}
+        </div>
+
+    </body>
+
+</html>
+{% endinline %}{% extends "hyde" %}
+{% block content %}
+<div class="post">
+  <h1 class="post-title">{{ page.title }}</h1>
+  <span class="post-date">{{ page.date | date "%Y-%m-%d" }}</span>
+  {{ page.content | safe }}
+</div>
+{% endblock %}

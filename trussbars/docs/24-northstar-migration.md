@@ -94,6 +94,23 @@ the `.truss` host-binding affordance, which building the harness drives), and si
 functions (`get_taxonomy`/`get_section`/pagination) need the host to *supply the index data*.
 Pick a layout-heavy, logic-light theme to keep both small.
 
+## Findings (the Hyde port)
+
+The first theme ported is **Hyde** (`getzola/hyde`) — `trussbars/examples/ssg/`, its
+`index.html` (base + post-list) and `page.html` (extends, overrides `content`) ported to
+`.truss`, rendered by a `truss!` harness over a typed `Config`/`Section`/`Page` context
+(deserialized from a real Zola `config.toml`). It exercises inheritance, nested config
+access, the `{% for x in xs %}` loop, `get_url`/`date` host helpers, the feed conditional,
+and markdown precompute — and renders faithfully.
+
+One **engine gap** surfaced (the point of the exercise): a **cross-file partial cannot yet
+be an `{% extends %}` base** — the inheritance flatten runs at parse time, before the
+cross-file partials are merged into the registry (`emit_with_partials`). The workaround is
+to inline the base into the extending template; the fix is to defer the inherit flatten
+until after the registry is built (split `parse()` into parse + a registry-aware flatten,
+threaded to the interpreter/VM too). Worth doing — it is the difference between one shared
+base file and a duplicated one for every layout.
+
 ## Non-goals (for the proof)
 
 - Full Zola/Tera feature parity (every filter, `get_url`, shortcodes) — port what the theme

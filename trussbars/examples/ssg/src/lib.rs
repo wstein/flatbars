@@ -1,12 +1,15 @@
-//! A minimal Zola-style static-site harness over Trussbars (northstar, docs/24).
+//! A minimal Zola-style static-site harness over Trussbars (northstar, docs/24) —
+//! porting the **Hyde** theme (`getzola/hyde`: `templates/index.html` is the base
+//! layout + a default post-list `content` block; `page.html` `{% extends %}` it).
 //!
 //! The pipeline is host-side — the logic-less split: a content file is split into TOML
 //! front-matter + a Markdown body; the body renders to HTML (`pulldown-cmark`); the
-//! result fills a **typed** context; a `truss!`-compiled render fn (parse → desugar →
-//! emit → straight-line Rust, `#![forbid(unsafe_code)]`) produces the page. Tera's
-//! `get_url`/`date` realize as **typed host helpers**; `markdown` is this precompute
-//! (the body → `| safe` HTML in the context); inheritance is the ADR-040 surface. No
-//! Zola fork — a theme + this harness.
+//! result fills a **typed** context (`Config`/`Section`/`Page`, deserialized from a Zola
+//! `config.toml`); a `truss!`-compiled render fn (parse → desugar → emit → straight-line
+//! Rust, `#![forbid(unsafe_code)]`) produces the page. Tera's `get_url`/`date` realize as
+//! typed host helpers; `markdown` is precompute → `{{ page.content | safe }}`;
+//! `{% extends %}`/`{% block %}` are the ADR-040 surface. No Zola fork — Hyde's templates
+//! ported to `.truss`, this harness, the engine.
 
 use pulldown_cmark::{Options, Parser, html};
 use serde::Deserialize;
@@ -14,18 +17,21 @@ use trussbars_macros::truss;
 
 // ── host helpers — the Tera-filter equivalents (docs/24) ─────────────────────────
 
-/// `get_url(path)` — resolve an internal content path to its permalink. A real harness
-/// threads the rendered site index; here, slugify the path.
+/// `get_url(path)` — a content path `@/x.md` → its permalink `/x/`; a static asset →
+/// `/asset`. A real harness threads Zola's rendered link index.
 fn get_url(path: &str) -> String {
-    match path {
-        "@/_index.md" => "/".to_string(),
-        p => format!("/{}/", p.trim_start_matches("@/").trim_end_matches(".md")),
+    match path.strip_prefix("@/") {
+        Some(p) => format!("/{}/", p.trim_end_matches(".md")),
+        None => format!("/{path}"),
     }
 }
 
 /// `date(value, fmt)` — format an ISO date. A real harness uses `chrono`; this stub
-/// renders `2026-06-11` as `Jun 11, 2026` (the `fmt` is taken for shape).
-fn date(value: &str, _fmt: &str) -> String {
+/// passes `%Y-%m-%d` through (Hyde's format) and renders a long form otherwise.
+fn date(value: &str, fmt: &str) -> String {
+    if fmt == "%Y-%m-%d" {
+        return value.to_string();
+    }
     const M: [&str; 12] = [
         "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
     ];
@@ -38,48 +44,93 @@ fn date(value: &str, _fmt: &str) -> String {
     }
 }
 
-// ── typed context ────────────────────────────────────────────────────────────────
+// ── typed context (mirrors Hyde's `config.*` / `section.pages` / `page.*` usage) ──
 
-/// A single rendered post: front-matter fields + the Markdown body pre-rendered to HTML.
+/// A sidebar nav link (`config.extra.hyde_links[]`).
+#[derive(Deserialize, Clone, trussbars_core::Trussbars)]
+pub struct Link {
+    url: String,
+    name: String,
+}
+
+/// The theme-specific `[extra]` table.
+#[derive(Deserialize, Clone, trussbars_core::Trussbars)]
+pub struct Extra {
+    hyde_theme: String,
+    hyde_reverse: bool,
+    hyde_sticky: bool,
+    hyde_links: Vec<Link>,
+}
+
+/// The Zola site `config.toml`.
+#[derive(Deserialize, Clone, trussbars_core::Trussbars)]
+pub struct Config {
+    title: String,
+    base_url: String,
+    description: String,
+    generate_feed: bool,
+    feed_filename: String,
+    extra: Extra,
+}
+
+/// A post in the index listing (`section.pages[]`).
 #[derive(trussbars_core::Trussbars)]
-pub struct Post {
+pub struct PageMeta {
+    permalink: String,
+    title: String,
+    date: String,
+}
+
+/// The section whose `pages` the index lists.
+#[derive(trussbars_core::Trussbars)]
+pub struct Section {
+    pages: Vec<PageMeta>,
+}
+
+/// A single rendered page (`page.*` in the overridden `content` block).
+#[derive(trussbars_core::Trussbars)]
+pub struct Page {
     title: String,
     date: String,
     /// Markdown rendered to HTML by the harness — emitted with `| safe`.
-    body_html: String,
+    content: String,
 }
 
-/// A post as it appears in the index listing.
+/// The index page context (Hyde's `index.html`, default `content` block).
 #[derive(trussbars_core::Trussbars)]
-pub struct PostRef {
-    title: String,
-    date: String,
-    slug: String,
+pub struct IndexCtx {
+    lang: String,
+    config: Config,
+    section: Section,
 }
 
-/// The index page context.
+/// A single-page context (Hyde's `page.html`).
 #[derive(trussbars_core::Trussbars)]
-pub struct Index {
-    posts: Vec<PostRef>,
+pub struct PageCtx {
+    lang: String,
+    config: Config,
+    page: Page,
 }
 
-// ── templates (ported, Zola-style) ───────────────────────────────────────────────
+// ── templates: Hyde's, ported to .truss ──────────────────────────────────────────
 //
-// A `base` layout with `{% block %}` slots; `post` / `index` `{% extends %}` it.
-// The base is repeated per `truss!` (each template compiles independently); a real
-// theme port shares it via a `.truss` file + cross-file partials (`partials = [..]`).
-
-truss!(
-    render_post,
-    Post,
-    r#"{% inline "base" %}<!DOCTYPE html><html><head><title>{% block title %}{% endblock %} · Trussbars</title></head><body><nav><a href="{{ get_url "@/_index.md" }}">Home</a></nav><main>{% block main %}{% endblock %}</main></body></html>{% endinline %}{% extends "base" %}{% block title %}{{title}}{% endblock %}{% block main %}<article><h1>{{title}}</h1><time>{{ date | date "%b %d, %Y" }}</time>{{ body_html | safe }}</article>{% endblock %}"#,
-    helpers = [get_url, date]
-);
+// `index.html` IS the base layout, so the index renders it directly. `page.html`
+// extends it — and because a cross-file partial cannot yet be an `{% extends %}` base
+// (the engine gap this port surfaced, docs/24), hyde_page.truss inlines the base.
 
 truss!(
     render_index,
-    Index,
-    r#"{% inline "base" %}<!DOCTYPE html><html><head><title>{% block title %}{% endblock %} · Trussbars</title></head><body><nav><a href="{{ get_url "@/_index.md" }}">Home</a></nav><main>{% block main %}{% endblock %}</main></body></html>{% endinline %}{% extends "base" %}{% block title %}Home{% endblock %}{% block main %}<ul>{% for posts %}<li><a href="{{ get_url slug }}">{{title}}</a> — <time>{{ date | date "%b %d, %Y" }}</time></li>{% endfor %}</ul>{% endblock %}"#,
+    IndexCtx,
+    path = "templates/hyde_base.truss",
+    helpers = [get_url, date]
+);
+
+// `render_page` inlines the base (`{% inline "hyde" %}`) in hyde_page.truss itself —
+// see the note there: a cross-file partial cannot yet be an `{% extends %}` base.
+truss!(
+    render_page,
+    PageCtx,
+    path = "templates/hyde_page.truss",
     helpers = [get_url, date]
 );
 
@@ -109,58 +160,77 @@ fn md_to_html(md: &str) -> String {
     out
 }
 
-/// Render one content file (front-matter + Markdown) to a full HTML page.
-pub fn build_post(content: &str) -> String {
+/// Parse the site `config.toml`.
+pub fn load_config(toml_src: &str) -> Config {
+    toml::from_str(toml_src).expect("invalid config.toml")
+}
+
+/// Render a single content file (front-matter + Markdown) as a Hyde `page.html`.
+pub fn build_page(config: Config, content: &str) -> String {
     let (fm, body_md) = split_frontmatter(content);
-    render_post(&Post {
-        title: fm.title,
-        date: fm.date,
-        body_html: md_to_html(&body_md),
+    render_page(&PageCtx {
+        lang: "en".to_string(),
+        config,
+        page: Page {
+            title: fm.title,
+            date: fm.date,
+            content: md_to_html(&body_md),
+        },
     })
 }
 
-/// Render the index from `(slug, content)` files, preserving the given order.
-pub fn build_index(contents: &[(&str, &str)]) -> String {
-    let posts = contents
+/// Render the index (Hyde `index.html`) listing `(slug, content)` posts, newest first.
+pub fn build_index(config: Config, contents: &[(&str, &str)]) -> String {
+    let pages = contents
         .iter()
         .map(|(slug, content)| {
             let (fm, _) = split_frontmatter(content);
-            PostRef {
+            PageMeta {
+                permalink: format!("/{slug}/"),
                 title: fm.title,
                 date: fm.date,
-                slug: format!("@/{slug}.md"),
             }
         })
         .collect();
-    render_index(&Index { posts })
+    render_index(&IndexCtx {
+        lang: "en".to_string(),
+        config,
+        section: Section { pages },
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    const CONFIG: &str = include_str!("../config.toml");
     const HELLO: &str = include_str!("../content/2026-06-11-hello.md");
     const NOTES: &str = include_str!("../content/2026-06-09-notes.md");
 
     #[test]
-    fn renders_a_post_end_to_end() {
-        let html = build_post(HELLO);
-        // inheritance: base layout filled by the post.
-        assert!(html.starts_with("<!DOCTYPE html>"));
-        assert!(html.contains("<title>Hello, Trussbars · Trussbars</title>"));
-        // host helpers: get_url (nav) + date (formatted).
-        assert!(html.contains(r#"<a href="/">Home</a>"#));
-        assert!(html.contains("<time>Jun 11, 2026</time>"));
-        // markdown precompute → HTML, spliced raw via `| safe`.
-        assert!(html.contains("<strong>first post</strong>"));
-        assert!(html.contains("<h2>Why</h2>"));
+    fn renders_a_hyde_page_end_to_end() {
+        let html = build_page(load_config(CONFIG), HELLO);
+        // base layout (sidebar) — config + the extra table + a nav link.
+        assert!(html.contains(r#"<html lang="en">"#));
+        assert!(html.contains("<h1>Trussbars × Hyde</h1>"));
+        assert!(html.contains(r#"<body class="theme-base-08 ">"#)); // hyde_reverse=false
+        assert!(html.contains(r#"<a href="/about/">About</a>"#)); // hyde_links loop
+        assert!(html.contains(r#"<link rel="stylesheet" href="/poole.css">"#)); // get_url asset
+        assert!(html.contains(r#"type="application/atom+xml""#)); // generate_feed + ==
+        // the overridden content block — the post.
+        assert!(html.contains(r#"<h1 class="post-title">Hello, Trussbars</h1>"#));
+        assert!(html.contains("<strong>first post</strong>")); // markdown → HTML, raw
     }
 
     #[test]
-    fn renders_the_index_list() {
-        let html = build_index(&[("2026-06-11-hello", HELLO), ("2026-06-09-notes", NOTES)]);
-        assert!(html.contains(r#"<a href="/2026-06-11-hello/">Hello, Trussbars</a>"#));
-        assert!(html.contains(r#"<a href="/2026-06-09-notes/">Field notes</a>"#));
-        assert!(html.contains("<time>Jun 9, 2026</time>"));
+    fn renders_the_hyde_index_list() {
+        let html = build_index(
+            load_config(CONFIG),
+            &[("2026-06-11-hello", HELLO), ("2026-06-09-notes", NOTES)],
+        );
+        // the default `content` block: the post list with permalinks + dates.
+        assert!(html.contains(r#"<a href="/2026-06-11-hello/">"#));
+        assert!(html.contains("Hello, Trussbars"));
+        assert!(html.contains(r#"<span class="post-date">2026-06-09</span>"#));
     }
 }

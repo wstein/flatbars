@@ -1,13 +1,14 @@
-//! Build the demo site: render every `content/*.md` to `dist/<slug>/index.html`, plus a
-//! `dist/index.html` listing. A tiny real SSG — front-matter + Markdown in, typed
-//! Trussbars render out.
+//! Build the demo Hyde site: render every `content/*.md` to `dist/<slug>/index.html`,
+//! plus a `dist/index.html` post listing. A tiny real SSG — `config.toml` + front-matter
+//! + Markdown in, typed Trussbars render out.
 
 use std::{fs, path::Path};
-use trussbars_ssg_demo::{build_index, build_post};
+use trussbars_ssg_demo::{build_index, build_page, load_config};
 
 fn main() -> std::io::Result<()> {
     let dist = Path::new("dist");
     fs::create_dir_all(dist)?;
+    let config = load_config(&fs::read_to_string("config.toml")?);
 
     // Read `content/*.md`, newest-first by the date-prefixed filename.
     let mut posts: Vec<(String, String)> = fs::read_dir("content")?
@@ -24,13 +25,13 @@ fn main() -> std::io::Result<()> {
     for (slug, content) in &posts {
         let dir = dist.join(slug);
         fs::create_dir_all(&dir)?;
-        fs::write(dir.join("index.html"), build_post(content))?;
+        fs::write(dir.join("index.html"), build_page(config.clone(), content))?;
     }
     let refs: Vec<(&str, &str)> = posts
         .iter()
         .map(|(s, c)| (s.as_str(), c.as_str()))
         .collect();
-    fs::write(dist.join("index.html"), build_index(&refs))?;
+    fs::write(dist.join("index.html"), build_index(config, &refs))?;
 
     println!("built {} post(s) + index → dist/", posts.len());
     Ok(())
