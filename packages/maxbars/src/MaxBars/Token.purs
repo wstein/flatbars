@@ -31,11 +31,13 @@ import Data.String.CodeUnits as SCU
 import FlatBars.Error (ParseError(..))
 import FlatBars.Token (PosToken, Token(..))
 
--- | The MaxBars infix-operator alphabet: arithmetic `+ - * / %`, the ternary head
--- | `?`, and its `:` separator. `& | ! < > =` are handled directly below (operators
--- | in every dialect), so they are not listed here.
+-- | The MaxBars infix-operator alphabet: arithmetic `+ - * / %`, the string-concat
+-- | `~` (Tera's spelling, ADR-042), the ternary head `?`, and its `:` separator.
+-- | `& | ! < > =` are handled directly below (operators in every dialect), so they
+-- | are not listed here. (`~` is free in MaxBars: the whitespace trim-mark is `-`
+-- | under `statementTags`, not `~`.)
 maxOperatorChars :: String
-maxOperatorChars = "+-*/%?:"
+maxOperatorChars = "+-*/%?:~"
 
 -- | Tokenize a MaxBars tag interior. `base` is its offset in the source, added to
 -- | every token's position so a downstream parse error points into the original

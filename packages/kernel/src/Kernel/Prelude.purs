@@ -347,6 +347,10 @@ primitiveOperationDefs =
   -- concatenation
   , valDef "append" "Appends the second string to the first." (binary appendH)
   , valDef "prepend" "Prepends the second string to the first." (binary prependH)
+  -- `concat` — the `~` operator's helper (ADR-042). Strict: both operands must be
+  -- strings (a non-string is a `TypeError`, *unlike* the lenient `append`), so
+  -- `"1" ~ 1` is the error the typed engine can see rather than a silent "11".
+  , valDef "concat" "Concatenates two strings — the `~` operator's helper." (binary concatH)
   -- case aliases (handlebars-helpers parity): render identically to the
   -- canonical case helpers, reusing the very same `strUnary` transform.
   , withAlias "lowercase" (valDef "downcase" "Lowercases its argument." (unary (strUnary toLower)))
@@ -936,6 +940,23 @@ prependH sv xv = do
   s <- stringifyM sv
   x <- stringifyM xv
   pure (VString (x <> s))
+
+-- | `concat a b` → the `~` operator: strict string concatenation. Both operands
+-- | must be strings (a `VSafe` counts as its inner string); anything else is a
+-- | `TypeError`, matching the AOT (`trussbars_std::concat` takes string refs, so a
+-- | non-string is a Rust compile error) — no coercion, the same discipline as the
+-- | arithmetic helpers (ADR-042).
+concatH :: forall m. MonadThrow Error m => Value -> Value -> m Value
+concatH a b = do
+  x <- asStr a
+  y <- asStr b
+  pure (VString (x <> y))
+
+asStr :: forall m. MonadThrow Error m => Value -> m String
+asStr = case _ of
+  VString s -> pure s
+  VSafe s -> pure s
+  _ -> throwError (TypeError "concat expects two strings")
 
 -- | Read a numeric argument as an `Int`, truncating toward zero (`trunc`) to
 -- | match the runtime's `Math.trunc`, and reusing `asNum`'s strict number guard.

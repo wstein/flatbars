@@ -90,6 +90,14 @@
       "doc": "Returns the first non-null argument — the `??` operator's helper."
     },
     {
+      "name": "concat",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null,
+      "doc": "Concatenates two strings — the `~` operator's helper."
+    },
+    {
       "name": "count",
       "kind": "inline",
       "arity": "1",

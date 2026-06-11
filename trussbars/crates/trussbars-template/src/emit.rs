@@ -1185,6 +1185,9 @@ fn emit_helper(env: &Env, name: &str, args: &[Expr]) -> Option<Result<String, St
         "trimEnd" => call("trim_end", &[Ref]),
         "append" => call("append", &[Ref, Ref]),
         "prepend" => call("prepend", &[Ref, Ref]),
+        // `~` string concat (ADR-042): `concat` takes string refs, so a non-string
+        // operand is a Rust compile error (strict, unlike the lenient `append`).
+        "concat" => call("concat", &[Ref, Ref]),
         "replace" => call("replace", &[Ref, Ref, Ref]),
         "split" => call("split", &[Ref, Ref]),
         "includes" => call("includes", &[Ref, Ref]),
@@ -1196,6 +1199,10 @@ fn emit_helper(env: &Env, name: &str, args: &[Expr]) -> Option<Result<String, St
         "truncate" if arity == 3 => call("truncate_with", &[Ref, IntArg, Ref]),
         "truncate" => call("truncate", &[Ref, IntArg]),
         "abs" => call("abs", &[Num]),
+        // numeric predicates (ADR-042) → Bool.
+        "even" => call("even", &[Num]),
+        "odd" => call("odd", &[Num]),
+        "divisibleBy" => call("divisible_by", &[Num, Num]),
         "floor" => call("floor", &[Num]),
         "ceil" => call("ceil", &[Num]),
         "round" => call("round", &[Num]),

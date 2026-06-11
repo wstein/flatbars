@@ -792,6 +792,13 @@ expr env = case _ of
     ae <- expr env a
     be <- expr env b
     Right ("trussbars_std::modulo(" <> ae <> ", " <> be <> ")")
+  -- `~` (ADR-042): `trussbars_std::concat` takes string refs, so a non-string
+  -- operand is a Rust compile error — the typed AOT mirror of the oracle's strict
+  -- string-only `concat`.
+  App "concat" [ a, b ] -> do
+    ae <- expr env a
+    be <- expr env b
+    Right ("trussbars_std::concat(&(" <> ae <> "), &(" <> be <> "))")
   App "safe" [ a ] -> do
     ae <- expr env a
     Right ("trussbars_std::safe(&(" <> ae <> "))")

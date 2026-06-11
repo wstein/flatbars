@@ -301,6 +301,9 @@ combinators toks =
   addOp = case _ of
     TOp "+" -> bin "add"
     TOp "-" -> bin "subtract"
+    -- `~` (Tera's spelling): string concatenation, left-assoc at additive
+    -- precedence; desugars to the `concat` prelude operation (ADR-042).
+    TOp "~" -> bin "concat"
     _ -> Nothing
     where
     bin h = Just (\a b -> App h [ a, b ])

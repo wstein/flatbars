@@ -14,6 +14,7 @@
 | `case` | block | 1 | registered | Routes to the first &#123;&#123;when&#125;&#125; arm whose value equals the subject (evaluated once), else the &#123;&#123;else&#125;&#125; clause (RawBars/MaxBars `{{#case s}}{{when …}}…{{/case}}`). |
 | `ceil` | value | 1 | registered | Rounds a number up to the nearest integer. |
 | `coalesce` | value | ≥1 | registered | Returns the first non-null argument — the `??` operator's helper. |
+| `concat` | value | 2 | registered | Concatenates two strings — the `~` operator's helper. |
 | `count` | value | 1 | registered | The number of items in an array (or characters in a string). |
 | `date` | value | ≥1 | registered | Formats a date value for the host's locale (Intl.DateTimeFormat); returns the value's plain text when no host formatter is registered (ADR-029). |
 | `depth` | value | 0 | scoped | The 1-based loop-nesting level (outermost loop = 1; a directly nested loop = 2). |

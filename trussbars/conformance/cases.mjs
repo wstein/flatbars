@@ -63,6 +63,28 @@ export const cases = [
     data: { n: 15 },
   },
 
+  // ── ~ string concatenation (ADR-042) ─────────────────────────────────────────
+  {
+    id: "concat-tilde",
+    template: "{{ greeting ~ name }}",
+    data: { greeting: "Hi ", name: "Ada" },
+  },
+  {
+    id: "concat-chain",
+    template: "{{ a ~ b ~ c }}",
+    data: { a: "x", b: "y", c: "z" },
+  },
+  {
+    id: "concat-literal",
+    template: '{{ name ~ "!" }}',
+    data: { name: "Ada" },
+  },
+  {
+    id: "concat-pipe",
+    template: '{{ name | concat "?" }}',
+    data: { name: "Bob" },
+  },
+
   // ── string helpers & pipes ───────────────────────────────────────────────────
   { id: "uppercase", template: "{{name | uppercase}}", data: { name: "ann" } },
   {

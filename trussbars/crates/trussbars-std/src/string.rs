@@ -123,6 +123,29 @@ pub fn prepend(subject: &(impl ToText + ?Sized), other: &(impl ToText + ?Sized))
     s
 }
 
+/// Strict string concatenation — the `~` operator's helper (ADR-042). Both
+/// operands are `&str`, so a non-string operand is a *compile* error (the typed
+/// mirror of the oracle's string-only `concat`), unlike the lenient `append`,
+/// which stringifies any `ToText`.
+pub fn concat(a: &str, b: &str) -> String {
+    let mut s = String::with_capacity(a.len() + b.len());
+    s.push_str(a);
+    s.push_str(b);
+    s
+}
+
+#[cfg(test)]
+mod concat_tests {
+    use super::concat;
+
+    #[test]
+    fn concatenates_strings() {
+        assert_eq!(concat("Hi ", "Ada"), "Hi Ada");
+        assert_eq!(concat(&concat("x", "y"), "z"), "xyz");
+        assert_eq!(concat("", ""), "");
+    }
+}
+
 /// Reverse the subject's characters (`reverse`, string form).
 pub fn reverse(subject: &(impl ToText + ?Sized)) -> String {
     text(subject).chars().rev().collect()

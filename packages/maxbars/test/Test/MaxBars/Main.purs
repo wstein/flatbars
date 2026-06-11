@@ -177,10 +177,23 @@ main = do
   expectM "even-false" "{{ even n }}" (obj [ Tuple "n" (num 7.0) ]) "false"
   expectM "odd-pipe" "{{ n | odd }}" (obj [ Tuple "n" (num 7.0) ]) "true"
   expectM "even-guard" "{% if (n | even) %}even{% else %}odd{% endif %}"
-    (obj [ Tuple "n" (num 4.0) ]) "even"
+    (obj [ Tuple "n" (num 4.0) ])
+    "even"
   expectM "divisibleBy-call" "{% if (divisibleBy n 3) %}fizz{% endif %}"
-    (obj [ Tuple "n" (num 9.0) ]) "fizz"
+    (obj [ Tuple "n" (num 9.0) ])
+    "fizz"
   expectM "divisibleBy-pipe" "{{ n | divisibleBy 4 }}" (obj [ Tuple "n" (num 10.0) ]) "false"
+
+  -- `~` string concatenation (ADR-042, Tera's spelling): left-assoc at additive
+  -- precedence, desugars to `concat`. Strict — a non-string operand is a TypeError.
+  expectM "concat-tilde" "{{ a ~ b }}"
+    (obj [ Tuple "a" (VString "Hi "), Tuple "b" (VString "Ada") ])
+    "Hi Ada"
+  expectM "concat-chain" "{{ a ~ b ~ c }}"
+    (obj [ Tuple "a" (VString "x"), Tuple "b" (VString "y"), Tuple "c" (VString "z") ])
+    "xyz"
+  expectM "concat-literal" "{{ name ~ \"!\" }}" (obj [ Tuple "name" (VString "Bo") ]) "Bo!"
+  expectM "concat-pipe" "{{ name | concat \"?\" }}" (obj [ Tuple "name" (VString "Q") ]) "Q?"
 
   -- null-coalescing `??` (desugars to coalesce): first non-null, NOT truthiness.
   expectM "coalesce-null" "{{ a ?? b }}" (obj [ Tuple "a" VNull, Tuple "b" (VString "fb") ]) "fb"

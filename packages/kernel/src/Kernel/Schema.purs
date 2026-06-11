@@ -214,6 +214,7 @@ stringPack = Set.fromFoldable
   , "trimEnd"
   , "append"
   , "prepend"
+  , "concat"
   , "replace"
   , "split"
   , "startsWith"

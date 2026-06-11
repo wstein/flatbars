@@ -76,8 +76,8 @@ enum Tok {
 
 /// The multi-char operators, longest first (so `==` beats `=`, `?:` beats `?`).
 const OPS: &[&str] = &[
-    "==", "!=", "<=", ">=", "&&", "||", "??", "?:", "..", "+", "-", "*", "/", "%", "<", ">", "!",
-    "?", ":", "|", "=", "(", ")", "[", "]", "{", "}", ",", ".",
+    "==", "!=", "<=", ">=", "&&", "||", "??", "?:", "..", "+", "-", "*", "/", "%", "~", "<", ">",
+    "!", "?", ":", "|", "=", "(", ")", "[", "]", "{", "}", ",", ".",
 ];
 
 fn tokenize(src: &str) -> Result<Vec<Tok>, ParseError> {
@@ -261,8 +261,15 @@ impl<'a> Parser<'a> {
         )
     }
     fn add(&mut self) -> Result<Expr, ParseError> {
+        // `~` (ADR-042): string concatenation at additive precedence, left-assoc,
+        // desugaring to the `concat` operation (Tera's spelling).
         self.bin_left(
-            &[("+", "add"), ("-", "subtract"), ("..", "range")],
+            &[
+                ("+", "add"),
+                ("-", "subtract"),
+                ("~", "concat"),
+                ("..", "range"),
+            ],
             Self::mul,
         )
     }
@@ -572,6 +579,12 @@ mod tests {
         );
         assert_eq!(p("a && b"), app("and", vec![p("a"), p("b")]));
         assert_eq!(p("!done"), app("not", vec![p("done")]));
+        // `~` (ADR-042): string concat, left-assoc at additive precedence.
+        assert_eq!(p("a ~ b"), app("concat", vec![p("a"), p("b")]));
+        assert_eq!(
+            p("a ~ b ~ c"),
+            app("concat", vec![app("concat", vec![p("a"), p("b")]), p("c")])
+        );
     }
 
     #[test]

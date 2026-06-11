@@ -20,6 +20,7 @@ export const OPERATION_NAMES = [
   "case",
   "ceil",
   "coalesce",
+  "concat",
   "count",
   "date",
   "depth",

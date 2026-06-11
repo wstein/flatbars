@@ -740,8 +740,12 @@ fn eval_expr(env: &Env, e: &Expr) -> Result<Value, String> {
         // numeric predicates (ADR-042). The `== 0` parity/divisibility test is
         // sign-independent, so `rem_euclid` agrees with the oracle's truncated
         // `jsMod` here; `odd` is the negation of `even`.
-        ("even", [n]) => Ok(Value::Bool(rem_euclid(eval_expr(env, n)?.as_num()?, 2.0) == 0.0)),
-        ("odd", [n]) => Ok(Value::Bool(rem_euclid(eval_expr(env, n)?.as_num()?, 2.0) != 0.0)),
+        ("even", [n]) => Ok(Value::Bool(
+            rem_euclid(eval_expr(env, n)?.as_num()?, 2.0) == 0.0,
+        )),
+        ("odd", [n]) => Ok(Value::Bool(
+            rem_euclid(eval_expr(env, n)?.as_num()?, 2.0) != 0.0,
+        )),
         ("divisibleBy", [a, b]) => num_cmp(env, a, b, |x, y| rem_euclid(x, y) == 0.0),
         ("ternary", [c, a, b]) => {
             if truthy_at(env, &eval_expr(env, c)?) {
@@ -1094,6 +1098,11 @@ fn eval_helper(env: &Env, name: &str, args: &[Expr]) -> Result<Value, String> {
         ("trim", [a]) => Ok(str_val(s(a).trim().to_string())),
         ("append", [a, b]) => Ok(str_val(s(a) + &s(b))),
         ("prepend", [a, b]) => Ok(str_val(s(b) + &s(a))),
+        // `~` (ADR-042): strict string concat — both operands must be strings, a
+        // non-string is an error (matching the oracle's TypeError + the AOT's
+        // string-typed `concat`), *not* the lenient stringify `append` uses.
+        ("concat", [Value::Str(x), Value::Str(y)]) => Ok(str_val(alloc::format!("{x}{y}"))),
+        ("concat", [_, _]) => Err("concat expects two strings".into()),
         ("replace", [a, b, c]) => Ok(str_val(s(a).replace(&s(b), &s(c)))),
         ("includes", [a, b]) => Ok(Value::Bool(s(a).contains(&s(b)))),
         ("startsWith", [a, b]) => Ok(Value::Bool(s(a).starts_with(&s(b)))),
