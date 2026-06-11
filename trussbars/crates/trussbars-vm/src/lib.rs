@@ -51,7 +51,7 @@ use alloc::vec::Vec;
 use core::cell::Cell;
 
 use trussbars_interp::{
-    Env, Helpers, TruthMode, Value, eval_expr, eval_nodes, hoist, write_escaped,
+    Env, Helpers, Limits, TruthMode, Value, eval_expr, eval_nodes, hoist, write_escaped,
 };
 use trussbars_template::{Expr, Node, Value as Lit, parse};
 
@@ -263,6 +263,9 @@ pub struct Program {
     /// Adaptive output-capacity hint (mirrors the interpreter's `Template`): seed each
     /// render's buffer with the previous render's length so it grows without realloc.
     cap: Cell<usize>,
+    /// Resource limits every render enforces (the untrusted-data DoS bound). Defaults to
+    /// [`Limits::UNLIMITED`]; set with [`Program::with_limits`].
+    limits: Limits,
 }
 
 impl Program {
@@ -279,6 +282,7 @@ impl Program {
             ops,
             partials: Rc::new(registry),
             cap: Cell::new(64),
+            limits: Limits::UNLIMITED,
         })
     }
 
@@ -306,6 +310,7 @@ impl Program {
             ops,
             partials: Rc::new(registry),
             cap: Cell::new(64),
+            limits: Limits::UNLIMITED,
         })
     }
 
@@ -322,7 +327,18 @@ impl Program {
             ops,
             partials: Rc::new(BTreeMap::new()),
             cap: Cell::new(64),
+            limits: Limits::UNLIMITED,
         })
+    }
+
+    /// Set the resource [`Limits`] every render enforces — the DoS bound for **untrusted data**
+    /// (docs/24, the N2 gate). Default is [`Limits::UNLIMITED`]; pass a bounded `Limits` before
+    /// rendering attacker-influenced or model-generated data so a pathological value (a huge
+    /// `{% for %}` array, amplified output) returns a located error instead of a runaway render.
+    #[must_use]
+    pub fn with_limits(mut self, limits: Limits) -> Self {
+        self.limits = limits;
+        self
     }
 
     /// Render against `data` under the default `NonEmpty` truthiness and no host helpers.
@@ -347,12 +363,11 @@ impl Program {
         let mut out = String::with_capacity(self.cap.get().max(16));
         // The Env stack mirrors scope nesting: index 0 is the render root; a loop pushes a
         // child Env (with its loop frame), popped when the loop ends. The top is `this`.
-        let mut envs: Vec<Env> = Vec::from([Env::root(
-            data,
-            Rc::clone(&self.partials),
-            mode,
-            Rc::clone(helpers),
-        )]);
+        let mut envs: Vec<Env> =
+            Vec::from([
+                Env::root(data, Rc::clone(&self.partials), mode, Rc::clone(helpers))
+                    .with_limits(self.limits),
+            ]);
         let mut loops: Vec<LoopState> = Vec::new();
         let mut pc = 0;
         while pc < self.ops.len() {
@@ -458,6 +473,8 @@ impl Program {
                         let (key, elem) = ls.items.at(i);
                         let (item, index) = (ls.item.as_deref(), ls.index.as_deref());
                         envs.last_mut().unwrap().set_iter(i, key, elem, item, index);
+                        // Charge one step per loop iteration (the untrusted-data DoS bound).
+                        envs.last().unwrap().charge(out.len())?;
                         pc = *body;
                         continue;
                     }
@@ -500,19 +517,46 @@ impl Program {
                     let subj = eval_expr(envs.last().unwrap(), subject)?;
                     let env = envs.last().unwrap();
                     let root = env.root_value();
+                    let (steps, max_output) = env.budget();
                     match &subj {
                         Value::Array(a) if !a.is_empty() => {
                             for (j, elem) in a.iter().enumerate() {
-                                run_fast(body, elem, root, j == 0, &mut out, mode);
+                                if !fast_step(steps, out.len(), max_output) {
+                                    break;
+                                }
+                                run_fast(
+                                    body,
+                                    elem,
+                                    root,
+                                    j == 0,
+                                    &mut out,
+                                    mode,
+                                    steps,
+                                    max_output,
+                                );
                             }
                         }
                         Value::Object(o) if !o.is_empty() => {
                             for (j, (_, v)) in o.iter().enumerate() {
-                                run_fast(body, v, root, j == 0, &mut out, mode);
+                                if !fast_step(steps, out.len(), max_output) {
+                                    break;
+                                }
+                                run_fast(body, v, root, j == 0, &mut out, mode, steps, max_output);
                             }
                         }
-                        _ => run_fast(empty, env.this(), root, false, &mut out, mode),
+                        _ => run_fast(
+                            empty,
+                            env.this(),
+                            root,
+                            false,
+                            &mut out,
+                            mode,
+                            steps,
+                            max_output,
+                        ),
                     }
+                    // Convert a budget-exhausted early stop into the located error.
+                    envs.last().unwrap().check_budget(out.len())?;
                 }
                 Op::Delegate(node) => {
                     eval_nodes(envs.last().unwrap(), core::slice::from_ref(node), &mut out)?;
@@ -568,6 +612,22 @@ fn resolve_fast<'a>(
 /// clone. `is_first` is the enclosing iteration's first-element flag (for `loop.first`). A
 /// nested `Loop` recurses with each element as the new `this`, so the whole nest stays on the
 /// borrow machine. Infallible: fast ops never evaluate a fallible expression.
+/// Charge one fast-loop step against the shared render budget ([`trussbars_interp::Limits`]).
+/// Returns `false` when the step or output budget is exhausted — the caller stops iterating, and
+/// the VM converts the early stop into a located error via `Env::check_budget`. A no-op (one
+/// `Cell` read) under the default unbounded limits.
+fn fast_step(steps: &Cell<u64>, out_len: usize, max_output: usize) -> bool {
+    let s = steps.get();
+    if s == 0 || out_len > max_output {
+        return false;
+    }
+    if s != u64::MAX {
+        steps.set(s - 1);
+    }
+    true
+}
+
+#[allow(clippy::too_many_arguments)]
 fn run_fast(
     plan: &[Fast],
     this: &Value,
@@ -575,6 +635,8 @@ fn run_fast(
     is_first: bool,
     out: &mut String,
     mode: TruthMode,
+    steps: &Cell<u64>,
+    max_output: usize,
 ) {
     for f in plan {
         match f {
@@ -601,13 +663,13 @@ fn run_fast(
                         t = !t;
                     }
                     if t {
-                        run_fast(body, this, root, is_first, out, mode);
+                        run_fast(body, this, root, is_first, out, mode, steps, max_output);
                         taken = true;
                         break;
                     }
                 }
                 if !taken {
-                    run_fast(else_, this, root, is_first, out, mode);
+                    run_fast(else_, this, root, is_first, out, mode, steps, max_output);
                 }
             }
             Fast::Loop {
@@ -617,15 +679,21 @@ fn run_fast(
             } => match resolve_fast(subject.0, &subject.1, this, root) {
                 Some(Value::Array(a)) if !a.is_empty() => {
                     for (j, elem) in a.iter().enumerate() {
-                        run_fast(body, elem, root, j == 0, out, mode);
+                        if !fast_step(steps, out.len(), max_output) {
+                            break;
+                        }
+                        run_fast(body, elem, root, j == 0, out, mode, steps, max_output);
                     }
                 }
                 Some(Value::Object(o)) if !o.is_empty() => {
                     for (j, (_, v)) in o.iter().enumerate() {
-                        run_fast(body, v, root, j == 0, out, mode);
+                        if !fast_step(steps, out.len(), max_output) {
+                            break;
+                        }
+                        run_fast(body, v, root, j == 0, out, mode, steps, max_output);
                     }
                 }
-                _ => run_fast(empty, this, root, is_first, out, mode),
+                _ => run_fast(empty, this, root, is_first, out, mode, steps, max_output),
             },
         }
     }
@@ -888,7 +956,7 @@ fn compile_node(n: &Node, ops: &mut Vec<Op>) {
 mod tests {
     use super::Program;
     use std::rc::Rc;
-    use trussbars_interp::{Value, render};
+    use trussbars_interp::{Limits, Value, render};
 
     fn obj(pairs: &[(&str, Value)]) -> Value {
         Value::Object(Rc::new(
@@ -1103,5 +1171,70 @@ mod tests {
         assert_eq!(got, interp.render(&d).unwrap(), "VM ≠ interpreter");
         // child override + {% super %} splicing the base default (which itself {% include %}s).
         assert_eq!(got, "<title>Site</title><p>Body</p>[Site]");
+    }
+
+    // ── resource limits — both VM loop paths bound untrusted-data iteration (docs/24) ──
+
+    fn big_xs(n: usize) -> Value {
+        obj(&[(
+            "xs",
+            arr(&(0..n).map(|i| s(&i.to_string())).collect::<Vec<_>>()),
+        )])
+    }
+
+    #[test]
+    fn vm_step_limit_bounds_the_bytecode_loop() {
+        // A binding loop `{% for x in xs %}` runs through the Env-stack EachStart/EachNext path.
+        let prog = Program::compile("{% for x in xs %}{{x}}{% endfor %}")
+            .unwrap()
+            .with_limits(Limits {
+                max_steps: Some(100),
+                max_output: None,
+            });
+        let err = prog.render(&big_xs(5_000)).unwrap_err();
+        assert!(err.contains("step limit exceeded"), "{err}");
+    }
+
+    #[test]
+    fn vm_step_limit_bounds_the_fast_path() {
+        // A bare loop with a wholly-static body `{% for xs %}{{this}}` takes the Env-free
+        // `run_fast` borrow machine — it must honour the budget too.
+        let prog = Program::compile("{% for xs %}{{this}}{% endfor %}")
+            .unwrap()
+            .with_limits(Limits {
+                max_steps: Some(100),
+                max_output: None,
+            });
+        let err = prog.render(&big_xs(5_000)).unwrap_err();
+        assert!(err.contains("step limit exceeded"), "{err}");
+    }
+
+    #[test]
+    fn vm_output_limit_bounds_amplified_output() {
+        let prog = Program::compile("{% for xs %}{{this}}{% endfor %}")
+            .unwrap()
+            .with_limits(Limits {
+                max_steps: None,
+                max_output: Some(500),
+            });
+        let err = prog.render(&big_xs(5_000)).unwrap_err();
+        assert!(err.contains("output limit exceeded"), "{err}");
+    }
+
+    #[test]
+    fn vm_within_limits_matches_interpreter() {
+        // Under generous limits the VM is byte-identical to the interpreter (and to an
+        // unbounded VM render) — the gate fires only on abuse.
+        let data = big_xs(3);
+        let src = "{% for x in xs %}[{{x}}]{% endfor %}";
+        let bounded = Program::compile(src).unwrap().with_limits(Limits {
+            max_steps: Some(10_000),
+            max_output: Some(10_000),
+        });
+        assert_eq!(
+            bounded.render(&data).unwrap(),
+            render(src, data.clone()).unwrap()
+        );
+        assert_eq!(bounded.render(&data).unwrap(), "[0][1][2]");
     }
 }

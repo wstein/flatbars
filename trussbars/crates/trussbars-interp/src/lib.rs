@@ -245,16 +245,50 @@ fn parent_at(parents: &Parents, depth: usize) -> Option<&Value> {
     None
 }
 
+/// Resource limits for a dynamic-backend render — the DoS bound for **untrusted data**
+/// (the N2 honesty gate, docs/24). Both default to unbounded; set them when rendering
+/// attacker-influenced or model-generated data so a pathological value (a huge array in a
+/// `{% for %}`, a large string interpolated repeatedly) returns a located error instead of
+/// burning the CPU or exhausting memory. The injection law sandboxes the data *plane*; these
+/// bound the data *amount*. Applies to the interpreter and the VM (the runtime backends); the
+/// AOT path renders trusted compile-time templates with typed data and is unaffected.
+#[derive(Clone, Copy)]
+pub struct Limits {
+    /// Max evaluation steps — one is charged per node-sequence render (≈ per loop iteration and
+    /// per block/partial entry), so it primarily bounds *data-driven iteration*. `None` = unbounded.
+    pub max_steps: Option<u64>,
+    /// Max output bytes. `None` = unbounded.
+    pub max_output: Option<usize>,
+}
+
+impl Limits {
+    /// No limits — the default (back-compatible: an existing render is unchanged).
+    pub const UNLIMITED: Limits = Limits {
+        max_steps: None,
+        max_output: None,
+    };
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Limits::UNLIMITED
+    }
+}
+
+/// The located reason when a render's step budget is exhausted (a runaway loop over untrusted data).
+pub(crate) const STEP_LIMIT: &str = "render step limit exceeded (a loop over untrusted data ran too long; raise Limits::max_steps or shrink the input)";
+/// The located reason when a render's output budget is exhausted (untrusted data amplified the output).
+pub(crate) const OUTPUT_LIMIT: &str =
+    "render output limit exceeded (untrusted data amplified the output beyond Limits::max_output)";
+
 /// The render environment threaded through eval. Because [`Value`] is cheap to clone
 /// (Rc-backed heap), the env holds values directly — entering a block scope is a
-/// handful of refcount bumps, not a deep copy of the data.
+/// handful of refcount bumps, not a deep copy of the data. It is the interpreter's
+/// evaluation context, exposed (with [`eval_expr`]/[`eval_nodes`]) as the **shared engine**
+/// the bytecode VM (`trussbars-vm`) drives, so the operator / value-helper / collection-op
+/// catalog stays single-sourced (docs/11 §4.3). Fields stay private; the VM navigates it
+/// through the methods below.
 #[derive(Clone)]
-/// The render context — `this`/`root`, scope bindings, the loop-frame chain, the
-/// partial registry, the truthiness policy, and the host-helper table. It is the
-/// interpreter's evaluation context, exposed (with [`eval_expr`]/[`eval_nodes`]) as the
-/// **shared engine** the bytecode VM (`trussbars-vm`) drives, so the operator /
-/// value-helper / collection-op catalog stays single-sourced (docs/11 §4.3). Fields stay
-/// private; the VM navigates it through the methods below.
 pub struct Env {
     this: Value,
     root: Value,
@@ -273,6 +307,12 @@ pub struct Env {
     mode: TruthMode,
     /// The host-helper registry (F3).
     helpers: Rc<Helpers>,
+    /// Remaining evaluation steps, shared across every frame of one render (`u64::MAX` =
+    /// unbounded). Decremented at each `eval_nodes` boundary and each VM loop step (the
+    /// [`Limits`] step budget).
+    steps: Rc<Cell<u64>>,
+    /// Max output bytes (`usize::MAX` = unbounded). Read-only, copied per frame.
+    max_output: usize,
 }
 
 impl Env {
@@ -299,7 +339,61 @@ impl Env {
             expanding: Vec::new(),
             mode,
             helpers,
+            steps: Rc::new(Cell::new(u64::MAX)),
+            max_output: usize::MAX,
         }
+    }
+
+    /// Apply a render's resource [`Limits`] to this (root) env. The step budget is shared
+    /// across every frame of the render (it lives behind the `Rc<Cell>` cloned with the env),
+    /// so it bounds the *whole* render, partial expansions included.
+    #[must_use]
+    pub fn with_limits(mut self, limits: Limits) -> Env {
+        self.steps = Rc::new(Cell::new(limits.max_steps.unwrap_or(u64::MAX)));
+        self.max_output = limits.max_output.unwrap_or(usize::MAX);
+        self
+    }
+
+    /// Charge one evaluation step and check the output budget against `out_len`. Returns a
+    /// located error when a [`Limits`] is hit — a runaway loop or output amplification from
+    /// untrusted data. Effectively free (two `Cell` ops) when unbounded.
+    ///
+    /// # Errors
+    /// `"render step limit exceeded …"` / `"render output limit exceeded …"`.
+    pub fn charge(&self, out_len: usize) -> Result<(), String> {
+        let s = self.steps.get();
+        if s == 0 {
+            return Err(STEP_LIMIT.to_string());
+        }
+        if s != u64::MAX {
+            self.steps.set(s - 1);
+        }
+        if out_len > self.max_output {
+            return Err(OUTPUT_LIMIT.to_string());
+        }
+        Ok(())
+    }
+
+    /// Check the budget **without** charging a step — for converting a fast-path early-out
+    /// (which decremented the shared counter directly) into the located error.
+    ///
+    /// # Errors
+    /// As [`Env::charge`].
+    pub fn check_budget(&self, out_len: usize) -> Result<(), String> {
+        if self.steps.get() == 0 {
+            return Err(STEP_LIMIT.to_string());
+        }
+        if out_len > self.max_output {
+            return Err(OUTPUT_LIMIT.to_string());
+        }
+        Ok(())
+    }
+
+    /// The shared step counter + output cap — for the VM fast path (`run_fast`), which is
+    /// Env-free and decrements/checks the budget inline.
+    #[must_use]
+    pub fn budget(&self) -> (&Cell<u64>, usize) {
+        (&self.steps, self.max_output)
     }
 
     /// A child scope that re-roots `this` and pushes the old `this` onto the parent
@@ -462,6 +556,9 @@ pub struct Template {
     /// The truthiness policy every render of this template uses (a load-time setting,
     /// docs/16). Defaults to [`TruthMode::NonEmpty`]; set with [`Template::with_truthiness`].
     mode: TruthMode,
+    /// Resource limits for every render (the untrusted-data DoS bound). Defaults to
+    /// [`Limits::UNLIMITED`]; set with [`Template::with_limits`].
+    limits: Limits,
 }
 
 impl Template {
@@ -477,6 +574,7 @@ impl Template {
             partials: Rc::new(registry),
             cap_hint: Cell::new(64),
             mode: TruthMode::NonEmpty,
+            limits: Limits::UNLIMITED,
         })
     }
 
@@ -503,6 +601,7 @@ impl Template {
             partials: Rc::new(registry),
             cap_hint: Cell::new(64),
             mode: TruthMode::NonEmpty,
+            limits: Limits::UNLIMITED,
         })
     }
 
@@ -513,6 +612,16 @@ impl Template {
     #[must_use]
     pub fn with_truthiness(mut self, mode: TruthMode) -> Self {
         self.mode = mode;
+        self
+    }
+
+    /// Set the resource [`Limits`] every render of this template enforces — the DoS bound
+    /// for **untrusted data** (docs/24, the N2 gate). Default is [`Limits::UNLIMITED`]; pass a
+    /// bounded `Limits` before rendering attacker-influenced or model-generated data, and a
+    /// pathological value returns a located error instead of a runaway render.
+    #[must_use]
+    pub fn with_limits(mut self, limits: Limits) -> Self {
+        self.limits = limits;
         self
     }
 
@@ -569,6 +678,8 @@ impl Template {
             expanding: Vec::new(),
             mode: self.mode,
             helpers: Rc::clone(helpers),
+            steps: Rc::new(Cell::new(self.limits.max_steps.unwrap_or(u64::MAX))),
+            max_output: self.limits.max_output.unwrap_or(usize::MAX),
         };
         eval_nodes(&env, &self.nodes, out)
     }
@@ -656,6 +767,10 @@ pub fn render(template: &str, data: Value) -> Result<String, String> {
 /// Propagates any evaluation error (a type error, an unknown helper/partial, a `{% yield %}`
 /// outside a block partial, …).
 pub fn eval_nodes(env: &Env, nodes: &[Node], out: &mut String) -> Result<(), String> {
+    // Charge one step per node-sequence render (≈ per loop iteration / block / partial entry)
+    // and check the output budget — the DoS bound for untrusted data ([`Limits`]). A no-op
+    // under the default unbounded limits, so conformance stays byte-identical.
+    env.charge(out.len())?;
     for n in nodes {
         eval_node(env, n, out)?;
     }
@@ -796,6 +911,9 @@ fn expand_partial(
         expanding,
         mode: env.mode,
         helpers: Rc::clone(&env.helpers),
+        // a partial shares the caller's render budget (the limit spans expansion).
+        steps: Rc::clone(&env.steps),
+        max_output: env.max_output,
     };
     eval_nodes(&child, body, out)
 }
@@ -1393,7 +1511,7 @@ fn eval_helper(env: &Env, name: &str, args: &[Expr]) -> Result<Value, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Helpers, Template, Value, render};
+    use super::{Helpers, Limits, Template, Value, render};
     use std::collections::BTreeMap;
     use std::rc::Rc;
 
@@ -1412,6 +1530,58 @@ mod tests {
 
     fn s(t: &str) -> Value {
         Value::Str(Rc::from(t))
+    }
+
+    // ── resource limits — the untrusted-data DoS bound (docs/24, the N2 gate) ──
+
+    #[test]
+    fn step_limit_bounds_a_runaway_loop_over_untrusted_data() {
+        // A `{% for %}` over a large attacker-controlled array: each iteration charges a step,
+        // so a tight step budget turns the runaway into a located error, not a hung render.
+        let big = arr(&(0..5_000).map(|i| s(&i.to_string())).collect::<Vec<_>>());
+        let data = obj(&[("xs", big)]);
+        let t = Template::parse("{% for x in xs %}{{x}}{% endfor %}")
+            .unwrap()
+            .with_limits(Limits {
+                max_steps: Some(100),
+                max_output: None,
+            });
+        let err = t.render(&data).unwrap_err();
+        assert!(err.contains("step limit exceeded"), "{err}");
+    }
+
+    #[test]
+    fn output_limit_bounds_amplified_output() {
+        // A loop that emits a chunk per element: a tight output budget catches the amplification
+        // even if the step budget is generous.
+        let big = arr(&(0..5_000).map(|_| s("xxxxxxxxxx")).collect::<Vec<_>>());
+        let data = obj(&[("xs", big)]);
+        let t = Template::parse("{% for x in xs %}{{x}}{% endfor %}")
+            .unwrap()
+            .with_limits(Limits {
+                max_steps: None,
+                max_output: Some(1_000),
+            });
+        let err = t.render(&data).unwrap_err();
+        assert!(err.contains("output limit exceeded"), "{err}");
+    }
+
+    #[test]
+    fn a_render_within_limits_succeeds_unchanged() {
+        // Under generous limits the output is byte-identical to an unbounded render — the gate
+        // only fires on abuse.
+        let data = obj(&[("xs", arr(&[s("a"), s("b"), s("c")]))]);
+        let src = "{% for x in xs %}[{{x}}]{% endfor %}";
+        let bounded = Template::parse(src).unwrap().with_limits(Limits {
+            max_steps: Some(10_000),
+            max_output: Some(10_000),
+        });
+        let unbounded = Template::parse(src).unwrap();
+        assert_eq!(
+            bounded.render(&data).unwrap(),
+            unbounded.render(&data).unwrap()
+        );
+        assert_eq!(bounded.render(&data).unwrap(), "[a][b][c]");
     }
 
     #[test]
