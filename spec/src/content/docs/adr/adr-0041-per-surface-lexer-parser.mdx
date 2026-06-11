@@ -168,13 +168,20 @@ built:
   better than a pure erasure would give. `{{{ … }}}` raw output and `{{! … }}` comments **are** erased
   (`bracesOutputOnly` baked in — `{{{` is a lex error, `{{!` is `not` output, the comment is
   `{# … #}`).
-- **Phase 4 slimmed the parser seam, not the lexer-interior knobs.** The dead
-  `ParseOptions.parseExpr`/`parseHead` seam, the `ExprParser` type, and the `clauseSeps` gate were
-  removed from the shared parser (no remaining dialect distinguishes head from output grammar). The
-  `LexOptions` knobs (`operatorChars`/`rangeOperator`/`collectionLiterals`) were **kept**: MaxBars
-  *highlighting* still runs the shared `tokenizeSpans` over the shared lexer with MaxBars's (now
-  inlined) config — highlighting is a separate axis from the parser coupling §1.1 targets, so owning a
-  MaxBars `tokenizeSpans` is a deferred follow-up, not part of this freeze.
+- **MaxBars owns its *entire* front-end — four modules, not two.** Beyond `MaxBars.Lexer` +
+  `MaxBars.Parser`, the fork extended to `MaxBars.Token` (the interior expression tokenizer, with the
+  infix alphabet / `..` range / `[…]`·`{k:v}` collections baked in) and `MaxBars.Highlight` (spans from
+  the owned lexer). Nothing in MaxBars's `String → Template`/spans path runs shared lexing code; it
+  shares only the AST *types* (`Syntax`, `Token`/`PosToken`/`Interior`, `Value`, `Span`) and the
+  back-end (desugar / engine / compile).
+- **Phase 4 fully slimmed the shared core.** Removed from the shared front-end, all now-dead: the
+  `ParseOptions.parseExpr`/`parseHead` seam + `ExprParser` type + `clauseSeps` gate (no remaining
+  dialect distinguishes head from output grammar), and the `LexOptions` knobs
+  (`operatorChars`/`rangeOperator`/`collectionLiterals`) + `defaultLexOptions` + `infixOperatorChars`
+  (no remaining dialect sets them non-default). `FlatBars.Token`'s `tokenizeInterior` is now the fixed
+  path/name-only grammar, and `FlatBars.Lexer.tokenizeTemplate` / `ParseOptions` / `HighlightConfig`
+  shed their `lexOptions`. The shared front-end is exactly what RawBars/ClassicBars/MinBars need.
 - The Phase 1–2 equivalence gates were retired with `maxOptions` once the fork became the production
   path; the full conformance suite (`test:compile`, `check:parity`, `examples`, `check:provenance`,
-  `check:parse-views`, the differential handlebars/mustache proofs) now covers it.
+  `check:parse-views`, the highlight/vocab/tmgrammar gates, the differential handlebars/mustache
+  proofs) now covers it.
