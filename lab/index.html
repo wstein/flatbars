@@ -1711,6 +1711,7 @@
       import { byId, qs } from "./app/dom.mjs?v=1";
       import { showBootError, bootFail } from "./app/boot-error.mjs?v=1";
       import { toast, openShareMenu, closeShareMenu } from "./app/ui-chrome.mjs?v=1";
+      import { createCmLanguages } from "./app/cm-languages.mjs?v=1";
       import { EditorState, Annotation, StateField, StateEffect, Compartment } from "https://esm.sh/@codemirror/state@6.5.2/es2022/state.mjs";
       import {
         Decoration,
@@ -2026,67 +2027,11 @@
         { tag: t.invalid, color: "var(--danger)" },
       ]);
 
-      // Lightweight highlighter for the JSONata transform editor: $functions and
-      // variables, strings, numbers, block comments, and operators. Token style
-      // names map through themeHighlight (already in the editors' extensions).
-      const jsonataLang = StreamLanguage.define({
-        token(stream) {
-          if (stream.match(/\/\*/)) {
-            while (!stream.match(/\*\//) && !stream.eol()) stream.next();
-            return "comment";
-          }
-          if (stream.match(/"(?:[^"\\]|\\.)*"/) || stream.match(/'(?:[^'\\]|\\.)*'/)) return "string";
-          if (stream.match(/\$[a-zA-Z_]\w*/) || stream.match(/\$/)) return "keyword";
-          if (stream.match(/-?\d+(\.\d+)?([eE][+-]?\d+)?/)) return "number";
-          if (stream.match(/(?:true|false|null)\b/)) return "atom";
-          if (stream.match(/[a-zA-Z_]\w*/)) return "variableName";
-          if (stream.match(/[+\-*/%=<>!&|~?:^@.]+/)) return "operator";
-          stream.next();
-          return null;
-        },
-      });
-
-      // Lightweight highlighter for the JS controller editor (Handlebars custom
-      // helpers): keywords, strings/templates, numbers, line+block comments, and
-      // operators. A StreamLanguage tokenizer in the same style as jsonataLang —
-      // enough for a short helper script without pulling a full JS grammar.
-      const JS_KEYWORDS =
-        /^(?:const|let|var|function|return|if|else|for|of|in|while|switch|case|break|continue|new|typeof|instanceof|this|class|extends|try|catch|finally|throw|await|async|yield|delete|void|do|null|undefined|true|false)\b/;
-      const jsLang = StreamLanguage.define({
-        token(stream) {
-          if (stream.match(/\/\//)) { stream.skipToEnd(); return "comment"; }
-          if (stream.match(/\/\*/)) {
-            while (!stream.match(/\*\//) && !stream.eol()) stream.next();
-            return "comment";
-          }
-          if (stream.match(/"(?:[^"\\]|\\.)*"/) || stream.match(/'(?:[^'\\]|\\.)*'/) || stream.match(/`(?:[^`\\]|\\.)*`/)) return "string";
-          if (stream.match(/(?:true|false|null|undefined)\b/)) return "atom";
-          if (stream.match(JS_KEYWORDS)) return "keyword";
-          if (stream.match(/-?\d+(\.\d+)?([eE][+-]?\d+)?/)) return "number";
-          if (stream.match(/[a-zA-Z_$][\w$]*/)) return "variableName";
-          if (stream.match(/[+\-*/%=<>!&|~?:^.]+/)) return "operator";
-          stream.next();
-          return null;
-        },
-      });
-
-      // Highlighter for the Bytecode disassembly view: uppercase opcodes/operands
-      // as keywords, quoted literals as strings, plus numbers and nil/bool atoms.
-      const BC_KEYWORDS =
-        /^(?:EMIT_TEXT|EMIT|IF|THEN|ELSE|EACH|WITH|DO|SCOPE|GET|ASSIGNS|ASSIGN|LOCAL|THIS|PARENT|ROOT|INDEX0|INDEX1|KEY|FIRST|LAST|LIT|CALL|ESCAPE|AS)\b/;
-      const bytecodeLang = StreamLanguage.define({
-        token(stream) {
-          if (stream.sol() && stream.match(/;.*/)) return "comment";
-          if (stream.eatSpace()) return null;
-          if (stream.match(/"(?:[^"\\]|\\.)*"/)) return "string";
-          if (stream.match(BC_KEYWORDS)) return "keyword";
-          if (stream.match(/-?\d+(\.\d+)?/)) return "number";
-          if (stream.match(/(?:true|false|nil|null)\b/)) return "atom";
-          if (stream.match(/[A-Za-z_]\w*/)) return "variableName";
-          stream.next();
-          return null;
-        },
-      });
+      // The lightweight JSONata / JS / bytecode StreamLanguage highlighters now
+      // live in ./app/cm-languages.mjs (pure tokenizers, unit-tested). They are
+      // built against this page's StreamLanguage instance so they reuse its single
+      // @codemirror/language (no duplicate-instance bug).
+      const { jsonataLang, jsLang, bytecodeLang } = createCmLanguages(StreamLanguage);
 
       // Coverage decoration (Panel #7: branch coverage in the editor).
       // The dock's Coverage tab lists every `if`/`unless`/`each`/`with` block

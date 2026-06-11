@@ -36,7 +36,8 @@ instead of re-closing over it.
 | `byId`/`qs` (in Bootstrap) | `app/dom.mjs` | none | ✅ |
 | `showBootError`/`bootFail` (Bootstrap) | `app/boot-error.mjs` | none (DOM-only) | ✅ (`fetchJson` stays inline → Phase 3 FileProvider) |
 | State block (1876) | `app/state.mjs` (`createAppState` record) | **defines** it | ✅ primitive built + tested; **adoption incremental** (consumers adopt on extraction) |
-| CodeMirror (1986) + Output editor (2288) | `app/editors.mjs` | reads state | ⛔ |
+| CodeMirror (1986): StreamLanguage tokenizers | `app/cm-languages.mjs` | none (pure) | ✅ (jsonata/js/bytecode, unit-tested) |
+| CodeMirror (1986) + Output editor (2288): EditorView wiring, decoration fields, update listeners | `app/editors.mjs` | reads ~14 state vars + ~10 inline callbacks | ⛔ (the nerve center — extract last, after its callback deps move) |
 | Virtual file explorer (2378) | `app/explorer.mjs` | reads/writes tabs | ⛔ |
 | Tabs (2658) + open-editor helpers (2769) | `app/tabs.mjs` | reads/writes tabs | ⛔ |
 | Compile + render `run()` (3080) | `app/render.mjs` | central; reads all | ⛔ |
