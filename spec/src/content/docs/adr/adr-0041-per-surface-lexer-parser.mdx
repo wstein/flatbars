@@ -185,3 +185,22 @@ built:
   path; the full conformance suite (`test:compile`, `check:parity`, `examples`, `check:provenance`,
   `check:parse-views`, the highlight/vocab/tmgrammar gates, the differential handlebars/mustache
   proofs) now covers it.
+
+### RawBars extracted too — the native/compat split
+
+RawBars (the desugared-core `{% %}` surface) followed MaxBars: `RawBars.Lexer` / `RawBars.Parser` /
+`RawBars.Highlight` own its front-end (it shares the path/name `FlatBars.Token` interior tokenizer —
+it has no infix grammar — and keeps the Handlebars `{{{ }}}`/`{{! }}` output+comment forms it retains,
+so `bracesOutputOnly` is off for it). `RawBars.purs` splits the owned dialect parse (`parseRaw`) from
+the CLI's configurable core path (`parseCore opts`, the shared parser — preserving
+`flatbars --compile --delimiters`). Every consumer (JS facade, CLI `lint`, `Linter.Lift`) was rewired
+off `coreOptions`, which is now gone.
+
+With MaxBars **and** RawBars off the shared lexer, nothing drove its `statementTags` / `bracesOutputOnly`
+knobs, so the entire `{% %}`/`{# #}` statement-tag machinery (`readStatementTag`, `{% raw %}`,
+`{% set/extends/include/yield/super %}`, `readInlineComment`, the `-` trim marker, …) was deleted from
+the shared `FlatBars.Lexer`. **The shared front-end is now purely Handlebars/Mustache** (ClassicBars +
+MinBars); the native `{% %}` family (RawBars/MaxBars/Trussbars) owns its lexers — the
+native-vs-compatibility split the ecosystem positioning calls for. ClassicBars/MinBars conformance is
+byte-identical (handlebars 49/50, mustache 184/184 unchanged). Only the two **compatibility** dialects
+remain on the shared front-end; per §6 that is now a deliberate end state, not a pending extraction.
