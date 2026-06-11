@@ -71,7 +71,8 @@ jobs:
 
   # The no_std proof: build the no_std-capable crates for a bare-metal target (no std
   # to link against). `trussbars-core` builds pure and full `perf`; the front-end
-  # `trussbars-template` (parse path) and the dynamic `trussbars-vm` build their libs
+  # `trussbars-template` (parse path) and BOTH dynamic backends — the tree-walk
+  # `trussbars-interp` and the bytecode `trussbars-vm` — build their libs
   # `--no-default-features` (`--lib`: the dev CLIs and `#[test]` need the std harness,
   # which runs in the `check` job).
   no-std:
@@ -89,7 +90,9 @@ jobs:
         run: cargo build -p trussbars-core --no-default-features --features perf --target thumbv7em-none-eabi
       - name: Build no_std (template parse path)
         run: cargo build -p trussbars-template --lib --no-default-features --target thumbv7em-none-eabi
-      - name: Build no_std (VM)
+      - name: Build no_std (interpreter)
+        run: cargo build -p trussbars-interp --lib --no-default-features --target thumbv7em-none-eabi
+      - name: Build no_std (bytecode VM)
         run: cargo build -p trussbars-vm --lib --no-default-features --target thumbv7em-none-eabi
 
   # The perf-regression ratchet: a separate workspace (it pulls handlebars/askama/

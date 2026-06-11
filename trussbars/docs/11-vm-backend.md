@@ -46,7 +46,7 @@ What this buys, and what it costs, stated plainly:
 | **Injection-safe (no SSTI)** | ✅ no interpreter at all | ✅ **preserved** — static names rule (§6); no `apply`, no computed partials, no computed `lookup` |
 | **Host-typed field checking** (`{{post.titlee}}` ⇒ compile error) | ✅ rustc-enforced | ⚠️ lost in lenient mode; **recovered in AOT-compat mode** (§7), exact for the modeled subset |
 | **Performance** | safe-Rust ceiling (~0.8 µs, docs/05) | interpreter — 10–100× slower; still expected to beat handlebars, nowhere near AOT |
-| **`no_std` + `forbid(unsafe)`** | ✅ | ✅ **shipped** — the VM lib (+ the `trussbars-template` parse path it reuses) builds `--no-default-features` for bare-metal/WASM; `alloc`-only, `forbid(unsafe)` (see §5). The dev `truss-vm` CLI stays `std`. |
+| **`no_std` + `forbid(unsafe)`** | ✅ | ✅ **shipped** — the VM lib (+ the `trussbars-template` parse path it reuses) builds `--no-default-features` for bare-metal/WASM; `alloc`-only, `forbid(unsafe)` (see §5). The dev `truss-interp` CLI stays `std`. |
 
 The host-typed-checking loss is the real trade. It is the *same* trade Tera/minijinja
 make against Askama/Maud — Trussbars now spans both halves of that split deliberately,
@@ -93,7 +93,7 @@ reason.
 
 ### 4.1 Measured (the spike + an allocation pass)
 
-The tree-walk spike is built (`trussbars-vm`) and gated: **34/34** of the covered
+The tree-walk interpreter is built (`trussbars-interp`) and gated: **34/34** of the covered
 conformance corpus byte-match the oracle (the rest report `unsupported`, honestly —
 partials, the collection filters, `pluck`/`sortBy`/`groupBy`, a few helpers). It is the
 6th engine in `trussbars/benchmarks`; the perf gate asserts **AOT ≤ VM ≤ handlebars**.
@@ -125,32 +125,48 @@ AOT remains the speed story while the VM owns dynamic flexibility.
 **Conclusion (evidence-first, like docs/05):** a *cheap-clone `Value` + tree-walk* clears
 the bar (VM ≥ handlebars, by 3×) without bytecode.
 
-### 4.2 Bytecode experiment (measured)
+### 4.2 Bytecode VM — separate crate, measured (≥2× the interpreter)
 
-The deferral was *pending a measurement* that bytecode beats the tree-walk. A subset
-bytecode VM (`bytecode.rs` — a flat instruction array + a stack machine; covers the
-benchmark workloads, errors on the rest) provides it. Byte-identical to the tree-walk
-(asserted in the equality gate); same min-of-N run:
+The deferral was *pending a measurement* that bytecode beats the tree-walk. The bytecode
+VM now lives in its **own crate, `trussbars-vm`** — honestly separated from the tree-walk
+**interpreter** (`trussbars-interp`), which keeps the name that fits what it is. The VM
+reuses the interpreter's [`Value`] and `write_escaped`/`raw_text` writers verbatim (so the
+two dynamic backends stay byte-identical, asserted in the equality gate), and adds a flat
+instruction array run by a **borrow-based machine**: output and control ops carry a
+pre-resolved path, the evaluator resolves it to a `&Value` and writes straight to the
+buffer, so the render hot loop does **zero `Value` clones and keeps no value stack** (only
+an `Rc` refcount bump per loop entry). It covers the benchmark subset and errors on the
+rest. Criterion medians (release; the perf-gate min-of-N agrees within noise):
 
 ```text
-              AOT     vy(unsafe)  tree-walk   BYTECODE    handlebars
-big-table     54 µs   19 µs       1.14 ms     371 µs      2.6 ms      bytecode ~3.0× the tree-walk
-teams         41 ns   83 ns       1.25 µs     667 ns      3.9 µs      bytecode ~1.9× the tree-walk
+              AOT     vy(unsafe)  BYTECODE-VM   interpreter   handlebars
+big-table     36 µs   20 µs       326 µs        1.14 ms       2.67 ms     VM ~3.5× the interpreter
+teams         88 ns   137 ns      403 ns        1.43 µs       4.03 µs     VM ~3.5× the interpreter
 ```
 
-So **bytecode is ~2–3× faster than the tree-walk** — real, and as expected (no AST
-pointer-chasing; flat dispatch). But two things temper it: **(a)** AOT stays ~7–16×
-faster than *bytecode* (it's still the speed path — if you need speed, compile), and
-**(b)** the tree-walk *already* cleared the only hard bar (≥ handlebars, by 3×).
+> **Correction (the honest re-measurement).** The earlier figures here showed the
+> tree-walk at ~1.14 ms / ~1.25 µs but the *benchmark column* at ~371 µs — because the
+> interpreter's `Template` silently ran the bytecode fast path for the covered subset, so
+> the "interpreter" column was secretly measuring bytecode (the two came out *tied*). That
+> fast path is **removed**: `trussbars-interp` is now a pure tree-walker, and the columns
+> measure what they say. The true interpreter is ~1.14 ms; the (now borrow-based) VM is
+> ~326 µs — **~3.5× faster**, comfortably past the 2× bar, and the perf gate ratchets
+> `VM × 2 ≤ interpreter` on both workloads.
 
-**Verdict:** bytecode is a genuine dynamic-path speedup, but the *full* build (the whole
-catalog + a name→slot resolve pass + a 3rd conformance axis + perpetual two-backend
-maintenance) is a large, permanent cost for a path where **AOT is the speed answer**. So
-bytecode **stays deferred** — now with data — gated on a real trigger: a workload where
-*dynamic-path throughput* is the proven bottleneck (the 2–3× would matter there), a named
-*embedding* consumer (a portable bytecode artifact), or the AOT-compat *compile pass*
-(load-time checks + slot resolution, which is half a bytecode compiler anyway). Not a
-speed chase — but the experiment crate stays as the head-start.
+So **the bytecode VM is ~3.5× the interpreter** — real, and as expected (no AST
+pointer-chasing, flat dispatch, borrow-based output). Two things still temper it: **(a)**
+AOT stays ~9–11× faster than the *VM* (it's still the speed path — if you need speed,
+compile), and **(b)** the interpreter alone already clears the hard bar (≥ handlebars).
+
+**Verdict:** the VM is a genuine ~3.5× dynamic-path speedup and now ships as its own crate
+(`trussbars-vm`) covering the benchmarked subset. Growing it to the *full* catalog (a
+name→slot resolve pass + a 3rd conformance axis + perpetual two-backend maintenance) stays
+gated on a real trigger: a workload where *dynamic-path throughput* is the proven
+bottleneck, a named *embedding* consumer (a portable bytecode artifact), or the AOT-compat
+*compile pass* (load-time checks + slot resolution, which is half a bytecode compiler
+anyway). Not a speed chase — but the crate is here, optimized, with the head-start banked.
+
+[`Value`]: ../crates/trussbars-interp/src/lib.rs
 
 ## 5. The dynamic `Value` model (the part AOT shed)
 
@@ -247,7 +263,7 @@ needs monomorphized codegen + a registration affordance. So the VM is the natura
 catalog, not less. (AOT pure-op gaps `range`/`bind`/`log` and `dict` are separate,
 small, and tracked independently of this doc.)
 
-**Done** (`trussbars-vm`): `Helpers` is exactly that registry — `register(name, |args:
+**Done** (`trussbars-interp`): `Helpers` is exactly that registry — `register(name, |args:
 &[Value]| -> Result<Value>)` — passed to `Template::render_with`. An unknown helper
 head resolves against it; in AOT-compat mode host helpers are **rejected** (AOT
 registers none), keeping the verifying-proxy guarantee. The i18n/locale pack on top is
@@ -258,7 +274,7 @@ then just a set of host helpers (a follow-up that needs no engine change).
 The project's safety net extends cleanly. Today: **interpreter (oracle) ≡ AOT**
 (71/71, `docs/04`). Add **VM ≡ oracle**, reusing the *same corpus and harness shape*:
 render each case through the VM, assert byte-equality against the committed golden —
-exactly as `harness.mjs` does for AOT (a `--vm` flag beside `--v2`). Then **VM ≡ AOT**
+exactly as `harness.mjs` does for AOT (a `--interp` flag beside `--v2`). Then **VM ≡ AOT**
 follows transitively on the shared subset.
 
 Crucially, the VM can run the corpus cases **AOT cannot** (dynamic-data / runtime
@@ -277,7 +293,7 @@ AOT-compat *reject* oracle.
 ```text
         MaxBars oracle (PureScript, reference)
           ║                         ║
-          ║ 71/71 (done)            ║ NEW: --vm gate, same corpus + the dynamic-only cases
+          ║ 71/71 (done)            ║ NEW: --interp gate, same corpus + the dynamic-only cases
           ▼                         ▼
         AOT  ───────── ≡ ───────── VM        (transitive on the shared subset)
 ```
@@ -293,7 +309,7 @@ the VM is the second half.
 
 **Shipped precursor — `examples/lab`.** A [ratatui](https://ratatui.rs) **terminal**
 mini-Lab already exercises this exact surface minus the browser: it **live-edits** a
-template and its (JSON) data and re-renders through `trussbars-vm` on each keystroke,
+template and its (JSON) data and re-renders through `trussbars-interp` on each keystroke,
 switches locale via i18n **host helpers** (`t`/`number`/`plural`/`date`/`relative`, §8 —
 the language drives a localized month name too). (It once toggled `render_compat` to show
 an AOT-parity verdict; that mode was removed with the AOT-compat layer — see §7's

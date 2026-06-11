@@ -178,7 +178,7 @@ the corpus an authority before Trussbars conforms byte-for-byte (docs/12 §5.5).
    pipe-the-result (`| trim`), nested capture, the reserved-name rejection.
 3. **Trussbars Rust.** Parser builds `Capture`; the emitter renders the body into a `String` and
    binds `Safe` with `{% set %}` scope; the VM mirrors it; size-hint seeds `__cap`. Corpus on
-   `--v2`/`--vm`/`--vm-compat`; freeze (docs/06 §5) amended to list `capture` IN; the
+   `--v2`/`--interp`/`--vm-compat`; freeze (docs/06 §5) amended to list `capture` IN; the
    unused-capture lint filed against docs/10.
 4. **Importer (docs/15).** Map Liquid `{% capture %}` / Jinja `{% set x %}…{% endset %}` →
    `{% capture %}`. Trussbars's `safe`-by-default capture **matches Jinja**, whose `{% set %}…

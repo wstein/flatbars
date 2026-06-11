@@ -160,7 +160,7 @@ likewise, pointing at `{% with %}`/Handlebars idioms; in MinBars they are ordina
 ### 5.1 One node, two scope-named spellings, byte-identical across backends
 
 `set` and `local` share the binding node and the `let`-emit. The reference handle, the AOT Rust
-`let`, the VM, and the JS compiler render identically, pinned by the corpus (`--v2`/`--vm`/
+`let`, the VM, and the JS compiler render identically, pinned by the corpus (`--v2`/`--interp`/
 `--vm-compat`) and `test:compile`. Neither can diverge a backend without diverging the other.
 
 ### 5.2 `let`→`local` is a freeze amendment (a rename, not a new feature)
@@ -198,7 +198,7 @@ byte-for-byte (docs/12 §5.5).
    forward sugar. Add `set-*`/`local-*` cases (prologue, in-loop drop, shadow, number-truthiness
    compile-error, reserved-name rejection, `local` auto-drop).
 3. **Trussbars Rust.** `local` keeps the block emit; `set` splices a bare `let`; the VM mirrors
-   both. Corpus on `--v2`/`--vm`/`--vm-compat`; freeze (docs/06 §5) amended (`let`→`local`, `set`
+   both. Corpus on `--v2`/`--interp`/`--vm-compat`; freeze (docs/06 §5) amended (`let`→`local`, `set`
    IN).
 4. **Migration (docs/15).** Codemod `{{#let}}`/`{% let %}` → `{% local %}`, Liquid/Jinja
    `{% assign %}`/`{% set %}` → `{% set %}` (with the leak/accumulator findings, §5.3).

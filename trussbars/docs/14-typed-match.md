@@ -178,7 +178,7 @@ the cross-backend debate — is:
 ## 7. Conformance & governance
 
 - A `{{#match}}` corpus case renders **byte-identically** to its `{{#case}}`-with-string-arms
-  twin on every axis (`--v2`/`--vm`/`--vm-compat`, `test:compile`) — the runtime dispatch is
+  twin on every axis (`--v2`/`--interp`/`--vm-compat`, `test:compile`) — the runtime dispatch is
   the same. The new thing to test is the **AOT exhaustiveness diagnostic**: a `trybuild`
   UI-snapshot (an omitted variant → rustc's non-exhaustive-`match` error) and the accept case.
 - Governed like `{{#case}}`: it is **nonEmpty-family surface** (RawBars/MaxBars), so the

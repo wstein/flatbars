@@ -146,7 +146,7 @@ empty"* vs *"no `{{else}}`"*).
 - **Still raw, still allow-listed, still rejected in AOT-compat** — unchanged from above.
 - **When built (not now):** land it *with* a real example helper that uses `{{else}}`
   (e.g. a `take n` / `paginate`), rendered through AOT **and** the VM and byte-compared,
-  added to the `--vm`/`--vm-compat` conformance axes — no untested convention ships.
+  added to the `--interp`/`--vm-compat` conformance axes — no untested convention ships.
 - **Not** this: *named, multi-arm* blocks (`{{#case}}…{{when …}}…{{else}}`) are a
   separate feature with their own decision doc — see [`docs/12`](12-case-multiarm-blocks.md).
   `Arm` is forward-compatible (it can grow variants without changing the closure shape),

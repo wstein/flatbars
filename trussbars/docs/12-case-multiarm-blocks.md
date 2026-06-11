@@ -3,7 +3,7 @@
 > **Status:** **Implemented** — a *first-class* construct (not a desugar). Reference:
 > `Kernel.Prelude.caseH` (RawBars/MaxBars). Trussbars: `trussbars-template::Case` lowered to
 > a Rust `match` by the AOT emitter, mirrored by the VM. Conformance: the `case-*` corpus
-> cases on `--v2`/`--vm`/`--vm-compat`; `test:compile` pins the JS compiler. **Audience:**
+> cases on `--v2`/`--interp`/`--vm-compat`; `test:compile` pins the JS compiler. **Audience:**
 > whoever extends surface control flow. Companion to `docs/09 §3.1` (host block helpers —
 > which this is explicitly **not** a generalization of), `docs/01` (the subset spec this
 > amends), `docs/04` (conformance), and `docs/08` (the v2 front-end this extends).
@@ -94,7 +94,7 @@ The AOT emitter lowers it to a **Rust `match`** — the subject bound once, one 
 ```
 
 Each guard reuses the same `==` the `eq` operator emits, so the rendered bytes are identical
-to the interpreter — a `{{#case}}` corpus case passes the `--v2`, `--vm`, and `--vm-compat`
+to the interpreter — a `{{#case}}` corpus case passes the `--v2`, `--interp`, and `--vm-compat`
 axes. The win over the desugared `eq`-chain is that the subject is evaluated **once**, and
 the node is the seam the typed-exhaustive `match` (§4 A2) plugs into later.
 
@@ -129,7 +129,7 @@ and the AOT backend emits a `match`.
 
 The `Case` node is rendered by four backends — the reference `caseH`, the AOT Rust `match`,
 the VM tree-walk, and the JS/`MaxBars.Rust.purs` compilers — each pinned byte-for-byte by
-the conformance corpus (`--v2`, `--vm`, `--vm-compat`) and `test:compile`. The arms carry
+the conformance corpus (`--v2`, `--interp`, `--vm-compat`) and `test:compile`. The arms carry
 *raw* values, so the AOT emitter is free to choose its dispatch (today a guard `match`;
 tomorrow a literal-pattern `match`, §4 A2) without touching the surface or the other
 backends.
@@ -175,7 +175,7 @@ authority for every `{{#case}}` case. (ClassicBars and MinBars are excluded — 
    conformance corpus then has an authority for each case. **Done.**
 3. **Trussbars Rust (`Case` node → `match`).** `case_block` builds a first-class `Case`
    (`Stop::When`, splitting on `when`/`else`); the emitter lowers it to a Rust `match` and the
-   VM mirrors it; corpus cases on the `--v2`/`--vm`/`--vm-compat` axes; the reserved-word
+   VM mirrors it; corpus cases on the `--v2`/`--interp`/`--vm-compat` axes; the reserved-word
    rejection (§5.2); `docs/09` cross-linked. **Done.**
 4. **Later, optional:** **A2** — a typed exhaustive `{{#case}}` over closed `#[serde(tag)]`
    enums (compile-time exhaustiveness), its own decision once the schema/enum story

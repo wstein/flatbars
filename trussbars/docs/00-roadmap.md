@@ -112,7 +112,7 @@ strict-native direction:
    the Rust proxy in lock-step was standing maintenance for a preview of "would this
    compile?" that the compiler answers directly. With strict-native there is no broader
    "compat surface" to assess, so the whole apparatus goes. Removed:
-   - **Rust:** `Template::render_compat`, the `truss-vm --compat` flag, the VM's `strict`
+   - **Rust:** `Template::render_compat`, the `truss-interp --compat` flag, the VM's `strict`
      field + all AOT-reject branches (numeric truthiness, bare-struct output, unknown
      field, host-helper-in-strict, dict-iteration), the `aot_compat_mode` test; and the
      `examples/lab` TUI's `Mode::Compat` toggle. The VM is now **lenient-only**.

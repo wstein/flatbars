@@ -134,7 +134,7 @@ viewer only displays the result).
   compile under AOT, identically? (the verifying proxy);
 - the **emitted Rust** the AOT backend would generate.
 
-`Inspection::to_json()` (dependency-free) feeds the Studio viewer; the `truss-vm
+`Inspection::to_json()` (dependency-free) feeds the Studio viewer; the `truss-interp
 --inspect` CLI prints it. Delivery modes (docs/11 §10): (A) dump-and-load JSON, (B) an
 app-served local Studio that re-`inspect`s in-process on edit. **Phase 2** (the context
 inspector — `this`/`parent`/`root`/locals at a span) is the next layer on the same
