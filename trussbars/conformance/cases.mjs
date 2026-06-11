@@ -337,6 +337,11 @@ export const cases = [
     data: {},
   },
   {
+    id: "inline-comment",
+    template: "a{# a Django/Jinja comment #}b{% if on %}{# dropped #}c{% endif %}",
+    data: { on: true },
+  },
+  {
     id: "inherit-multilevel",
     template:
       '{% inline "base" %}<b>{% block c %}base{% endblock %}</b>{% endinline %}{% inline "mid" %}{% extends "base" %}{% block c %}mid{% endblock %}{% endinline %}{% extends "mid" %}{% block c %}leaf{% endblock %}',

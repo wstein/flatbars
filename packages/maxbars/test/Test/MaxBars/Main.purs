@@ -394,6 +394,14 @@ main = do
   assert' "reject: two-word else if"
     (isLeft (renderMax "{% if a %}A{% else if b %}B{% endif %}" (obj [])))
 
+  -- `{# … #}` inline comments (ADR-039 item 1): dropped from output, like Jinja/Django,
+  -- in every position (top level, inside a block, multi-line).
+  expectM "comment-inline" "a{# note #}b" (obj []) "ab"
+  expectM "comment-in-block" "{% if on %}A{# c #}B{% endif %}"
+    (obj [ Tuple "on" (VBool true) ])
+    "AB"
+  expectM "comment-multiline" "p{#\nspans\n#}q" (obj []) "pq"
+
   -- Verbatim region: the `{% raw %}` spelling (ADR-039 item 2) keeps its body
   -- untouched — `{{x}}` and a nested `{% if %}` are literal text, not interpolated.
   expectM "raw-region"

@@ -53,6 +53,7 @@
   "partial-context": "[Intro]",
   "inherit-override-default": "<h>Site</h><b>Hi Ada</b>",
   "inherit-super": "[Base]",
+  "inline-comment": "abc",
   "inherit-multilevel": "<b>leaf</b>",
   "outer-label": "1:a 1:b 2:c ",
   "pluck": "a,b",

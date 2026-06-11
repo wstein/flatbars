@@ -6878,8 +6878,8 @@ var isSpace = function(c) {
 };
 var sepHead = function(s) {
   var cs = dropWhile(isSpace)(toCharArray(s));
-  return fromCharArray(takeWhile(function($457) {
-    return !isSpace($457);
+  return fromCharArray(takeWhile(function($464) {
+    return !isSpace($464);
   })(cs));
 };
 var trimEndWs = function(s) {
@@ -6892,8 +6892,8 @@ var hasNL = function(s) {
   return notEq4(nlIndex(true)(s))(Nothing.value);
 };
 var firstWord = function(s) {
-  return fromCharArray(takeWhile(function($458) {
-    return !isSpace($458);
+  return fromCharArray(takeWhile(function($465) {
+    return !isSpace($465);
   })(dropWhile(isSpace)(toCharArray(s))));
 };
 var findFrom = function(cs) {
@@ -6969,8 +6969,8 @@ var tokenizeTemplate = function(cfg) {
         };
       };
       var rawName = function(s) {
-        return fromCharArray(takeWhile(function($459) {
-          return !isSpace($459);
+        return fromCharArray(takeWhile(function($466) {
+          return !isSpace($466);
         })(dropWhile(isSpace)(toCharArray(s))));
       };
       var interiorAt = function(base) {
@@ -6997,8 +6997,8 @@ var tokenizeTemplate = function(cfg) {
                   ;
                   return s1;
                 })();
-                var $215 = s2 === "";
-                if ($215) {
+                var $217 = s2 === "";
+                if ($217) {
                   return acc;
                 }
                 ;
@@ -7008,25 +7008,25 @@ var tokenizeTemplate = function(cfg) {
           };
         };
       };
-      var finalize = function($460) {
-        return fromFoldable3(reverse2($460));
+      var finalize = function($467) {
+        return fromFoldable3(reverse2($467));
       };
       var delimWords = function(s) {
         var a0 = dropWhile(isSpace)(toCharArray(s));
-        var a1 = dropWhile(isSpace)(dropWhile(function($461) {
-          return !isSpace($461);
+        var a1 = dropWhile(isSpace)(dropWhile(function($468) {
+          return !isSpace($468);
         })(a0));
-        var rest = dropWhile(isSpace)(dropWhile(function($462) {
-          return !isSpace($462);
+        var rest = dropWhile(isSpace)(dropWhile(function($469) {
+          return !isSpace($469);
         })(a1));
-        var w2 = takeWhile(function($463) {
-          return !isSpace($463);
+        var w2 = takeWhile(function($470) {
+          return !isSpace($470);
         })(a1);
-        var w1 = takeWhile(function($464) {
-          return !isSpace($464);
+        var w1 = takeWhile(function($471) {
+          return !isSpace($471);
         })(a0);
-        var $216 = $$null(w1) || ($$null(w2) || !$$null(rest));
-        if ($216) {
+        var $218 = $$null(w1) || ($$null(w2) || !$$null(rest));
+        if ($218) {
           return Nothing.value;
         }
         ;
@@ -7038,9 +7038,9 @@ var tokenizeTemplate = function(cfg) {
       var parseDelimDirective = function(interior) {
         var t = trimStartWs(interior);
         var v = bind3(stripPrefix("@delimiters")(t))((function() {
-          var $465 = stripPrefix(":");
-          return function($466) {
-            return $465(trimStartWs($466));
+          var $472 = stripPrefix(":");
+          return function($473) {
+            return $472(trimStartWs($473));
           };
         })());
         if (v instanceof Nothing) {
@@ -7058,7 +7058,7 @@ var tokenizeTemplate = function(cfg) {
           })());
         }
         ;
-        throw new Error("Failed pattern match at FlatBars.Lexer (line 535, column 7 - line 542, column 100): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at FlatBars.Lexer (line 549, column 7 - line 556, column 100): " + [v.constructor.name]);
       };
       var delimSwitch = function(v) {
         if (v instanceof Just && (v.value0 instanceof RComment && cfg.mustacheDelims)) {
@@ -7075,7 +7075,7 @@ var tokenizeTemplate = function(cfg) {
             return new Right(new Just(v1.value0.value0));
           }
           ;
-          throw new Error("Failed pattern match at FlatBars.Lexer (line 522, column 58 - line 525, column 39): " + [v1.constructor.name]);
+          throw new Error("Failed pattern match at FlatBars.Lexer (line 536, column 58 - line 539, column 39): " + [v1.constructor.name]);
         }
         ;
         return new Right(Nothing.value);
@@ -7164,8 +7164,8 @@ var tokenizeTemplate = function(cfg) {
                   if (v instanceof Just && v.value0 === "}") {
                     $tco_var_i = i + 1 | 0;
                     $copy_depth = (function() {
-                      var $239 = depth > 0;
-                      if ($239) {
+                      var $241 = depth > 0;
+                      if ($241) {
                         return depth - 1 | 0;
                       }
                       ;
@@ -7281,7 +7281,7 @@ var tokenizeTemplate = function(cfg) {
           return Nothing.value;
         }
         ;
-        throw new Error("Failed pattern match at FlatBars.Lexer (line 569, column 3 - line 569, column 41): " + [i.constructor.name]);
+        throw new Error("Failed pattern match at FlatBars.Lexer (line 583, column 3 - line 583, column 41): " + [i.constructor.name]);
       };
       var isSeparatorAt = function(i) {
         return matchAt(cs)(i)("{{") && (!matchAt(cs)(i)("{{{") && (function() {
@@ -7294,7 +7294,7 @@ var tokenizeTemplate = function(cfg) {
             return true;
           }
           ;
-          throw new Error("Failed pattern match at FlatBars.Lexer (line 598, column 70 - line 600, column 20): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at FlatBars.Lexer (line 612, column 70 - line 614, column 20): " + [v.constructor.name]);
         })());
       };
       var escapedOpenerAt = function(i) {
@@ -7304,15 +7304,15 @@ var tokenizeTemplate = function(cfg) {
         }
         ;
         if (v instanceof Nothing) {
-          var $246 = isSeparatorAt(i);
-          if ($246) {
+          var $248 = isSeparatorAt(i);
+          if ($248) {
             return new Just("{{");
           }
           ;
           return Nothing.value;
         }
         ;
-        throw new Error("Failed pattern match at FlatBars.Lexer (line 609, column 23 - line 611, column 62): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at FlatBars.Lexer (line 623, column 23 - line 625, column 62): " + [v.constructor.name]);
       };
       var isOpenerAt = function(i) {
         var v = openerLiteralAt(i);
@@ -7324,7 +7324,7 @@ var tokenizeTemplate = function(cfg) {
           return isSeparatorAt(i);
         }
         ;
-        throw new Error("Failed pattern match at FlatBars.Lexer (line 603, column 18 - line 605, column 31): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at FlatBars.Lexer (line 617, column 18 - line 619, column 31): " + [v.constructor.name]);
       };
       var pushSeg = function(segStart) {
         return function(frags) {
@@ -7409,9 +7409,30 @@ var tokenizeTemplate = function(cfg) {
               return mk(new RSep(span2, start, interior, interiorAt(start)(interior)));
             }
             ;
-            throw new Error("Failed pattern match at FlatBars.Lexer (line 1012, column 7 - line 1043, column 77): " + [v.constructor.name]);
+            throw new Error("Failed pattern match at FlatBars.Lexer (line 1045, column 7 - line 1076, column 77): " + [v.constructor.name]);
           };
         };
+      };
+      var readInlineComment = function(i) {
+        var start = i + 2 | 0;
+        var v = findFrom(cs)(start)("#}");
+        if (v instanceof Nothing) {
+          return new Left(new UnterminatedComment(i));
+        }
+        ;
+        if (v instanceof Just) {
+          return new Right({
+            mtok: new Just(new RComment({
+              start: i,
+              end: v.value0 + 2 | 0
+            }, start, slice3(cs)(start)(v.value0))),
+            next: v.value0 + 2 | 0,
+            trimL: false,
+            trimR: false
+          });
+        }
+        ;
+        throw new Error("Failed pattern match at FlatBars.Lexer (line 923, column 7 - line 931, column 14): " + [v.constructor.name]);
       };
       var readLongComment = function(i) {
         return function(opener) {
@@ -7438,7 +7459,7 @@ var tokenizeTemplate = function(cfg) {
             });
           }
           ;
-          throw new Error("Failed pattern match at FlatBars.Lexer (line 905, column 30 - line 912, column 8): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at FlatBars.Lexer (line 938, column 30 - line 945, column 8): " + [v.constructor.name]);
         };
       };
       var readRaw = function(i) {
@@ -7471,10 +7492,10 @@ var tokenizeTemplate = function(cfg) {
               });
             }
             ;
-            throw new Error("Failed pattern match at FlatBars.Lexer (line 932, column 13 - line 946, column 22): " + [v1.constructor.name]);
+            throw new Error("Failed pattern match at FlatBars.Lexer (line 965, column 13 - line 979, column 22): " + [v1.constructor.name]);
           }
           ;
-          throw new Error("Failed pattern match at FlatBars.Lexer (line 921, column 7 - line 946, column 22): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at FlatBars.Lexer (line 954, column 7 - line 979, column 22): " + [v.constructor.name]);
         };
       };
       var readSetDelim = function(i) {
@@ -7514,10 +7535,10 @@ var tokenizeTemplate = function(cfg) {
                 ;
               }
               ;
-              throw new Error("Failed pattern match at FlatBars.Lexer (line 968, column 19 - line 979, column 88): " + [v1.constructor.name]);
+              throw new Error("Failed pattern match at FlatBars.Lexer (line 1001, column 19 - line 1012, column 88): " + [v1.constructor.name]);
             }
             ;
-            throw new Error("Failed pattern match at FlatBars.Lexer (line 965, column 7 - line 979, column 88): " + [v.constructor.name]);
+            throw new Error("Failed pattern match at FlatBars.Lexer (line 998, column 7 - line 1012, column 88): " + [v.constructor.name]);
           };
         };
       };
@@ -7549,7 +7570,7 @@ var tokenizeTemplate = function(cfg) {
             });
           }
           ;
-          throw new Error("Failed pattern match at FlatBars.Lexer (line 886, column 7 - line 898, column 16): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at FlatBars.Lexer (line 900, column 7 - line 912, column 16): " + [v.constructor.name]);
         };
       };
       var contentTo = function(segStart) {
@@ -7612,7 +7633,7 @@ var tokenizeTemplate = function(cfg) {
                 return;
               }
               ;
-              throw new Error("Failed pattern match at FlatBars.Lexer (line 867, column 29 - line 872, column 34): " + [v.constructor.name]);
+              throw new Error("Failed pattern match at FlatBars.Lexer (line 881, column 29 - line 886, column 34): " + [v.constructor.name]);
             }
             ;
             if (otherwise) {
@@ -7620,7 +7641,7 @@ var tokenizeTemplate = function(cfg) {
               return;
             }
             ;
-            throw new Error("Failed pattern match at FlatBars.Lexer (line 865, column 5 - line 873, column 33): " + [j.constructor.name]);
+            throw new Error("Failed pattern match at FlatBars.Lexer (line 879, column 5 - line 887, column 33): " + [j.constructor.name]);
           }
           ;
           while (!$tco_done2) {
@@ -7651,7 +7672,7 @@ var tokenizeTemplate = function(cfg) {
               });
             }
             ;
-            throw new Error("Failed pattern match at FlatBars.Lexer (line 846, column 39 - line 857, column 8): " + [v.constructor.name]);
+            throw new Error("Failed pattern match at FlatBars.Lexer (line 860, column 39 - line 871, column 8): " + [v.constructor.name]);
           };
         };
       };
@@ -7676,7 +7697,7 @@ var tokenizeTemplate = function(cfg) {
             });
           }
           ;
-          throw new Error("Failed pattern match at FlatBars.Lexer (line 741, column 7 - line 752, column 16): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at FlatBars.Lexer (line 755, column 7 - line 766, column 16): " + [v.constructor.name]);
         };
       };
       var readBlockOpen = function(i) {
@@ -7703,7 +7724,7 @@ var tokenizeTemplate = function(cfg) {
                 });
               }
               ;
-              throw new Error("Failed pattern match at FlatBars.Lexer (line 700, column 7 - line 712, column 16): " + [v.constructor.name]);
+              throw new Error("Failed pattern match at FlatBars.Lexer (line 714, column 7 - line 726, column 16): " + [v.constructor.name]);
             };
           };
         };
@@ -7731,7 +7752,7 @@ var tokenizeTemplate = function(cfg) {
               });
             }
             ;
-            throw new Error("Failed pattern match at FlatBars.Lexer (line 722, column 7 - line 733, column 16): " + [v.constructor.name]);
+            throw new Error("Failed pattern match at FlatBars.Lexer (line 736, column 7 - line 747, column 16): " + [v.constructor.name]);
           };
         };
       };
@@ -7755,12 +7776,12 @@ var tokenizeTemplate = function(cfg) {
           });
         }
         ;
-        throw new Error("Failed pattern match at FlatBars.Lexer (line 678, column 7 - line 689, column 16): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at FlatBars.Lexer (line 692, column 7 - line 703, column 16): " + [v.constructor.name]);
       };
       var readSeparator = function(i) {
         var start = (function() {
-          var $291 = leadTrimAt(i);
-          if ($291) {
+          var $295 = leadTrimAt(i);
+          if ($295) {
             return i + 3 | 0;
           }
           ;
@@ -7784,7 +7805,7 @@ var tokenizeTemplate = function(cfg) {
           });
         }
         ;
-        throw new Error("Failed pattern match at FlatBars.Lexer (line 762, column 7 - line 773, column 16): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at FlatBars.Lexer (line 776, column 7 - line 787, column 16): " + [v.constructor.name]);
       };
       var readTag = function(i) {
         if (matchAt(cs)(i)("{{{{#")) {
@@ -7895,12 +7916,12 @@ var tokenizeTemplate = function(cfg) {
           return new Left(new LexError("internal: no opener", i));
         }
         ;
-        throw new Error("Failed pattern match at FlatBars.Lexer (line 613, column 3 - line 613, column 48): " + [i.constructor.name]);
+        throw new Error("Failed pattern match at FlatBars.Lexer (line 627, column 3 - line 627, column 48): " + [i.constructor.name]);
       };
       var readStatementTag = function(i) {
         var start = (function() {
-          var $295 = leadTrimAt(i);
-          if ($295) {
+          var $299 = leadTrimAt(i);
+          if ($299) {
             return i + 3 | 0;
           }
           ;
@@ -7926,40 +7947,40 @@ var tokenizeTemplate = function(cfg) {
             });
           };
           var headWord2 = firstWord(t.core);
-          var $297 = headWord2 === "";
-          if ($297) {
+          var $301 = headWord2 === "";
+          if ($301) {
             return new Left(new LexError("empty statement tag '{% %}'", i));
           }
           ;
-          var $298 = trim(t.core) === "raw";
-          if ($298) {
+          var $302 = trim(t.core) === "raw";
+          if ($302) {
             return readRawBody(i)(start)(v.value0 + 2 | 0);
           }
           ;
-          var $299 = isStmtClose(headWord2);
-          if ($299) {
+          var $303 = isStmtClose(headWord2);
+          if ($303) {
             var name2 = drop2(3)(headWord2);
             return mk(new RClose(span2, start, name2, interiorAt(start)(name2)));
           }
           ;
-          var $300 = isStmtSep(headWord2) || (headWord2 === "set" || (trim(t.core) === "yield" || trim(t.core) === "super"));
-          if ($300) {
+          var $304 = isStmtSep(headWord2) || (headWord2 === "set" || (trim(t.core) === "yield" || trim(t.core) === "super"));
+          if ($304) {
             return mk(new RSep(span2, start, t.core, interiorAt(start)(t.core)));
           }
           ;
-          var $301 = headWord2 === "extends";
-          if ($301) {
+          var $305 = headWord2 === "extends";
+          if ($305) {
             return mk(new RSep(span2, start, t.core, interiorAt(start)(t.core)));
           }
           ;
-          var $302 = headWord2 === "include";
-          if ($302) {
+          var $306 = headWord2 === "include";
+          if ($306) {
             var skipSp = function($copy_j) {
               var $tco_done3 = false;
               var $tco_result;
               function $tco_loop(j) {
-                var $303 = j < v.value0 && maybe(false)(isSpace)(index(cs)(j));
-                if ($303) {
+                var $307 = j < v.value0 && maybe(false)(isSpace)(index(cs)(j));
+                if ($307) {
                   $copy_j = j + 1 | 0;
                   return;
                 }
@@ -7982,7 +8003,7 @@ var tokenizeTemplate = function(cfg) {
           return mk(new ROpen(span2, Section.value, start, t.core, interiorAt(start)(t.core)));
         }
         ;
-        throw new Error("Failed pattern match at FlatBars.Lexer (line 785, column 7 - line 839, column 73): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at FlatBars.Lexer (line 799, column 7 - line 853, column 73): " + [v.constructor.name]);
       };
       var recoverFrom = function(i) {
         return function(e) {
@@ -8094,9 +8115,34 @@ var tokenizeTemplate = function(cfg) {
                             throw new Error("Failed pattern match at FlatBars.Lexer (line 427, column 55 - line 436, column 68): " + [v1.constructor.name]);
                           }
                           ;
+                          if (cfg.statementTags && matchAt(cs)(i)("{#")) {
+                            var v1 = readInlineComment(i);
+                            if (v1 instanceof Left) {
+                              $tco_done4 = true;
+                              return recoverFrom(i)(v1.value0)(segStart)(frags)(acc)(pend)(open)(close);
+                            }
+                            ;
+                            if (v1 instanceof Right) {
+                              var acc2 = consTok(v1.value0.mtok)(flush({
+                                start: segStart,
+                                end: i
+                              })(contentTo(segStart)(frags)(i))(acc)(pend)(v1.value0.trimL));
+                              $tco_var_i = v1.value0.next;
+                              $tco_var_open = open;
+                              $tco_var_close = close;
+                              $tco_var_segStart = v1.value0.next;
+                              $tco_var_frags = [];
+                              $tco_var_acc = acc2;
+                              $copy_pend = v1.value0.trimR;
+                              return;
+                            }
+                            ;
+                            throw new Error("Failed pattern match at FlatBars.Lexer (line 441, column 55 - line 450, column 68): " + [v1.constructor.name]);
+                          }
+                          ;
                           if (open === "{{" && (close === "}}" && v.value0 === "\\")) {
-                            var $319 = matchAt(cs)(i + 1 | 0)("\\");
-                            if ($319) {
+                            var $326 = matchAt(cs)(i + 1 | 0)("\\");
+                            if ($326) {
                               $tco_var_i = i + 2 | 0;
                               $tco_var_open = open;
                               $tco_var_close = close;
@@ -8131,7 +8177,7 @@ var tokenizeTemplate = function(cfg) {
                               return;
                             }
                             ;
-                            throw new Error("Failed pattern match at FlatBars.Lexer (line 444, column 20 - line 450, column 98): " + [v1.constructor.name]);
+                            throw new Error("Failed pattern match at FlatBars.Lexer (line 458, column 20 - line 464, column 98): " + [v1.constructor.name]);
                           }
                           ;
                           if (open === "{{" && (close === "}}" && (v.value0 === "{" && isOpenerAt(i)))) {
@@ -8174,10 +8220,10 @@ var tokenizeTemplate = function(cfg) {
                                 return;
                               }
                               ;
-                              throw new Error("Failed pattern match at FlatBars.Lexer (line 460, column 19 - line 463, column 92): " + [v2.constructor.name]);
+                              throw new Error("Failed pattern match at FlatBars.Lexer (line 474, column 19 - line 477, column 92): " + [v2.constructor.name]);
                             }
                             ;
-                            throw new Error("Failed pattern match at FlatBars.Lexer (line 451, column 74 - line 463, column 92): " + [v1.constructor.name]);
+                            throw new Error("Failed pattern match at FlatBars.Lexer (line 465, column 74 - line 477, column 92): " + [v1.constructor.name]);
                           }
                           ;
                           if (open === "{{" && close === "}}") {
@@ -8231,10 +8277,10 @@ var tokenizeTemplate = function(cfg) {
                                 return;
                               }
                               ;
-                              throw new Error("Failed pattern match at FlatBars.Lexer (line 476, column 19 - line 479, column 92): " + [v2.constructor.name]);
+                              throw new Error("Failed pattern match at FlatBars.Lexer (line 490, column 19 - line 493, column 92): " + [v2.constructor.name]);
                             }
                             ;
-                            throw new Error("Failed pattern match at FlatBars.Lexer (line 467, column 34 - line 479, column 92): " + [v1.constructor.name]);
+                            throw new Error("Failed pattern match at FlatBars.Lexer (line 481, column 34 - line 493, column 92): " + [v1.constructor.name]);
                           }
                           ;
                           if (otherwise) {
@@ -8250,7 +8296,7 @@ var tokenizeTemplate = function(cfg) {
                           ;
                         }
                         ;
-                        throw new Error("Failed pattern match at FlatBars.Lexer (line 409, column 19 - line 480, column 71): " + [v.constructor.name]);
+                        throw new Error("Failed pattern match at FlatBars.Lexer (line 409, column 19 - line 494, column 71): " + [v.constructor.name]);
                       }
                       ;
                       throw new Error("Failed pattern match at FlatBars.Lexer (line 397, column 3 - line 405, column 39): " + [i.constructor.name, open.constructor.name, close.constructor.name, segStart.constructor.name, frags.constructor.name, acc.constructor.name, pend.constructor.name]);
@@ -8335,9 +8381,9 @@ var beforeFirstNL = function(s) {
   throw new Error("Failed pattern match at FlatBars.Lexer (line 259, column 19 - line 261, column 15): " + [v.constructor.name]);
 };
 var allWs = /* @__PURE__ */ (function() {
-  var $467 = all2(isSpace);
-  return function($468) {
-    return $467(toCharArray($468));
+  var $474 = all2(isSpace);
+  return function($475) {
+    return $474(toCharArray($475));
   };
 })();
 var afterLastNL = function(s) {
@@ -8465,16 +8511,16 @@ var trimStandalone = function(seps) {
       return function(v) {
         if (v instanceof RContent) {
           var s1 = (function() {
-            var $453 = standaloneAt(j - 1 | 0);
-            if ($453) {
+            var $460 = standaloneAt(j - 1 | 0);
+            if ($460) {
               return dropLeadingLine(v.value1);
             }
             ;
             return v.value1;
           })();
           var s2 = (function() {
-            var $454 = standaloneAt(j + 1 | 0);
-            if ($454) {
+            var $461 = standaloneAt(j + 1 | 0);
+            if ($461) {
               return dropTrailingIndent(s1);
             }
             ;

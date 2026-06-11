@@ -434,6 +434,20 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
                     )
                 in
                   go res.next open close res.next [] acc2 res.trimR
+          -- A Django/Jinja inline comment `{# … #}` (ADR-039 item 1; gated on
+          -- `statementTags`, replacing the Handlebars `{{! … }}` in those dialects). It
+          -- renders nothing — emitted as an `RComment` the parser drops. Checked before
+          -- the `{{` opener probe so a leading `{#` is never read as a dict literal.
+          | cfg.statementTags && matchAt cs i "{#" -> case readInlineComment i of
+              Left e -> recoverFrom i e segStart frags acc pend open close
+              Right res ->
+                let
+                  acc2 = consTok res.mtok
+                    ( flush { start: segStart, end: i } (contentTo segStart frags i) acc pend
+                        res.trimL
+                    )
+                in
+                  go res.next open close res.next [] acc2 res.trimR
           -- Default delimiters `{{`/`}}`: the full Handlebars-flavored grammar,
           -- byte-identical to the fixed-delimiter lexer (backslash escapes, triple,
           -- raw blocks, long comments, `~`). The opener probe is gated on `{`, so
@@ -896,6 +910,25 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
               , trimL: leadTrimAt i
               , trimR
               }
+
+  -- A Django/Jinja inline comment `{# … #}` (ADR-039 item 1). The body runs verbatim to
+  -- the first `#}` (never brace-aware, like `{{! }}` — a stray `{`/`}` must not swallow
+  -- the close); it renders nothing (an `RComment` the parser drops) and lifts no
+  -- directive. No `~` trims (the `{%- -%}` markers are statement-tag-only).
+  readInlineComment :: Int -> Either ParseError TagResult
+  readInlineComment i =
+    let
+      start = i + 2
+    in
+      case findFrom cs start "#}" of
+        Nothing -> Left (UnterminatedComment i)
+        Just q ->
+          Right
+            { mtok: Just (RComment { start: i, end: q + 2 } start (slice cs start q))
+            , next: q + 2
+            , trimL: false
+            , trimR: false
+            }
 
   -- A long comment `{{!-- … --}}` renders nothing and carries no directive, so
   -- it is dropped (`mtok: Nothing`) — except under `keepLongComments`, where it

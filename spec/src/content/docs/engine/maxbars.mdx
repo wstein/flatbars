@@ -208,7 +208,7 @@ generalization is **template inheritance** (ADR-040): a base defines named
 
 The child overrides `title` (splicing the base's default via `{% super %}` → `Welcome —
 Site`) and `content`; an un-overridden block keeps its default. (A child may hold only
-`{% block %}` definitions — text or a `{# … #}` between them is stray content.)
+`{% block %}` definitions and `{# … #}` comments — stray *text* between them is rejected.)
 
 Inheritance is **resolved statically at compile time** — a lower-phase flatten
 (`Kernel.Inherit`, mirrored in Rust by `trussbars_template::inherit`) that walks the
