@@ -184,7 +184,28 @@ problem, and the Phase-5 server stays render-free.
 - Gate: `check:bundle`-analog for the wasm artifact (content-hashed like Phase 1).
 - Lazy-loaded: oracle first-paints; trussbars `load()` fires on demand.
 
-### Phase 5 — Local dev transport (`flatbars lab`) + `local` FileProvider
+### Phase 5 — Local dev transport (`flatbars lab`) + `local` FileProvider  ✅ DONE (2026-06-11)
+
+Shipped in two independently-green parts:
+- **The `local` FileProvider + transport detection** (`lab/app/file-provider.mjs`):
+  `localFileProvider` talks to the `/__fs/*` bridge (read + list) sending the session
+  token; `detectTransport`/`selectFileProvider` pick the transport from the served page
+  (`<meta name="fb-transport" content="local">` + `window.__FB_TOKEN`), defaulting to
+  `http`. 17 file-provider tests.
+- **The FS bridge server** — a Node reference (`scripts/lab-server.mjs`, `npm run
+  lab:local`) AND the Rust binary that owns it (`trussbars/crates/trussbars-lab`, the
+  `trussbars-lab` bin, std-only — no HTTP deps). Both serve the static Lab + a
+  root-jailed `/__fs/{read,list,write}` API with the full security baseline (session
+  token, CSRF `Origin` guard, read-only unless `--write`, bind 127.0.0.1). The server
+  NEVER renders (the engine is in-page wasm). The pure logic is unit-tested both sides
+  (8 Node + 7 Rust) and proven end-to-end over a real socket.
+
+**Deferred to Phase 6 (with the project model):** flipping boot to the `local` provider
+(the example loader still uses the `http` app assets — a project dir ≠ the bundled
+examples), the `<meta fb-transport=local>` injection, and `/__fs/watch` SSE. The token
+is already injected; the bridge is live.
+
+Original design (retained for reference):
 
 The **Trussbars Rust binary owns this** (`trussbars lab [dir]`, decided). It
 serves the static Lab bundle **and** exposes a narrow, root-jailed FS API. Because

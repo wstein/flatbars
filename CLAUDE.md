@@ -280,6 +280,15 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   v1 feature vector is empty (render-only), so the capability gate hides every analysis
   panel it doesn't back. It is lazy (oracle first-paints; the wasm instantiates on the
   first `create()`) and not yet user-selectable — the provider picker is a follow-up.
+  A **local dev transport** lets the Lab read templates off disk (ADR-0020 Phase 5): the
+  `local` FileProvider (`lab/app/file-provider.mjs`, beside `http` + `fs-access`) talks
+  to a root-jailed `/__fs/{read,list,write}` bridge that the `trussbars-lab` binary
+  (`trussbars/crates/trussbars-lab`, std-only — no HTTP deps) serves alongside the static
+  Lab. The bridge NEVER renders (the engine is in-page wasm); its security baseline is a
+  per-session token (`window.__FB_TOKEN`), a CSRF `Origin` guard, read-only unless
+  `--write`, and 127.0.0.1-only. `scripts/lab-server.mjs` (`npm run lab:local`) is the
+  Node reference of the same server. The project model that consumes the transport (and
+  flips boot to the `local` provider) is the Phase 6 follow-up.
 - **`cli`** (`flatbars-cli`) — render templates, and the `examples verify`
   conformance gate.
 - **`linter`** — cross-dialect lowering (MaxBars → RawBars source).

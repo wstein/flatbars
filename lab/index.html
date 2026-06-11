@@ -1730,7 +1730,7 @@
       import { renderContext } from "./app/dock/context.mjs?v=9673ce33";
       import { createOutputView } from "./app/output.mjs?v=55b63f9a";
       import { createRun } from "./app/render.mjs?v=a8f9db2f";
-      import { httpFileProvider } from "./app/file-provider.mjs?v=8b850eb0";
+      import { httpFileProvider } from "./app/file-provider.mjs?v=a6459bdb";
       import { createStatusBar } from "./app/statusbar.mjs?v=15b53d45";
       import { TRANSFORMER_RISK } from "./app/transformer-risk.mjs?v=c55054b4";
       import { EditorState, Annotation, StateField, StateEffect, Compartment } from "https://esm.sh/@codemirror/state@6.5.2/es2022/state.mjs";
@@ -1781,9 +1781,11 @@
 
       // Boot defence (showBootError / bootFail) now lives in ./app/boot-error.mjs.
       // The FileProvider seam (./app/file-provider.mjs): all example/catalog/fixture
-      // reads route through `files` so a later transport (FS Access API, the
-      // `trussbars lab` localhost bridge) can drop in. readJson treats a non-OK
-      // response (a 404 HTML page) as an error, like the former fetchJson.
+      // reads route through `files`. App-bundled assets stay on the `http` provider;
+      // the `local` transport (the `trussbars lab` root-jailed /__fs/* bridge, detected
+      // via selectFileProvider) drives the Phase 6 project model over the launch dir —
+      // a separate handle from these app assets. readJson treats a non-OK response as
+      // an error, like the former fetchJson.
       const files = httpFileProvider();
 
       // Pick the engine adapter. The lab exposes the FlatBars dialects as

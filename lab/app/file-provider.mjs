@@ -97,3 +97,52 @@ export async function pickDirectory(opts) {
   const handle = await globalThis.showDirectoryPicker(opts);
   return fsAccessFileProvider(handle);
 }
+
+// `localFileProvider` (Phase 5) talks to the `trussbars lab` localhost FS bridge — a
+// root-jailed `/__fs/*` API the dev server exposes over the launch directory. Every
+// request carries the per-session token the server injected into the page
+// (`window.__FB_TOKEN`); the server also rejects cross-origin requests (CSRF). It
+// backs `read` + `list` (writes are a Phase 6 opt-in). The server never renders — the
+// engine is in-page wasm — so this is purely a file transport.
+export function localFileProvider({ token = "", base = "/__fs", fetchImpl } = {}) {
+  const doFetch = fetchImpl || ((...a) => fetch(...a));
+  const headers = token ? { "x-fb-token": token } : {};
+  const url = (op, path) => `${base}/${op}?path=${encodeURIComponent(path)}`;
+  return {
+    id: "local",
+    capabilities: new Set(["read", "list"]),
+    // Mirrors httpFileProvider.readText: the body is returned regardless of status,
+    // so a missing optional partial yields the server's 404 body exactly as before.
+    readText: (path) => doFetch(url("read", path), { headers }).then((r) => r.text()),
+    readJson: (path) => doFetch(url("read", path), { headers }).then((res) => {
+      if (!res.ok) throw new Error(`${path}: ${res.status} ${res.statusText}`);
+      return res.json();
+    }),
+    list: (dir = ".") => doFetch(url("list", dir), { headers }).then((res) => {
+      if (!res.ok) throw new Error(`${dir}: ${res.status} ${res.statusText}`);
+      return res.json();
+    }),
+  };
+}
+
+// Detect the active transport from the page the server served. `trussbars lab` injects
+// `<meta name="fb-transport" content="local">` + a `window.__FB_TOKEN`; absent those,
+// the hosted Lab defaults to `http`. Args are injectable for testing.
+export function detectTransport(doc, win) {
+  const d = doc !== undefined ? doc : (typeof document !== "undefined" ? document : null);
+  const w = win !== undefined ? win : (typeof window !== "undefined" ? window : null);
+  const meta = d && d.querySelector && d.querySelector('meta[name="fb-transport"]');
+  const id = (meta && meta.getAttribute("content")) || "http";
+  return id === "local"
+    ? { id: "local", token: (w && w.__FB_TOKEN) || "" }
+    : { id: "http" };
+}
+
+// Resolve the FileProvider for the current transport (boot calls this instead of
+// hard-wiring `httpFileProvider()`). `local` when the dev server injected the meta tag;
+// `http` otherwise. The `fs-access` provider is opened on demand (a user gesture), not
+// auto-selected here.
+export function selectFileProvider(doc, win) {
+  const t = detectTransport(doc, win);
+  return t.id === "local" ? localFileProvider({ token: t.token }) : httpFileProvider();
+}

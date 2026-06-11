@@ -6,7 +6,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { httpFileProvider, fsAccessFileProvider, supportsFsAccess, pickDirectory } from "./file-provider.mjs";
+import { httpFileProvider, fsAccessFileProvider, supportsFsAccess, pickDirectory, localFileProvider, detectTransport, selectFileProvider } from "./file-provider.mjs";
 
 // A minimal in-memory FileSystemDirectoryHandle, enough to exercise the provider.
 // `tree` is a nested object: string leaf = file content, object = subdirectory.
@@ -122,4 +122,61 @@ test("pickDirectory returns an fs-access provider when the API is present", asyn
   } finally {
     delete globalThis.showDirectoryPicker;
   }
+});
+
+// --- local provider + transport detection (Phase 5, the localhost FS bridge) ---
+
+// A fetch double that records the request + serves a route table keyed by op.
+function localFetch(routes) {
+  const calls = [];
+  const impl = async (urlStr, opts = {}) => {
+    const u = new URL(urlStr, "http://x");
+    const op = u.pathname.replace("/__fs/", "");
+    const path = u.searchParams.get("path");
+    calls.push({ op, path, headers: opts.headers || {} });
+    const r = routes[`${op}:${path}`] ?? routes[op];
+    if (!r) return { ok: false, status: 404, statusText: "Not Found", text: async () => "404 body", json: async () => { throw new Error("nf"); } };
+    return { ok: true, status: 200, statusText: "OK", text: async () => r, json: async () => JSON.parse(r) };
+  };
+  return { impl, calls };
+}
+
+test("localFileProvider advertises local + read/list, sends the session token", async () => {
+  const { impl, calls } = localFetch({ "read:hello.hbs": "Hi {{name}}", "list:.": '[{"name":"hello.hbs","kind":"file"}]' });
+  const p = localFileProvider({ token: "secret-123", fetchImpl: impl });
+  assert.equal(p.id, "local");
+  assert.ok(p.capabilities.has("read") && p.capabilities.has("list"));
+  assert.equal(await p.readText("hello.hbs"), "Hi {{name}}");
+  assert.deepEqual(await p.list("."), [{ name: "hello.hbs", kind: "file" }]);
+  assert.ok(calls.every((c) => c.headers["x-fb-token"] === "secret-123"), "every request carries the token");
+  assert.equal(calls[0].op, "read");
+  assert.equal(calls[0].path, "hello.hbs");
+});
+
+test("localFileProvider.readText returns the body regardless of status (matches http)", async () => {
+  const { impl } = localFetch({});
+  assert.equal(await localFileProvider({ fetchImpl: impl }).readText("missing"), "404 body");
+});
+
+test("localFileProvider.readJson / list throw on a non-OK response", async () => {
+  const { impl } = localFetch({});
+  const p = localFileProvider({ fetchImpl: impl });
+  await assert.rejects(() => p.readJson("x.json"), /x\.json: 404 Not Found/);
+  await assert.rejects(() => p.list("sub"), /sub: 404 Not Found/);
+});
+
+test("detectTransport: http by default, local when the meta tag is present", () => {
+  const noMeta = { querySelector: () => null };
+  assert.deepEqual(detectTransport(noMeta, {}), { id: "http" });
+
+  const withMeta = { querySelector: (sel) => (sel.includes("fb-transport") ? { getAttribute: () => "local" } : null) };
+  assert.deepEqual(detectTransport(withMeta, { __FB_TOKEN: "tok" }), { id: "local", token: "tok" });
+});
+
+test("selectFileProvider returns the provider matching the served transport", () => {
+  const noMeta = { querySelector: () => null };
+  assert.equal(selectFileProvider(noMeta, {}).id, "http");
+
+  const withMeta = { querySelector: () => ({ getAttribute: () => "local" }) };
+  assert.equal(selectFileProvider(withMeta, { __FB_TOKEN: "t" }).id, "local");
 });

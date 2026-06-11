@@ -1,0 +1,19 @@
+[package]
+name = "trussbars-lab"
+description = "The `trussbars lab [dir]` local dev transport — serves the static FlatBars Lab and a narrow, root-jailed /__fs/* file bridge over the launch directory. The engine is in-page wasm, so this server never renders: it is purely a file transport (PLAN-registry-local-trussbars.md, Phase 5). std-only, no HTTP dependencies."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+keywords = ["template", "maxbars", "lab", "devserver"]
+categories = ["template-engine", "development-tools"]
+
+[[bin]]
+name = "trussbars-lab"
+path = "src/main.rs"
+
+[lib]
+path = "src/lib.rs"
+
+[lints]
+workspace = true
