@@ -1712,6 +1712,7 @@
       import { createExplorer } from "./app/explorer.mjs?v=1";
       import { createConfigYaml } from "./app/config-yaml.mjs?v=1";
       import { mdFence, makeZip } from "./app/export-utils.mjs?v=1";
+      import { snapshotState as snapshotStateFor } from "./app/share-state.mjs?v=1";
       import { byId, qs, makeEl } from "./app/dom.mjs?v=2";
       import { showBootError, bootFail } from "./app/boot-error.mjs?v=1";
       import { toast, openShareMenu, closeShareMenu } from "./app/ui-chrome.mjs?v=1";
@@ -3538,34 +3539,8 @@
       }
 
       // ── URL state ─────────────────────────────────────────────────────
-      function snapshotState() {
-        return {
-          tabs: ctx.state.tabs.map((t) => ({ n: t.name, s: t.source })),
-          d: ctx.state.yamlSrc,
-          t: ctx.state.transformSrc,
-          // Custom-helper source (ADR-018), a separate field from the transform.
-          ...(ctx.state.helpersSrc.trim() ? { h: ctx.state.helpersSrc } : {}),
-          // i18n (ADR-029): the message catalog + the active locale (default en omitted).
-          ...(ctx.state.catalogSource.trim() ? { cat: ctx.state.catalogSource } : {}),
-          ...(ctx.state.labLocale && ctx.state.labLocale !== "en" ? { loc: ctx.state.labLocale } : {}),
-          // ADR-030 analyse path schema — persisted so a "watch suppression" link round-trips.
-          ...(ctx.state.labPathSchema.length ? { ps: ctx.state.labPathSchema } : {}),
-          // Data overlays — each entry is { n: name, s: source }. Omitted when
-          // there are none so legacy/short links stay compact.
-          ...(ctx.state.dataOverlays.length ? { do: ctx.state.dataOverlays.map((o) => ({ n: o.name, s: o.source })) } : {}),
-          e: ctx.state.escapeMode, v: ctx.state.outputView,
-          sa: ctx.state.standalone ? 1 : 0,       // ADR-0016 ctx.state.standalone flag
-          ...(ctx.state.allowList !== null ? { al: ctx.state.allowList } : {}), // ADR-0013 transformer allow-list
-          av: ctx.state.activeView, ai: ctx.state.activeTabIdx,
-          // MinBars truthiness toggle (ADR-022 S2); omitted when off so links stay compact.
-          ...(ctx.state.minbarsCompat ? {} : { mj: 0 }), // default mustacheJs; persist only the spec opt-out
-          // Active template-pane mode (1 = transform tab, 0/omitted = tmpl).
-          // Persisted so a shared "I'm editing the transform" link round-trips.
-          ...(templateMode === "transform" ? { tm: 1 } : {}),
-          ...(templateMode === "helpers" ? { hm: 1 } : {}),
-          x: ctx.state.loadedExampleIdx, // which example (or -1 for an edited "custom" state)
-        };
-      }
+      // snapshotState now lives in ./app/share-state.mjs; bind the live templateMode.
+      const snapshotState = () => snapshotStateFor(ctx, templateMode);
 
       // Encoding the state is async (CompressionStream), so rapid edits could
       // finish out of order; a sequence token keeps only the newest write.
