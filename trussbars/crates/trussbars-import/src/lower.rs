@@ -326,6 +326,7 @@ impl Lower<'_> {
                         span: *span,
                         name: name.clone(),
                         ctx: None,
+                        hash: Vec::new(),
                     });
                 }
             }
@@ -598,6 +599,7 @@ impl Lower<'_> {
                             span: *span,
                             name: n.clone(),
                             ctx,
+                            hash: Vec::new(),
                         });
                     }
                     hb::PartialName::Dynamic(_) => {
@@ -656,6 +658,7 @@ impl Lower<'_> {
                 out.push(ir::Node::Inline {
                     span: *span,
                     name: name.clone(),
+                    params: Vec::new(),
                     body,
                 });
             }
@@ -1117,6 +1120,7 @@ impl Lower<'_> {
                         span: *span,
                         name: s.clone(),
                         ctx: None,
+                        hash: Vec::new(),
                     });
                 } else {
                     self.report_only(
@@ -1244,6 +1248,7 @@ impl Lower<'_> {
                     span,
                     name: s.clone(),
                     ctx,
+                    hash: Vec::new(),
                 });
             }
             _ => {
@@ -1599,6 +1604,7 @@ pub fn stringtemplate_group(
         ir.push(ir::Node::Inline {
             span: def.span,
             name: def.name.clone(),
+            params: Vec::new(),
             body,
         });
     }
@@ -1708,6 +1714,7 @@ impl Lower<'_> {
                     span,
                     name: t.clone(),
                     ctx: None,
+                    hash: Vec::new(),
                 });
             }
             st::Expr::Include {
@@ -1778,6 +1785,7 @@ impl Lower<'_> {
                         span,
                         name: t.clone(),
                         ctx: None,
+                        hash: Vec::new(),
                     }],
                     otherwise: Vec::new(),
                 }));

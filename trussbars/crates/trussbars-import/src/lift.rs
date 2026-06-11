@@ -202,7 +202,7 @@ impl Pretty<'_> {
                 self.body(&b.body);
                 self.line(&format!("{{{{/{}}}}}", b.head));
             }
-            Node::Inline { span, name, body } => {
+            Node::Inline { span, name, body, params: _ } => {
                 self.note_lines(*span);
                 let mut s = String::from("{{#inline ");
                 quote(name, &mut s);
@@ -340,7 +340,7 @@ fn print_node(n: &Node, notes: &Notes, out: &mut String) {
         Node::For(e) => print_each(e, notes, out),
         Node::Cond(c) => print_cond(c, notes, out),
         Node::With(w) => print_with(w, notes, out),
-        Node::Partial { span, name, ctx } => {
+        Node::Partial { span, name, ctx, hash: _ } => {
             emit_notes(*span, notes, out);
             out.push_str("{{> ");
             out.push_str(name);
@@ -369,7 +369,7 @@ fn print_node(n: &Node, notes: &Notes, out: &mut String) {
             out.push_str("{{/let}}");
         }
         Node::Case(c) => print_case(c, notes, out),
-        Node::Inline { span, name, body } => {
+        Node::Inline { span, name, body, params: _ } => {
             emit_notes(*span, notes, out);
             out.push_str("{{#inline ");
             quote(name, out);
@@ -906,7 +906,8 @@ mod tests {
             to_truss(&[Node::Partial {
                 span: span(),
                 name: "footer".into(),
-                ctx: None
+                ctx: None,
+                hash: Vec::new(),
             }]),
             "{{> footer}}"
         );
@@ -915,6 +916,7 @@ mod tests {
                 span: span(),
                 name: "card".into(),
                 ctx: Some(path(&["post"])),
+                hash: Vec::new(),
             }]),
             "{{> card post}}"
         );
@@ -1025,6 +1027,7 @@ mod tests {
         let inline = Node::Inline {
             span: span(),
             name: "card".into(),
+            params: Vec::new(),
             body: vec![Node::Yield { span: span() }],
         };
         assert_eq!(
