@@ -4,11 +4,14 @@
 //! `let` hash, threads a [`Scope`] for path rooting, and splits the `{% %}`-only
 //! `{% else %}` / `{% elif %}` / `{% when %}` clauses.
 
-use crate::ast::{Case, Cond, Expr, For, HelperBlock, Node, With};
+use crate::ast::{Case, Cond, Expr, For, HelperBlock, Node, Value, With};
 use crate::lex::{Lexeme, Sigil, lex};
 use crate::parse_expr::{ParseError, Scope, parse_expr};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+
+/// An include's `key=value` hash arguments (ADR-042 §8).
+type PartialHash = Vec<(String, Expr)>;
 
 /// Parse a template source into a desugared [`Node`] tree.
 ///
@@ -37,7 +40,11 @@ pub fn parse(src: &str) -> Result<Vec<Node>, ParseError> {
     match stop {
         // ADR-040: flatten `{% extends %}`/`{% block %}`/`{% super %}` into a plain tree
         // before the emitter/VM ever see it (`crate::inherit`).
-        Stop::Eof => crate::inherit::resolve_inheritance(nodes),
+        Stop::Eof => {
+            // ADR-042 §8: fill omitted optional inline-parameter defaults into each
+            // include's hash, after inheritance flattening.
+            crate::inherit::resolve_inheritance(nodes).map(crate::sig::augment_signatures)
+        }
         Stop::Close(name) => err(format!("unexpected `{{% end{name} %}}` (no open block)"), 0),
         Stop::Else | Stop::ElseIf(_) => {
             err("unexpected `{% else %}` outside a block".to_string(), 0)
@@ -484,13 +491,26 @@ impl Blocks<'_> {
         rest: &str,
         scope: &Scope,
     ) -> Result<Node, ParseError> {
-        let (name, _) = read_string_literal(rest).ok_or_else(|| ParseError {
+        let (name, after) = read_string_literal(rest).ok_or_else(|| ParseError {
             message: "{% inline %} needs a quoted name".into(),
             at: span.start,
         })?;
-        let (body, stop) = self.parse_until(scope)?;
+        // ADR-042 §8: an optional `(p, q=default)` parameter signature. The parameter
+        // names enter the body scope, so a bare `{{p}}` is a scoped reference the
+        // include-site binding resolves.
+        let params = parse_signature(after, span.start)?;
+        let mut body_scope = scope.clone();
+        for (p, _) in &params {
+            body_scope = body_scope.with(p);
+        }
+        let (body, stop) = self.parse_until(&body_scope)?;
         expect_close(&stop, "inline", span.start)?;
-        Ok(Node::Inline { span, name, body })
+        Ok(Node::Inline {
+            span,
+            name,
+            params,
+            body,
+        })
     }
 
     /// `{% block name %}…{% endblock %}` (ADR-040) — a named inheritance slot. The name is
@@ -568,8 +588,13 @@ impl Blocks<'_> {
                 span.start,
             );
         }
-        let ctx = parse_opt_ctx(after, scope)?;
-        Ok(Node::Partial { span, name, ctx })
+        let (ctx, hash) = parse_partial_args(after, scope, span.start)?;
+        Ok(Node::Partial {
+            span,
+            name,
+            ctx,
+            hash,
+        })
     }
 
     /// After a body, consume a `{% else %}` arm (if any) and require the close — which
@@ -786,6 +811,127 @@ fn read_paren(s: &str, at: usize) -> Result<(&str, &str), ParseError> {
         i += 1;
     }
     err("unterminated `( … )`", at)
+}
+
+// ── ADR-042 §8: inline signatures + include hash arguments ──────────────────────
+
+/// Parse an optional `(p, q=default)` inline parameter signature. Each parameter is
+/// a name with an optional *literal* default; `[]` when there is no `(`.
+fn parse_signature(rest: &str, at: usize) -> Result<Vec<(String, Option<Expr>)>, ParseError> {
+    let r = rest.trim_start();
+    if !r.starts_with('(') {
+        return Ok(Vec::new());
+    }
+    let (inner, _) = read_paren(r, at)?;
+    let mut params = Vec::new();
+    for part in split_top_on(inner, |c| c == b',') {
+        let part = part.trim();
+        if part.is_empty() {
+            continue;
+        }
+        let (pname, after) = read_ident(part).ok_or_else(|| ParseError {
+            message: "expected an inline parameter name".into(),
+            at,
+        })?;
+        let after = after.trim_start();
+        if let Some(def) = after.strip_prefix('=') {
+            params.push((pname.to_string(), Some(literal_default(def.trim(), at)?)));
+        } else if after.is_empty() {
+            params.push((pname.to_string(), None));
+        } else {
+            return err(
+                "malformed inline parameter (expected `name` or `name=literal`)",
+                at,
+            );
+        }
+    }
+    Ok(params)
+}
+
+/// A literal default value: a quoted string, a number, or `true`/`false`/`null`.
+fn literal_default(s: &str, at: usize) -> Result<Expr, ParseError> {
+    if let Some((v, rest)) = read_string_literal(s)
+        && rest.trim().is_empty()
+    {
+        return Ok(Expr::str(&v));
+    }
+    match s {
+        "true" => Ok(Expr::Lit(Value::Bool(true))),
+        "false" => Ok(Expr::Lit(Value::Bool(false))),
+        "null" => Ok(Expr::Lit(Value::Null)),
+        _ => s
+            .parse::<f64>()
+            .map(|n| Expr::Lit(Value::Num(n)))
+            .map_err(|_| ParseError {
+                message: "inline parameter default must be a literal (quote a string)".into(),
+                at,
+            }),
+    }
+}
+
+/// Parse an include's arguments: an optional positional context expression, then
+/// `key=value` hash arguments (ADR-042 §8 — the glued `key=value` form). A bare
+/// chunk is the positional context; a `key=value` chunk is a hash pair.
+fn parse_partial_args(
+    rest: &str,
+    scope: &Scope,
+    at: usize,
+) -> Result<(Option<Expr>, PartialHash), ParseError> {
+    let mut ctx = None;
+    let mut hash = Vec::new();
+    for chunk in split_top_on(rest, |c| c.is_ascii_whitespace()) {
+        let chunk = chunk.trim();
+        if chunk.is_empty() {
+            continue;
+        }
+        match hash_pair(chunk) {
+            Some((k, v)) => hash.push((k.to_string(), parse_expr(v.trim(), scope)?)),
+            None if ctx.is_none() => ctx = Some(parse_expr(chunk, scope)?),
+            None => return err("unexpected include argument (a context is given once)", at),
+        }
+    }
+    Ok((ctx, hash))
+}
+
+/// A glued `key=value` hash chunk → `(key, value)`; `None` for a positional chunk
+/// (no `=`, a comparison `==`, or a non-identifier head).
+fn hash_pair(chunk: &str) -> Option<(&str, &str)> {
+    let (id, after) = read_ident(chunk)?;
+    let after = after.trim_start();
+    let val = after.strip_prefix('=')?;
+    if val.starts_with('=') {
+        return None; // `==` is a comparison, not a hash pair
+    }
+    Some((id, val))
+}
+
+/// Split `s` into top-level chunks on a separator predicate, respecting quotes and
+/// `()`/`[]`/`{}` nesting.
+fn split_top_on(s: &str, is_sep: impl Fn(u8) -> bool) -> Vec<&str> {
+    let b = s.as_bytes();
+    let n = b.len();
+    let mut out = Vec::new();
+    let mut depth = 0i32;
+    let mut start = 0usize;
+    let mut i = 0;
+    while i < n {
+        match b[i] {
+            b'"' | b'\'' => {
+                i = skip_str(b, n, i);
+                continue;
+            }
+            b'(' | b'[' | b'{' => depth += 1,
+            b')' | b']' | b'}' => depth -= 1,
+            c if depth == 0 && is_sep(c) => {
+                out.push(&s[start..i]);
+                start = i + 1;
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    out.push(&s[start..]);
+    out
 }
 
 /// Split `s` at the first standalone word `kw` at brace/paren/bracket depth 0.
@@ -1083,6 +1229,35 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(&y[1], Node::PartialBlock { name, .. } if name == "c"));
+    }
+
+    #[test]
+    fn inline_signature_and_hash_include() {
+        // ADR-042 §8: a `(title, badge="")` signature + a `{% include … k=v %}` hash;
+        // the augment pass fills the omitted optional `badge=""` into the include hash.
+        let ns = parse(
+            r#"{% inline "card" (title, badge="") %}{{title}}{% endinline %}{% include "card" title=name %}"#,
+        )
+        .unwrap();
+        match &ns[0] {
+            Node::Inline { params, .. } => {
+                assert_eq!(params.len(), 2);
+                assert_eq!(params[0], ("title".to_string(), None));
+                assert_eq!(params[1].0, "badge");
+                assert!(params[1].1.is_some());
+            }
+            other => panic!("expected an Inline, got {other:?}"),
+        }
+        match &ns[1] {
+            Node::Partial { hash, .. } => {
+                // provided `title` + augmented default `badge`.
+                let keys: Vec<&str> = hash.iter().map(|(k, _)| k.as_str()).collect();
+                assert_eq!(keys, vec!["title", "badge"]);
+            }
+            other => panic!("expected a Partial, got {other:?}"),
+        }
+        // a bare (non-literal) default is a located error.
+        assert!(parse(r#"{% inline "r" (s=foo) %}{{s}}{% endinline %}"#).is_err());
     }
 
     #[test]

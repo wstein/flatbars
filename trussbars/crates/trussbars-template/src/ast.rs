@@ -137,7 +137,7 @@ pub enum Node {
         /// The body, rendered with the aliases in scope.
         body: Vec<Node>,
     },
-    /// `{{> name [ctx]}}` — a partial reference.
+    /// `{{> name [ctx]}}` / `{% include "name" [ctx] [k=v] %}` — a partial reference.
     Partial {
         /// The tag span.
         span: Span,
@@ -145,13 +145,20 @@ pub enum Node {
         name: String,
         /// An explicit context expression, if given.
         ctx: Option<Expr>,
+        /// `key=value` hash arguments (ADR-042 §8), bound as scoped parameters in the
+        /// partial body. A typed inline signature's omitted optional defaults are
+        /// filled in here by `crate::sig`.
+        hash: Vec<(String, Expr)>,
     },
-    /// `{% inline "name" %}…{% endinline %}` — a partial definition (hoisted at emit).
+    /// `{% inline "name" [(p, q=default)] %}…{% endinline %}` — a partial definition
+    /// (hoisted at emit), with an optional ADR-042 parameter signature.
     Inline {
         /// The tag span.
         span: Span,
         /// The partial name.
         name: String,
+        /// The parameter signature: each `(name, optional literal default)`.
+        params: Vec<(String, Option<Expr>)>,
         /// The definition body.
         body: Vec<Node>,
     },

@@ -654,12 +654,20 @@ fn eval_node(env: &Env, n: &Node, out: &mut String) -> Result<(), String> {
             eval_nodes(&child, body, out)?;
         }
         Node::Inline { .. } => {} // hoisted into the registry
-        Node::Partial { name, ctx, .. } => {
+        Node::Partial {
+            name, ctx, hash, ..
+        } => {
             let scope = match ctx {
                 Some(e) => eval_expr(env, e)?,
                 None => env.this.clone(),
             };
-            expand_partial(env, name, scope, env.yield_html.clone(), out)?;
+            // ADR-042 §8: bind the include's hash arguments as scoped parameters, so
+            // the partial body's `{{p}}` resolves to the argument or its default.
+            let mut params = BTreeMap::new();
+            for (k, v) in hash {
+                params.insert(k.clone(), eval_expr(env, v)?);
+            }
+            expand_partial(env, name, scope, params, env.yield_html.clone(), out)?;
         }
         Node::PartialBlock {
             name, ctx, body, ..
@@ -671,7 +679,14 @@ fn eval_node(env: &Env, n: &Node, out: &mut String) -> Result<(), String> {
                 Some(e) => eval_expr(env, e)?,
                 None => env.this.clone(),
             };
-            expand_partial(env, name, scope, Some(Rc::from(yielded.as_str())), out)?;
+            expand_partial(
+                env,
+                name,
+                scope,
+                BTreeMap::new(),
+                Some(Rc::from(yielded.as_str())),
+                out,
+            )?;
         }
         Node::Yield { .. } => match &env.yield_html {
             Some(y) => out.push_str(y),
@@ -719,6 +734,7 @@ fn expand_partial(
     env: &Env,
     name: &str,
     scope: Value,
+    params: BTreeMap<String, Value>,
     yield_html: Option<Rc<str>>,
     out: &mut String,
 ) -> Result<(), String> {
@@ -734,7 +750,7 @@ fn expand_partial(
     let child = Env {
         this: scope,
         root: env.root.clone(),
-        params: BTreeMap::new(),
+        params,
         parents: None,
         loop_frame: None,
         labels: BTreeMap::new(),

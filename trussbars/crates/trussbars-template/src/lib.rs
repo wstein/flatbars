@@ -35,6 +35,7 @@ pub mod inherit;
 pub mod lex;
 pub mod parse;
 pub mod parse_expr;
+pub mod sig;
 pub mod span;
 
 pub use ast::{Case, Cond, Expr, For, Node, TruthMode, TruthPolicy, Value, With};

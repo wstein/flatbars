@@ -397,11 +397,14 @@ fn emit_node_inner(env: &Env, src: &str, n: &Node, out: &mut String) -> Result<(
             out.push_str(&format!("out.push_str({});\n", rust_str(body)))
         }
         Node::Yield { .. } => return yield_here(env, out),
-        Node::Partial { name, ctx, .. } => {
+        Node::Partial {
+            name, ctx, hash, ..
+        } => {
             return inline_partial(
                 env,
                 name,
                 ctx.clone().unwrap_or_else(|| Expr::nullary("this")),
+                hash,
                 None,
                 out,
             );
@@ -416,6 +419,7 @@ fn emit_node_inner(env: &Env, src: &str, n: &Node, out: &mut String) -> Result<(
                 env,
                 name,
                 ctx.clone().unwrap_or_else(|| Expr::nullary("this")),
+                &[],
                 Some(yield_buf),
                 out,
             );
@@ -483,6 +487,7 @@ fn inline_partial(
     env: &Env,
     name: &str,
     ctx_e: Expr,
+    hash: &[(String, Expr)],
     yield_code: Option<String>,
     out: &mut String,
 ) -> Result<(), String> {
@@ -493,10 +498,16 @@ fn inline_partial(
         return Err(format!("unsupported: recursive partial '{name}'"));
     }
     let ctx_code = emit_expr(env, &ctx_e)?;
+    // ADR-042 §8: bind the include's hash arguments (each value emitted in the CALLER
+    // env) as scoped parameters, so the partial body's `{{p}}` resolves to the value.
+    let mut params = BTreeMap::new();
+    for (k, v) in hash {
+        params.insert(k.clone(), emit_expr(env, v)?);
+    }
     let mut child = env.clone();
     child.scope = ctx_code;
     child.loop_var = None;
-    child.params = BTreeMap::new();
+    child.params = params;
     child.parents = Vec::new();
     child.expanding.push(name.to_string());
     child.yield_code = yield_code;

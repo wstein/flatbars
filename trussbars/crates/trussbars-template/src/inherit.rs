@@ -125,7 +125,17 @@ fn fill_blocks(overrides: &Registry, nodes: Vec<Node>) -> Vec<Node> {
                     }
                 }
             }
-            Node::Inline { span, name, body } => out.push(Node::Inline { span, name, body }),
+            Node::Inline {
+                span,
+                name,
+                params,
+                body,
+            } => out.push(Node::Inline {
+                span,
+                name,
+                params,
+                body,
+            }),
             other => out.push(map_node_children(other, &|ns| fill_blocks(overrides, ns))),
         }
     }
@@ -141,7 +151,17 @@ fn subst_super(def: &[Node], override_body: Vec<Node>) -> Vec<Node> {
         match n {
             Node::Super { .. } => out.extend(def.iter().cloned()),
             Node::Block { span, name, body } => out.push(Node::Block { span, name, body }),
-            Node::Inline { span, name, body } => out.push(Node::Inline { span, name, body }),
+            Node::Inline {
+                span,
+                name,
+                params,
+                body,
+            } => out.push(Node::Inline {
+                span,
+                name,
+                params,
+                body,
+            }),
             other => out.push(map_node_children(other, &|ns| subst_super(def, ns))),
         }
     }
@@ -201,9 +221,15 @@ fn map_node_children<F: Fn(Vec<Node>) -> Vec<Node>>(n: Node, f: &F) -> Node {
             name,
             body: f(body),
         },
-        Node::Inline { span, name, body } => Node::Inline {
+        Node::Inline {
             span,
             name,
+            params,
+            body,
+        } => Node::Inline {
+            span,
+            name,
+            params,
             body: f(body),
         },
         leaf => leaf,
