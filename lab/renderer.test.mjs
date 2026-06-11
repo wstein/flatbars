@@ -636,6 +636,12 @@ test("requiredAssigns excludes MaxBars for/let bound names + the for-header `in`
     ra("{% for node in outline %}{{node.name}}{% for child in node.children %}{{child}}{% endfor %}{% endfor %}"),
     ["outline"], // not node/child/in — those are loop bindings + the keyword
   );
+  // labelled loop `{% for X in Y label L %}` → args [X,"in",Y,"label",L]; only Y
+  // reads data (L is the label binding; in/label are keywords; body refs to L are paths).
+  assert.deepEqual(
+    ra("{% for section in sections label outer %}{{outer.index1}}/{{outer.length}} {{section.title}}{% endfor %}"),
+    ["sections"],
+  );
   // `{% let n = v %}` names n in a @hash and references it as a path in the body.
   assert.deepEqual(ra("{% let n = total %}{{n}}{% endlet %}"), ["total"]);
   assert.deepEqual(ra("{% let n = 5 %}{{n}}{% endlet %}"), []);

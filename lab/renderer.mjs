@@ -305,20 +305,26 @@ function flatbarsRenderer(activeDialect, _opts) {
 
   // required-assigns (EXACT): the root of every `{t:"path"}`. Helpers are explicit
   // calls and ClassicBars block params lower to calls, so neither leaks in. The
-  // MaxBars binding surfaces, however, carry their bound name into the lowered AST
-  // AS A PATH: `{% for x in y %}` is a `for` node with raw [x, "in", y] path args
-  // (`each … in` / `with … as` lower correctly and don't), and `{% let n = v %}`
-  // names `n` in a @hash and references it as a path in the body. So we collect the
-  // for/let bound names — and skip the for-header `in` keyword — and exclude them,
-  // leaving only the iterable / value / real reads. (Other dialects have no
-  // for/let nodes, so `bound` stays empty and behaviour is unchanged.)
+  // MaxBars binding surfaces, however, carry their bound names into the lowered AST
+  // AS PATHS. A `{% for X in Y [label L] %}` is a `for` node whose args are the raw
+  // header tokens as paths — `[X, "in", Y]` or `[X, "in", Y, "label", L]` — so X,
+  // the `in`/`label` keywords, and the label binding L all look like reads, and
+  // body refs to X/L are paths too. `{% let n = v %}` names `n` in a @hash and
+  // references it as a path. (`each … in` / `with … as` lower correctly and don't;
+  // other dialects have no for/let nodes.) So: only the ITERABLE (the arg after
+  // `in`) is a data read; collect the for/let bound names (X, L, n) and exclude
+  // them everywhere, along with the header keywords.
   function requiredAssigns(program) {
     const nodes = nodesOf(program);
+    const pathRoot = (a) => (a && a.value && a.value.t === "path" && a.value.segments && a.value.segments.length) ? a.value.segments[0] : null;
     const bound = new Set();
     walk(nodes, (node) => {
-      if (node.t === "for" && node.args && node.args[0]) {
-        const b = node.args[0].value;
-        if (b && b.t === "path" && b.segments && b.segments.length) bound.add(b.segments[0]);
+      if (node.t === "for" && Array.isArray(node.args)) {
+        // The primary binding (before `in`) and any label binding (after `label`).
+        const r0 = pathRoot(node.args[0]); if (r0) bound.add(r0);
+        for (let i = 1; i < node.args.length - 1; i++) {
+          if (pathRoot(node.args[i]) === "label") { const l = pathRoot(node.args[i + 1]); if (l) bound.add(l); }
+        }
       } else if (node.t === "let" && Array.isArray(node.args)) {
         for (const a of node.args) {
           const h = a.value;
@@ -335,10 +341,12 @@ function flatbarsRenderer(activeDialect, _opts) {
     });
     walk(nodes, (node) => {
       if (node.t === "for" && Array.isArray(node.args)) {
-        // Skip the binding (args[0]) and the `in` keyword (args[1]); only the
-        // iterable (args[2..]) reads data. Body reads are visited via walk() and
-        // filtered by `bound`.
-        for (const a of node.args.slice(2)) collect(a.value);
+        // Only the iterable — the arg immediately after the `in` keyword — reads
+        // data. The bindings, the label name, and the keywords don't. Body reads
+        // are visited via walk() and filtered by `bound`.
+        const inIdx = node.args.findIndex((a) => pathRoot(a) === "in");
+        const iter = inIdx >= 0 ? node.args[inIdx + 1] : node.args[2];
+        if (iter) collect(iter.value);
       } else {
         eachExpr(node, collect);
       }
