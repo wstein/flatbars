@@ -303,54 +303,83 @@ function flatbarsRenderer(activeDialect, _opts) {
     return parsed.ast ? parsed.ast.nodes : [];
   }
 
-  // required-assigns (EXACT): the root of every `{t:"path"}`. Helpers are explicit
-  // calls and ClassicBars block params lower to calls, so neither leaks in. The
-  // MaxBars binding surfaces, however, carry their bound names into the lowered AST
-  // AS PATHS. A `{% for X in Y [label L] %}` is a `for` node whose args are the raw
-  // header tokens as paths — `[X, "in", Y]` or `[X, "in", Y, "label", L]` — so X,
-  // the `in`/`label` keywords, and the label binding L all look like reads, and
-  // body refs to X/L are paths too. `{% let n = v %}` names `n` in a @hash and
-  // references it as a path. (`each … in` / `with … as` lower correctly and don't;
-  // other dialects have no for/let nodes.) So: only the ITERABLE (the arg after
-  // `in`) is a data read; collect the for/let bound names (X, L, n) and exclude
-  // them everywhere, along with the header keywords.
+  // required-assigns (EXACT): the root data keys a template reads. A flat "collect
+  // every `{t:"path"}` root" is wrong for CONTEXT-CHANGING blocks: `each`/`for`
+  // iterate and `with`/`scope` re-root, so bare paths in their BODIES resolve
+  // against the item / new root, not the data root — only the subject/iterable
+  // (evaluated in the enclosing context) is a root read. `if`/`unless`/`let` keep
+  // the context (their bodies are recursed; `let` shadows its binding). This walk
+  // is context-aware: it collects subjects but does not descend into re-rooted
+  // bodies, which also subsumes the for/each binding-leak cases (the `in`/`label`
+  // keywords, the loop var, and the label name never reach a collected position).
   function requiredAssigns(program) {
     const nodes = nodesOf(program);
     const pathRoot = (a) => (a && a.value && a.value.t === "path" && a.value.segments && a.value.segments.length) ? a.value.segments[0] : null;
-    const bound = new Set();
-    walk(nodes, (node) => {
-      if (node.t === "for" && Array.isArray(node.args)) {
-        // The primary binding (before `in`) and any label binding (after `label`).
-        const r0 = pathRoot(node.args[0]); if (r0) bound.add(r0);
-        for (let i = 1; i < node.args.length - 1; i++) {
-          if (pathRoot(node.args[i]) === "label") { const l = pathRoot(node.args[i + 1]); if (l) bound.add(l); }
-        }
-      } else if (node.t === "let" && Array.isArray(node.args)) {
-        for (const a of node.args) {
-          const h = a.value;
-          if (h && h.t === "call" && h.name === "@hash" && h.args && h.args[0]) {
-            const nameLit = h.args[0].value;
-            if (nameLit && nameLit.t === "lit") bound.add(String(nameLit.value));
+    const out = new Set();
+    const collect = (e, bound) => walkExpr(e, (x) => {
+      if (x.t === "path" && x.segments && x.segments.length && !bound.has(x.segments[0])) out.add(x.segments[0]);
+    });
+    // `{% local n = v %}` is a @hash; `{% set n = v %}` (forward) is a `dict`.
+    // Both name n (a lit) then the value(s); collect the values in the current
+    // context and return the bound name(s).
+    const bindingPairs = (call, bound, into) => {
+      const a = call.args || [];
+      for (let k = 0; k + 1 < a.length; k += 2) {
+        const nm = a[k].value;
+        if (nm && nm.t === "lit") into.add(String(nm.value));
+        collect(a[k + 1].value, bound);
+      }
+    };
+    // Walk a sibling list in the current (root-equivalent) context. `bound` are the
+    // names visible HERE — forward `{% set %}` bindings accumulate across siblings;
+    // block bindings (`let`/`local`) scope to their own body. Re-rooting / iterating
+    // blocks (each/for/with/scope) are AMBIGUOUS inside: a bare path there resolves
+    // against the item / new root (and, under Handlebars fallback, MIGHT reach root),
+    // so flagging it as a missing ROOT assign is a false positive — we read only the
+    // subject/iterable (a real root read) and do NOT descend the body.
+    const walkCtx = (list, parentBound) => {
+      const bound = new Set(parentBound);
+      for (const node of list || []) {
+        switch (node.t) {
+          case "text": case "sep": case "raw": break;
+          case "emit": {
+            // `{% set n = v %}` lowers to emit(call "set" [dict [lit n, v]]).
+            const e = node.expr;
+            const dict = e && e.t === "call" && e.name === "set" && e.args && e.args[0] && e.args[0].value;
+            if (dict && dict.t === "call" && dict.name === "dict") bindingPairs(dict, bound, bound);
+            else collect(e, bound);
+            break;
+          }
+          case "each": case "with": collect(node.subject, bound); break;
+          case "scope": if (node.args && node.args[0]) collect(node.args[0].value, bound); break;
+          case "for": {
+            const inIdx = (node.args || []).findIndex((a) => pathRoot(a) === "in");
+            const iter = inIdx >= 0 ? node.args[inIdx + 1] : (node.args || [])[2];
+            if (iter) collect(iter.value, bound);
+            break;
+          }
+          case "let": case "local": {
+            const inner = new Set(bound);
+            for (const a of node.args || []) {
+              const h = a.value;
+              if (h && h.t === "call" && (h.name === "@hash" || h.name === "dict")) bindingPairs(h, bound, inner);
+              else collect(a.value, bound);
+            }
+            walkCtx(node.body, inner);
+            break;
+          }
+          // Same-context blocks (if/unless/case/when/…): collect in-context
+          // expressions and recurse the arms.
+          default: {
+            if (node.cond) collect(node.cond, bound);
+            if (node.subject) collect(node.subject, bound);
+            if (Array.isArray(node.args)) for (const a of node.args) collect(a.value, bound);
+            for (const key of ["then", "else", "body"]) if (Array.isArray(node[key])) walkCtx(node[key], bound);
           }
         }
       }
-    });
-    const out = new Set();
-    const collect = (e) => walkExpr(e, (x) => {
-      if (x.t === "path" && x.segments && x.segments.length && !bound.has(x.segments[0])) out.add(x.segments[0]);
-    });
-    walk(nodes, (node) => {
-      if (node.t === "for" && Array.isArray(node.args)) {
-        // Only the iterable — the arg immediately after the `in` keyword — reads
-        // data. The bindings, the label name, and the keywords don't. Body reads
-        // are visited via walk() and filtered by `bound`.
-        const inIdx = node.args.findIndex((a) => pathRoot(a) === "in");
-        const iter = inIdx >= 0 ? node.args[inIdx + 1] : node.args[2];
-        if (iter) collect(iter.value);
-      } else {
-        eachExpr(node, collect);
-      }
-    });
+    };
+    walkCtx(nodes, new Set());
     return [...out].sort();
   }
   // used-transformers: block-helper node types + every `{t:"call"}` head.

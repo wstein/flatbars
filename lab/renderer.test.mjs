@@ -290,9 +290,13 @@ test("requiredAssigns is exact (path roots only, no helpers/params)", async () =
     '{{ title }}{{#each rows as |row|}}{{ row.id }} {{ city.name }}{{/each}}{{#if (eq a b)}}{{ a }}{{/if}}',
     {},
   ).program;
-  // `rows`, `city`, `a`, `b` are data; `row` is a block param (a call, excluded);
-  // `eq`/`each`/`if` are helpers (excluded).
-  assert.deepEqual(r.requiredAssigns(prog), ["a", "b", "city", "rows", "title"]);
+  // `rows` (each subject), `a`/`b` (in the `if` cond + body — `if` keeps the
+  // context) and `title` are root reads. `row` is a block param (a call). `city`
+  // sits INSIDE the each body, where a bare path resolves against the item (or,
+  // under Handlebars fallback, maybe root) — it is ambiguous, so the context-aware
+  // analysis does not flag it as a required root assign (avoiding false-positive
+  // "missing assign" rows for item/scope fields). `eq`/`each`/`if` are helpers.
+  assert.deepEqual(r.requiredAssigns(prog), ["a", "b", "rows", "title"]);
 });
 
 test("usedTransformers collects block + call helpers (the used-transformers feature)", async () => {
@@ -626,9 +630,17 @@ test("MinBars compileToJs seeds the chosen truthiness rule", async () => {
   assert.match(compat.value, /truthyHandlebars/);
 });
 
-test("requiredAssigns excludes MaxBars for/let bound names + the for-header `in` keyword", async () => {
+test("requiredAssigns is context-aware (MaxBars bindings + re-rooting blocks)", async () => {
   const r = await createRenderer("maxbars");
   const ra = (src) => r.requiredAssigns({ dialect: "maxbars", source: src, partials: {} });
+  // forward `{% set n = v %}` (no end tag) — n is a binding, not a data read; its
+  // value reads are root reads. `total`/`tax` here are set bindings, not assigns.
+  assert.deepEqual(
+    ra("{% set tax = (multiply subtotal rate) %}{% set total = (add subtotal tax) %}{{subtotal}} {{tax}} {{total}}"),
+    ["rate", "subtotal"],
+  );
+  // block bindings `{% let/local n = v %}` — n is bound for the body; value is root.
+  assert.deepEqual(ra("{% local n = base %}{{n}}{% endlocal %}"), ["base"]);
   // `{% for x in y %}` parses to a for node with raw [x, "in", y] path args, and
   // body refs to x are paths — none of x/in/(nested bindings) are data assigns.
   assert.deepEqual(ra("{% for x in items %}{{x}}{% endfor %}"), ["items"]);
@@ -645,7 +657,14 @@ test("requiredAssigns excludes MaxBars for/let bound names + the for-header `in`
   // `{% let n = v %}` names n in a @hash and references it as a path in the body.
   assert.deepEqual(ra("{% let n = total %}{{n}}{% endlet %}"), ["total"]);
   assert.deepEqual(ra("{% let n = 5 %}{{n}}{% endlet %}"), []);
-  // already-correct forms stay correct (engine lowers each/with bindings to calls)
-  assert.deepEqual(ra("{% each x in items %}{{x}}{% endeach %}"), ["items"]);
+  // context-changing blocks: `scope`/`with` re-root and `each` iterates, so bare
+  // paths in their BODIES aren't root reads — only the subject/iterable is.
+  assert.deepEqual(ra("{% scope totals %}{{count}} · {{total}}{% endscope %}"), ["totals"]);
+  assert.deepEqual(ra("{% each item in items %}{{name}}{% endeach %}"), ["items"]);
+  assert.deepEqual(ra("{% with totals as t %}{{t.count}}{% endwith %}"), ["totals"]);
+  // root-context reads around a re-rooting block are still collected
+  assert.deepEqual(ra("{{header}}{% scope totals %}{{count}}{% endscope %}{{footer}}"), ["footer", "header", "totals"]);
+  // `if`/`unless` keep the context — their bodies ARE root reads
+  assert.deepEqual(ra("{% if flag %}{{deep.x}}{% endif %}"), ["deep", "flag"]);
   assert.deepEqual(ra("{{user.name}} {{title}}"), ["title", "user"]);
 });
