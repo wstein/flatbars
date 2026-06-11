@@ -51,6 +51,9 @@ becomes `ctx.caches.lastOutput = x`. No semantic change.
   Other last* caches migrate into ctx.caches as their owning subsystem moves.
 - ✅ `setOutput` → `app/output.mjs` (createSetOutput factory: binds ctx + the five
   host refreshers + the active-view getter; call sites unchanged). First core fn.
+- ✅ paintTextView + renderPreview + setOutputDoc + buildProvenance folded into the
+  same `createOutputView(ctx, host)` factory. lastSegViews migrated into ctx.caches.
+  Output subsystem fully modular. Next: run()/scheduleRun → app/render.mjs.
 
 ## Move order (leaf-most consumers first, run() last)
 

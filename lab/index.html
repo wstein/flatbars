@@ -1712,7 +1712,7 @@
       import { showBootError, bootFail } from "./app/boot-error.mjs?v=1";
       import { toast, openShareMenu, closeShareMenu } from "./app/ui-chrome.mjs?v=1";
       import { createCmLanguages } from "./app/cm-languages.mjs?v=1";
-      import { previewDoc, applyEscape, outputHasContent } from "./app/render-helpers.mjs?v=2";
+      import { applyEscape, outputHasContent } from "./app/render-helpers.mjs?v=2";
       import { renderPerformance } from "./app/dock/performance.mjs?v=1";
       import { renderWhitespace } from "./app/dock/whitespace.mjs?v=1";
       import { renderCoverage } from "./app/dock/coverage.mjs?v=1";
@@ -1722,7 +1722,7 @@
       import { renderLint } from "./app/dock/lint.mjs?v=1";
       import { renderProblems } from "./app/dock/problems.mjs?v=1";
       import { renderContext } from "./app/dock/context.mjs?v=1";
-      import { createSetOutput } from "./app/output.mjs?v=1";
+      import { createOutputView } from "./app/output.mjs?v=2";
       import { TRANSFORMER_RISK } from "./app/transformer-risk.mjs?v=1";
       import { EditorState, Annotation, StateField, StateEffect, Compartment } from "https://esm.sh/@codemirror/state@6.5.2/es2022/state.mjs";
       import {
@@ -3048,12 +3048,22 @@
       // lastProgram, lastOutput } from a cache snapshot — ctx.caches has exactly
       // those keys (plus lastSegments, which it ignores), so pass it directly.
 
-      // setOutput now lives in ./app/output.mjs — the factory binds ctx + the five
-      // host refreshers (still in this file, hoisted) + the active-view getter, and
-      // returns the same setOutput(str, segments) so every call site is unchanged.
-      const setOutput = createSetOutput(ctx, {
-        getOutputView: () => outputView,
-        paintTextView, renderPreview, renderDock, renderDataInspect, refreshSearchPanel,
+      // The output subsystem (setOutput / paintTextView / renderPreview /
+      // setOutputDoc) now lives in ./app/output.mjs. The factory binds ctx + the
+      // live CM handles + the still-inline host fns once and returns the same
+      // signatures, so every call site is unchanged. updateOutLang, templateSourceFor,
+      // partialsMap, renderDock/… are hoisted function declarations (referenced here,
+      // defined below); the library helpers are injected to reuse this page's single
+      // instances (no playground_utils dual-instance).
+      const { setOutput, paintTextView, renderPreview } = createOutputView(ctx, {
+        getView: () => outputView,
+        getMinbarsCompat: () => minbarsCompat,
+        getAllowScripts: () => allowScripts,
+        renderer, outputEditor, Decoration, setProvenance, setOutLink,
+        renderDock, renderDataInspect, refreshSearchPanel, updateOutLang,
+        templateSourceFor, partialsMap,
+        resetCaretLink: () => { caretLinkKey = null; },
+        disassemble, dumpYaml, marked, segmentRanges,
       });
 
       // Copy the active output to the clipboard. For the text views (Plain Text /
@@ -3201,55 +3211,7 @@
       // Model" view shows the view-model as highlighted YAML (no provenance); the
       // "Plain Text" view shows the output, highlighted in the example's output
       // language, with the source-map provenance as decorations.
-      function paintTextView() {
-        if (outputView === "bytecode") {
-          ctx.caches.lastSegViews = [];
-          setOutputDoc(ctx.caches.lastProgram ? disassemble(ctx.caches.lastProgram) : "", Decoration.none);
-        } else if (outputView === "data") {
-          let text = "";
-          if (ctx.caches.lastData != null) {
-            try { text = dumpYaml(ctx.caches.lastData, { indent: 2, lineWidth: -1, noRefs: true }); }
-            catch { text = String(ctx.caches.lastData); }
-          }
-          ctx.caches.lastSegViews = [];
-          setOutputDoc(text, Decoration.none);
-        } else if (outputView === "compiled") {
-          // The template compiled to a JS module (the `compile-js` engine
-          // extension). Errors come back as a `// …` comment so the pane stays
-          // valid-looking JS.
-          ctx.caches.lastSegViews = [];
-          let text = "// this engine has no compiler";
-          if (typeof renderer.compileToJs === "function") {
-            const r = renderer.compileToJs(templateSourceFor("main"), partialsMap(), { compat: minbarsCompat });
-            text = r.ok ? r.value : "// compile error: " + r.error;
-          }
-          setOutputDoc(text, Decoration.none);
-        } else if (outputView === "migrated") {
-          // The template rewritten from Handlebars to MaxBars source (the
-          // `migrate` engine extension). Residuals the migrator could not safely
-          // rewrite are surfaced as leading `{{! … }}` MaxBars comments, so the
-          // pane stays valid MaxBars and a clean migration shows pure source.
-          ctx.caches.lastSegViews = [];
-          let text = "{{! this engine has no migrator }}";
-          if (typeof renderer.migrate === "function") {
-            const r = renderer.migrate(templateSourceFor("main"));
-            if (!r.ok) {
-              text = "{{! migrate error: " + r.error + " }}";
-            } else {
-              const head = (r.residuals || []).map((x) =>
-                "{{! residual — " + x.kind + ": " + x.message +
-                (x.suggestion ? " — " + x.suggestion : "") + " }}").join("\n");
-              text = head ? head + "\n" + r.source : r.source;
-            }
-          }
-          setOutputDoc(text, Decoration.none);
-        } else {
-          const { segViews, deco } = buildProvenance(ctx.caches.lastOutput, ctx.caches.lastSegments);
-          ctx.caches.lastSegViews = segViews;
-          setOutputDoc(ctx.caches.lastOutput, deco);
-        }
-        updateOutLang();
-      }
+      // paintTextView now lives in ./app/output.mjs (see the factory above).
 
       // Output highlight language. The choice is "Auto" (follow the example's
       // output format), "Plain text", or any of the ~140 languages in the
@@ -3322,54 +3284,8 @@
         if (ext != null) outputEditor.dispatch({ effects: outLangComp.reconfigure(ext) });
       }
 
-      // Swap the output editor's document and provenance in one programmatic
-      // transaction (and clear any stale caret-link highlight). Language is applied
-      // separately by updateOutLang, which may lazy-load a grammar.
-      function setOutputDoc(text, provenanceDeco) {
-        const cur = outputEditor.state.doc.toString();
-        outputEditor.dispatch({
-          changes: cur === text ? undefined : { from: 0, to: cur.length, insert: text },
-          effects: [
-            setProvenance.of(provenanceDeco),
-            setOutLink.of(Decoration.none),
-          ],
-        });
-        caretLinkKey = null;
-      }
-
-      // Build the provenance mark decorations from the renderer's segments. The
-      // output offsets are UTF-16 code units (JS string indices), so `segmentRanges`
-      // uses them directly — NO byte↔char conversion (which drifts every mark after a
-      // multibyte char, the misalignment bug). Each mark carries its index in
-      // ctx.caches.lastSegViews via data-i so hover/click can recover the segment.
-      function buildProvenance(output, segments) {
-        if (!segments.length) return { segViews: [], deco: Decoration.none };
-        const segViews = segmentRanges(output, segments);
-        const ranges = segViews.map((v, i) =>
-          Decoration.mark({
-            class: "seg" + (v.kind === "emit" ? " seg-expr" : ""),
-            attributes: { "data-i": String(i) },
-          }).range(v.from, v.to));
-        return { segViews, deco: Decoration.set(ranges, true) };
-      }
-
-      // Fill the iframe for the current iframe view: raw output HTML for
-      // "Preview", or the output interpreted as Markdown for "Markdown". Both
-      // honour the "Allow scripts" toggle, swapping to an isolated `allow-scripts`
-      // sandbox (no `allow-same-origin`, so it cannot reach this page).
-      function renderPreview() {
-        const scripts = (outputView === "rendered" || outputView === "markdown") && allowScripts;
-        const frame = byId("output-preview");
-        // Only (re)assign `sandbox` when it actually changes. Re-setting the
-        // attribute — even to the same value — reloads the iframe asynchronously,
-        // and that reload races with the `srcdoc` set below: on load the preview
-        // paints blank and only an edit (which sets `srcdoc` without re-touching
-        // `sandbox`) recovers it. Guarding the attribute makes the first paint stick.
-        const wantSandbox = scripts ? "allow-scripts" : "allow-same-origin";
-        if (frame.getAttribute("sandbox") !== wantSandbox) frame.setAttribute("sandbox", wantSandbox);
-        const body = outputView === "markdown" ? marked.parse(ctx.caches.lastOutput) : ctx.caches.lastOutput;
-        frame.srcdoc = previewDoc(body, scripts);
-      }
+      // setOutputDoc, buildProvenance, and renderPreview now live in
+      // ./app/output.mjs (see the factory above).
 
       // The file behind a segment ("main" is tab 0; partials are the rest).
       function tabIndexByFile(file) {
