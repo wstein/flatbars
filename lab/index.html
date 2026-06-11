@@ -1708,7 +1708,7 @@
       // App shell modules extracted from this file (Phase 0, engine-registry
       // plan). Pure leaves first — engine resolution + the DOM lookup helpers.
       import { resolveEngine, engineLabel, templateExt, templateFence } from "./app/engine-config.mjs?v=1";
-      import { byId, qs } from "./app/dom.mjs?v=1";
+      import { byId, qs, makeEl } from "./app/dom.mjs?v=2";
       import { showBootError, bootFail } from "./app/boot-error.mjs?v=1";
       import { toast, openShareMenu, closeShareMenu } from "./app/ui-chrome.mjs?v=1";
       import { createCmLanguages } from "./app/cm-languages.mjs?v=1";
@@ -5050,19 +5050,7 @@
 
       function dockVisible() { return !byId("dock").hidden; }
 
-      function makeEl(tag, attrs = {}, children = []) {
-        const node = document.createElement(tag);
-        for (const [k, v] of Object.entries(attrs)) {
-          if (k === "class") node.className = v;
-          else if (k === "style") node.style.cssText = v;
-          else node.setAttribute(k, v);
-        }
-        for (const c of [].concat(children)) {
-          if (c == null) continue;
-          node.append(typeof c === "string" ? document.createTextNode(c) : c);
-        }
-        return node;
-      }
+      // makeEl now lives in ./app/dom.mjs (imported above).
 
       // Parse main + every partial to its pre-expansion AST, then derive the DAG.
       function currentDependencyGraph() {
