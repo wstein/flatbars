@@ -160,14 +160,25 @@ All four phases landed green; `MaxBars.parse` is the production render/compile/i
 codegen path and `String → Template` never touches `FlatBars.Parser`. Two refinements to §3/§4 as
 built:
 
-- **Rejected shapes stay *recognized-then-rejected*, not lexically erased.** `MaxBars.Parser`
-  rejects `{{&}}` / `{{^}}` / `{{<` / `{{$` / `{{#*}}` / `{{#>}}` / bare `{{{{name}}}}` with a located
-  `DisallowedShape` (the message names the shape), rather than the lexer simply not producing those
-  tokens. A specific "this is not a MaxBars shape" diagnostic beats a generic "unexpected `&`" parse
-  error. The §3 *gate booleans* are gone (the rejection is unconditional grammar); the diagnostics are
-  better than a pure erasure would give. `{{{ … }}}` raw output and `{{! … }}` comments **are** erased
-  (`bracesOutputOnly` baked in — `{{{` is a lex error, `{{!` is `not` output, the comment is
+- **Rejected shapes stay *recognized-then-rejected*, not lexically erased — a *learning-tool*
+  behavior.** `MaxBars.Parser` rejects `{{&}}` / `{{^}}` / `{{<` / `{{$` / `{{#*}}` / `{{#>}}` / bare
+  `{{{{name}}}}` with a located `DisallowedShape` whose message names the shape, rather than the lexer
+  simply not producing those tokens. This is deliberate because of *what the PureScript engine is*: a
+  multi-dialect **learning lab** that hosts ClassicBars (Handlebars) right next to MaxBars, so MaxBars
+  keeps awareness of the Handlebars shapes precisely to *teach the contrast* — "that's a Handlebars
+  form; the MaxBars way is …" — rather than emit a generic "unexpected `&`". The §3 *gate booleans* are
+  gone (the rejection is unconditional grammar). `{{{ … }}}` raw output and `{{! … }}` comments **are**
+  erased (`bracesOutputOnly` baked in — `{{{` is a lex error, `{{!` is `not` output, the comment is
   `{# … #}`).
+
+  **This must NOT be ported to Rust Trussbars.** Trussbars is the *native standalone* engine — it has
+  no Handlebars/Mustache concepts at all, so its grammar has only the six native sigils
+  (`Output`/`Clause`/`Open`/`Close`/`Partial`/`Comment`) and a stray `{{&x}}` is simply a syntax error,
+  like `@#$`, not "a rejected Handlebars shape". Teaching Trussbars about `{{&}}`/`{{^}}`/`{{<` just to
+  produce a friendlier message would import compatibility knowledge the native reference deliberately
+  lacks. The two implementations owe each other **conformance on valid input** (byte-identical render
+  output over the corpus), not parity of rejection diagnostics: the lab contrasts dialects, the native
+  engine stands alone.
 - **MaxBars owns its *entire* front-end — four modules, not two.** Beyond `MaxBars.Lexer` +
   `MaxBars.Parser`, the fork extended to `MaxBars.Token` (the interior expression tokenizer, with the
   infix alphabet / `..` range / `[…]`·`{k:v}` collections baked in) and `MaxBars.Highlight` (spans from
