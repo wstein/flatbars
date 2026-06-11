@@ -944,6 +944,12 @@ mod tests {
         let cases: &[(&str, Value)] = &[
             // operators / helpers / literals in output (were `vm subset: expr unsupported`).
             ("{{ 2 | add 3 }}", Value::Null),
+            // ADR-25 stage 2: the internal `render "@name"` op (capture/apply foundation) —
+            // renders a hoisted `@` inline partial to a Safe value, via the shared eval_expr.
+            (
+                r#"{% inline "@t" %}<b>{{x}}</b>{% endinline %}{{ render "@t" }}"#,
+                obj(&[("x", s("<i>"))]),
+            ),
             ("{{ name | uppercase }}", obj(&[("name", s("ann"))])),
             (
                 "{% if n > 2 %}big{% elif n > 0 %}mid{% else %}small{% endif %}",

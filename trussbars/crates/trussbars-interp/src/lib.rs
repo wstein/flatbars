@@ -1034,6 +1034,20 @@ pub fn eval_expr(env: &Env, e: &Expr) -> Result<Value, String> {
             }
             Ok(Value::Object(Rc::new(obj)))
         }
+        // ADR-25: render a hoisted `{% capture %}`/`{% apply %}` body (a synthetic `@…` inline
+        // partial) to a `Safe` value, in the **current** scope — loop vars / locals / parents
+        // preserved (docs/18 "surrounding context", *not* a re-rooted partial frame). The name
+        // is a string literal beginning with `@`, so it is only ever the parser-emitted
+        // synthetic; a user template cannot reach it and the names-static boundary holds.
+        ("render", [Expr::Lit(Lit::Str(name))]) if name.starts_with('@') => {
+            let partials = Rc::clone(&env.partials);
+            let body = partials
+                .get(name.as_str())
+                .ok_or_else(|| alloc::format!("internal: unknown captured fragment '{name}'"))?;
+            let mut buf = String::new();
+            eval_nodes(env, body, &mut buf)?;
+            Ok(Value::Safe(Rc::from(buf.as_str())))
+        }
         _ => {
             if let Some(v) = env.params.get(name)
                 && args.is_empty()
@@ -1401,6 +1415,36 @@ mod tests {
         let d = obj(&[("name", s("<b>"))]);
         assert_eq!(render("{{name}}", d.clone()).unwrap(), "&lt;b&gt;");
         assert_eq!(render("{{ name | safe }}", d).unwrap(), "<b>");
+    }
+
+    /// The internal `render "@name"` op (ADR-25 stage 2) — renders a hoisted `@`-named
+    /// inline partial (a `{% capture %}`/`{% apply %}` body) to a `Safe` value in the current
+    /// scope: the body's interpolations escape, the result emits **verbatim** (no
+    /// double-escape), and it sees the surrounding context (here, the loop element).
+    #[test]
+    fn render_op_produces_safe_in_current_scope() {
+        // body escapes its interpolation; the Safe result is emitted verbatim.
+        let d = obj(&[("x", s("<i>"))]);
+        assert_eq!(
+            render(
+                r#"{% inline "@t" %}<b>{{x}}</b>{% endinline %}{{ render "@t" }}"#,
+                d
+            )
+            .unwrap(),
+            "<b>&lt;i&gt;</b>"
+        );
+        // "surrounding context": `render` inside a loop sees the current element.
+        let d2 = obj(&[("xs", arr(&[s("a"), s("b")]))]);
+        assert_eq!(
+            render(
+                r#"{% inline "@t" %}[{{this}}]{% endinline %}{% for xs %}{{ render "@t" }}{% endfor %}"#,
+                d2
+            )
+            .unwrap(),
+            "[a][b]"
+        );
+        // a non-`@` name is not the internal op — it is an unknown helper (boundary holds).
+        assert!(render(r#"{{ render "nav" }}"#, Value::Null).is_err());
     }
 
     /// `Value::Safe` (docs/25) — a pre-escaped value: `{{ x }}` emits it verbatim (no
