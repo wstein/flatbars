@@ -117,6 +117,9 @@ const CASES = [
   // there lexes as output, not a comment.
   ["{{! comment with add toFixed }}", ["classicbars", "minbars", "rawbars"]],
   ["{{!-- a {{nested}}-looking comment --}}", ["classicbars", "minbars", "rawbars"]],
+  // the Django/Jinja inline comment `{# … #}` (ADR-039 item 1) — the statement-tag
+  // dialects (RawBars/MaxBars), where the engine lexes it as a comment.
+  ["{# a {{nested}}-looking comment #}", ["rawbars", "maxbars"]],
   ["{{a + b * c}}", ["maxbars"]],
   ["{{price >= 100}}", ["maxbars"]],
   ["{{=<% %>=}}", ["minbars"]],

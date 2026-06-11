@@ -84,6 +84,9 @@
           "include": "#comment_short"
         },
         {
+          "include": "#comment_inline"
+        },
+        {
           "include": "#triple_stash"
         },
         {
@@ -268,6 +271,22 @@
         }
       },
       "end": "\\}\\}",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.comment.end.flatbars"
+        }
+      }
+    },
+    "comment_inline": {
+      "_doc": "{# … #} — the Django/Jinja inline comment of the statement-tag dialects (RawBars/MaxBars, ADR-039 item 1); body ends at the first #}. The `{#`/`#}` braces are comment-family punctuation (punctuation.definition.comment.*), like {{! }} / {{!-- --}}, so the whole comment reads in the comment colour with delimiter-class braces. (The grammar is a dialect-agnostic floor; ClassicBars/MinBars do not lex {# #} as a comment, but the LSP corrects per dialect.)",
+      "name": "comment.block.flatbars",
+      "begin": "\\{#",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.comment.begin.flatbars"
+        }
+      },
+      "end": "#\\}",
       "endCaptures": {
         "0": {
           "name": "punctuation.definition.comment.end.flatbars"

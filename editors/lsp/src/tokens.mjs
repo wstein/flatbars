@@ -409,6 +409,11 @@ export function flatten(text, dialect) {
   const ctxBySpan = spansWithActiveDelims(spans, text);
   for (const { span: s, openDelim, closeDelim } of ctxBySpan) {
     if (s.role !== "tag") continue;
+    // Comments are floored to the grammar (their `{{!`/`{#` braces are comment-family
+    // punctuation, painted by the TextMate `comment_*` rules). Skip them here, or the
+    // `{# … #}` inline comment trips the delimiter-switch heuristic below — its `{#`
+    // opener is neither `{{` nor `{%`, so the braces would wrongly paint as set-delimiter.
+    if (s.kind === "comment") continue;
     if (s.kind === "set-delimiter") {
       const [from, to] = shrinkToInner(text, s.from, s.to, openDelim, closeDelim);
       fillRange(kinds, from, to, s.kind);
