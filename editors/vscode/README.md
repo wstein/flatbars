@@ -1,13 +1,13 @@
-# FlatBars for VS Code
+# Trussbars for VS Code
 
-Syntax support for FlatBars templates (and the Handlebars / Mustache surfaces it
-covers), implementing the two-layer model of ADR-017
-(`docs/modules/ROOT/pages/adr-0017-editor-support-lsp.adoc`):
+Syntax support for **Trussbars** templates (`.truss`) — the production Rust template
+engine built on the FlatBars MaxBars surface — implementing the two-layer model of
+ADR-017 (`docs/modules/ROOT/pages/adr-0017-editor-support-lsp.adoc`):
 
 - **A TextMate grammar (the floor).** Colours the default-delimiter forms
-  (`{{ }}`, `{{{ }}}`, sections, partials, comments, …) immediately — at first
-  paint, and as the only colour in no-LSP contexts. It is best-effort and
-  non-authoritative: it leaves set-delimiter regions and MaxBars operators plain
+  (`{{ }}`, `{% … %}` statement tags, `{# … #}` comments, sections, partials, …)
+  immediately — at first paint, and as the only colour in no-LSP contexts. It is
+  best-effort and non-authoritative: it leaves the infix operators and pipes plain
   rather than mis-colouring them.
 - **`flatbars-lsp` semantic tokens (the ceiling).** The extension spawns the
   engine-backed language server, whose tokens **override** the grammar and correct
@@ -17,17 +17,14 @@ covers), implementing the two-layer model of ADR-017
 The server is the committed `flatbars-js` engine bundle run as a language server —
 there is no second grammar to drift, which is the whole point of ADR-017.
 
-## Dialect
+## Language
 
-Each dialect is its own language, registered on its native extensions: **RawBars**
-(`.rawbars` / `.rbars`), **MinBars** (`.minbars` / `.mbars`), **ClassicBars**
-(`.classicbars` / `.fbars`), **MaxBars** (`.maxbars` / `.xbars` / `.truss`). The server reads the
-dialect from the document's language id — pick it from the status bar to mark a
-file as a different dialect.
-
-We deliberately do **not** claim `.hbs`/`.handlebars`/`.mustache` — those belong to
-the Handlebars/Mustache extensions. To use FlatBars on such a file, add a
-`files.associations` entry (e.g. `"*.hbs": "classicbars"`).
+The extension is **Trussbars-only**: one language, registered on the `.truss`
+extension (the on-disk format for Trussbars templates). Trussbars is the typed,
+AOT-compiled subset of the FlatBars **MaxBars** surface, so the server tokenizes and
+diagnoses a `.truss` file with the MaxBars engine. The other FlatBars dialects
+(RawBars / MinBars / ClassicBars / MaxBars) remain first-class in the engine and the
+FlatBars Lab, but are not shipped as editor languages here.
 
 ## Building
 

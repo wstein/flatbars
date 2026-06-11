@@ -13,10 +13,10 @@ const path = require("path");
 const { workspace } = require("vscode");
 const { LanguageClient, TransportKind } = require("vscode-languageclient/node");
 
-// The four dialect language ids the extension contributes. Kept identical to
+// The language ids the extension contributes — Trussbars-only. Kept identical to
 // editors/shared/sync.mjs LANGUAGES (codegened into package.json via
 // editors/scripts/sync-manifests.mjs, gated by check:editors-manifests).
-const LANGUAGE_IDS = ["rawbars", "minbars", "classicbars", "maxbars"];
+const LANGUAGE_IDS = ["trussbars"];
 
 let client;
 

@@ -11,17 +11,6 @@ package com.flatbars.idea
  */
 object FlatBarsLanguages {
   val EXTENSIONS: Set<String> = setOf(
-    "rawbars",
-    "rbars",
-    "minbars",
-    "mbars",
-    "mustache",
-    "classicbars",
-    "fbars",
-    "hbs",
-    "handlebars",
-    "maxbars",
-    "xbars",
     "truss",
   )
 }

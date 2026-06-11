@@ -1,13 +1,14 @@
-# FlatBars for JetBrains IDEs
+# Trussbars for JetBrains IDEs
 
-Syntax support for FlatBars templates (and the Handlebars / Mustache surfaces it
-covers) in IntelliJ IDEA, WebStorm, and the other JetBrains IDEs, implementing
-ADR-017's two-layer model (`docs/modules/ROOT/pages/adr-0017-editor-support-lsp.adoc`):
+Syntax support for **Trussbars** templates (`.truss`) — the production Rust template
+engine built on the FlatBars MaxBars surface — in IntelliJ IDEA, WebStorm, and the
+other JetBrains IDEs, implementing ADR-017's two-layer model
+(`docs/modules/ROOT/pages/adr-0017-editor-support-lsp.adoc`):
 
 - **TextMate grammar — the floor.** Bundled via a `TextMateBundleProvider`, it
   colours the default-delimiter forms in **every** JetBrains IDE, Community
-  included. Best-effort and non-authoritative: it leaves set-delimiter regions and
-  MaxBars operators plain rather than mis-colouring them.
+  included. Best-effort and non-authoritative: it leaves the infix operators and
+  pipes plain rather than mis-colouring them.
 - **`flatbars-lsp` semantic tokens — the ceiling.** On IntelliJ **Ultimate**
   (2024.2+, matching `build.gradle.kts` `sinceBuild = "242"`), the plugin starts the same
   engine-backed server the VS Code extension ships; the IDE consumes its semantic
@@ -32,11 +33,9 @@ toolchain** (the IntelliJ Platform baseline) — Gradle can auto-provision it.
 
 ### Settings
 
-**Settings ▸ Languages & Frameworks ▸ FlatBars** offers a **default dialect** for
-contexts where the URI cannot resolve to a dialect (the JetBrains LSP client
-sometimes elides the language id; the long and short native extensions —
-`.rawbars`/`.rbars`, `.minbars`/`.mbars`, `.classicbars`/`.fbars`,
-`.maxbars`/`.xbars`/`.truss` — resolve themselves). It's an application-level preference
+**Settings ▸ Languages & Frameworks ▸ Trussbars** offers a **default language** for
+contexts where the URI cannot resolve one (the JetBrains LSP client sometimes elides
+the language id; the `.truss` extension resolves itself). It's an application-level preference
 (`FlatBarsSettings`) passed to the server as an initialization option
 (`FlatBarsLspServerDescriptor.createInitializationOptions`); like the VS Code client,
 it is read when a server starts, so a change applies to files opened afterwards. The

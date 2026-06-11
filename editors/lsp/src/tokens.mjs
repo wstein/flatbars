@@ -40,34 +40,24 @@ function kindEncoder(vocab, legend) {
   return map;
 }
 
-// FlatBars has four surfaces, each a first-class editor language. The dialect is
-// the document's `languageId` — `rawbars`/`minbars`/`classicbars`/`maxbars`; the
-// `flatbars` umbrella (and anything else) yields null so the caller falls back.
+// The engine has four surfaces; `tokenize` / `dialectDiagnostics` below accept any of them
+// (the FlatBars Lab and the paint-parity gate exercise all four). The SHIPPED editor
+// language, however, is Trussbars-only — the plugins contribute one language, `trussbars`,
+// whose engine surface is `maxbars` (Trussbars is MaxBars→Rust). So a document's `maxbars`
+// engine dialect is reached through the `trussbars` language id / the `.truss` extension.
 export const DIALECTS = ["rawbars", "minbars", "classicbars", "maxbars"];
 
+// The shipped editor language id → its engine dialect. Only `trussbars` ships.
+const LANGUAGE_DIALECT = { trussbars: "maxbars" };
+
 export function dialectForLanguageId(languageId) {
-  return DIALECTS.includes(languageId) ? languageId : null;
+  return LANGUAGE_DIALECT[languageId] ?? (DIALECTS.includes(languageId) ? languageId : null);
 }
 
-// A robust fallback when the languageId is not a dialect (the `flatbars` umbrella,
-// or a host — e.g. JetBrains — that doesn't send our id): map the native extension.
-// Returns null if the extension picks no dialect. Each dialect ships long-form
-// (`.rawbars`) and short-form (`.rbars`) extensions; ClassicBars also claims the
-// Handlebars extensions, MinBars the Mustache extension, and MaxBars `.truss`
-// (Trussbars AOT-compiled templates) — see editors/shared/sync.mjs LANGUAGES for
-// the canonical mapping.
+// A robust fallback when the languageId is not the shipped language (a host — e.g.
+// JetBrains — that doesn't send our id): map the native extension. The Trussbars-only
+// plugins associate a single extension, `.truss`, onto the `maxbars` engine surface.
 const URI_EXTENSION_DIALECT = {
-  ".rawbars": "rawbars",
-  ".rbars": "rawbars",
-  ".minbars": "minbars",
-  ".mbars": "minbars",
-  ".mustache": "minbars",
-  ".classicbars": "classicbars",
-  ".fbars": "classicbars",
-  ".hbs": "classicbars",
-  ".handlebars": "classicbars",
-  ".maxbars": "maxbars",
-  ".xbars": "maxbars",
   ".truss": "maxbars",
 };
 
@@ -79,8 +69,16 @@ export function dialectForUri(uri) {
 
 // The resolution the server uses: languageId first, then the URI, then the
 // configured default (ClassicBars unless overridden).
-export function resolveDialect(languageId, uri, fallback = "classicbars") {
-  return dialectForLanguageId(languageId) ?? dialectForUri(uri) ?? fallback;
+export function resolveDialect(languageId, uri, fallback = "maxbars") {
+  // The `fallback` (the `flatbars.defaultDialect` setting) is a shipped language id, so
+  // normalise it through `dialectForLanguageId` (`trussbars` → `maxbars`); a final
+  // `maxbars` keeps the result a valid engine dialect for `tokenize`.
+  return (
+    dialectForLanguageId(languageId) ??
+    dialectForUri(uri) ??
+    dialectForLanguageId(fallback) ??
+    "maxbars"
+  );
 }
 
 // Parse diagnostics (ADR-023) as engine offset ranges. The recovering parser

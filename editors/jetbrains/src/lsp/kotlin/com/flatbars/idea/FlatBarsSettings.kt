@@ -51,10 +51,10 @@ class FlatBarsSettings : PersistentStateComponent<FlatBarsSettings.State> {
     }
 
   companion object {
-    const val DEFAULT_DIALECT = "classicbars"
+    const val DEFAULT_DIALECT = "trussbars"
 
-    /** Offered dialects — the engine's surfaces, matching the VS Code setting's enum. */
-    val DIALECTS = arrayOf("classicbars", "minbars", "rawbars", "maxbars")
+    /** The shipped language — Trussbars-only, matching the VS Code setting's enum. */
+    val DIALECTS = arrayOf("trussbars")
 
     val instance: FlatBarsSettings
       get() = ApplicationManager.getApplication().getService(FlatBarsSettings::class.java)

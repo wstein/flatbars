@@ -88,7 +88,7 @@ try {
     processId: process.pid,
     rootUri: null,
     capabilities: {},
-    initializationOptions: { defaultDialect: "classicbars" },
+    initializationOptions: { defaultDialect: "trussbars" },
   });
   assert.ok(init.capabilities.semanticTokensProvider, "bundled server advertises semantic tokens");
   assert.ok(init.capabilities.codeActionProvider, "bundled server advertises code actions");
@@ -96,10 +96,10 @@ try {
   // Semantic tokens are sparse corrections: a plain interpolation emits nothing
   // (the grammar paints it), but a MaxBars operator does. Decode the delta stream
   // and assert SEMANTICALLY so an additive painter doesn't break this gate.
-  const uri = "file:///t/page.maxbars";
+  const uri = "file:///t/page.truss";
   const text = "{{ a ?? b }}";
   await conn.sendNotification("textDocument/didOpen", {
-    textDocument: { uri, languageId: "maxbars", version: 1, text },
+    textDocument: { uri, languageId: "trussbars", version: 1, text },
   });
   const r = await conn.sendRequest("textDocument/semanticTokens/full", { textDocument: { uri } });
   const legend = init.capabilities.semanticTokensProvider.legend;

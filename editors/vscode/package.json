@@ -1,7 +1,7 @@
 {
-  "name": "flatbars",
-  "displayName": "FlatBars",
-  "description": "FlatBars / Handlebars / Mustache syntax highlighting — a TextMate fallback plus the engine-backed flatbars-lsp for correct, stateful semantic tokens (ADR-017).",
+  "name": "trussbars",
+  "displayName": "Trussbars",
+  "description": "Trussbars template support for `.truss` files — syntax highlighting (a TextMate fallback) plus the engine-backed language server for correct, stateful semantic tokens and diagnostics (ADR-017). Trussbars is the production Rust template engine built on the FlatBars MaxBars surface.",
   "version": "0.1.0",
   "publisher": "flatbars",
   "license": "Apache-2.0",
@@ -18,57 +18,16 @@
   ],
   "main": "./dist/extension.js",
   "activationEvents": [
-    "onLanguage:rawbars",
-    "onLanguage:minbars",
-    "onLanguage:classicbars",
-    "onLanguage:maxbars"
+    "onLanguage:trussbars"
   ],
   "contributes": {
     "languages": [
       {
-        "id": "rawbars",
+        "id": "trussbars",
         "aliases": [
-          "RawBars"
+          "Trussbars"
         ],
         "extensions": [
-          ".rawbars",
-          ".rbars"
-        ],
-        "configuration": "./language-configuration.json"
-      },
-      {
-        "id": "minbars",
-        "aliases": [
-          "MinBars"
-        ],
-        "extensions": [
-          ".minbars",
-          ".mbars",
-          ".mustache"
-        ],
-        "configuration": "./language-configuration.json"
-      },
-      {
-        "id": "classicbars",
-        "aliases": [
-          "ClassicBars"
-        ],
-        "extensions": [
-          ".classicbars",
-          ".fbars",
-          ".hbs",
-          ".handlebars"
-        ],
-        "configuration": "./language-configuration.json"
-      },
-      {
-        "id": "maxbars",
-        "aliases": [
-          "MaxBars"
-        ],
-        "extensions": [
-          ".maxbars",
-          ".xbars",
           ".truss"
         ],
         "configuration": "./language-configuration.json"
@@ -76,22 +35,7 @@
     ],
     "grammars": [
       {
-        "language": "rawbars",
-        "scopeName": "source.flatbars",
-        "path": "./dist/flatbars.tmLanguage.json"
-      },
-      {
-        "language": "minbars",
-        "scopeName": "source.flatbars",
-        "path": "./dist/flatbars.tmLanguage.json"
-      },
-      {
-        "language": "classicbars",
-        "scopeName": "source.flatbars",
-        "path": "./dist/flatbars.tmLanguage.json"
-      },
-      {
-        "language": "maxbars",
+        "language": "trussbars",
         "scopeName": "source.flatbars",
         "path": "./dist/flatbars.tmLanguage.json"
       },
@@ -134,31 +78,16 @@
         "flatbars.defaultDialect": {
           "type": "string",
           "enum": [
-            "rawbars",
-            "minbars",
-            "classicbars",
-            "maxbars"
+            "trussbars"
           ],
-          "default": "classicbars",
-          "description": "Dialect the FlatBars language server falls back to when the document's languageId and URI extension both fail to resolve. Defaults to ClassicBars (Handlebars-faithful)."
+          "default": "trussbars",
+          "description": "Language the Trussbars server falls back to when the document's languageId and URI extension both fail to resolve. The extension is Trussbars-only, so this is always `trussbars`."
         }
       }
     },
     "snippets": [
       {
-        "language": "rawbars",
-        "path": "./snippets/flatbars.json"
-      },
-      {
-        "language": "minbars",
-        "path": "./snippets/flatbars.json"
-      },
-      {
-        "language": "classicbars",
-        "path": "./snippets/flatbars.json"
-      },
-      {
-        "language": "maxbars",
+        "language": "trussbars",
         "path": "./snippets/flatbars.json"
       }
     ],
@@ -171,31 +100,7 @@
     ],
     "semanticTokenScopes": [
       {
-        "language": "rawbars",
-        "scopes": {
-          "embeddedDelimiter": [
-            "punctuation.section.embedded.flatbars"
-          ]
-        }
-      },
-      {
-        "language": "minbars",
-        "scopes": {
-          "embeddedDelimiter": [
-            "punctuation.section.embedded.flatbars"
-          ]
-        }
-      },
-      {
-        "language": "classicbars",
-        "scopes": {
-          "embeddedDelimiter": [
-            "punctuation.section.embedded.flatbars"
-          ]
-        }
-      },
-      {
-        "language": "maxbars",
+        "language": "trussbars",
         "scopes": {
           "embeddedDelimiter": [
             "punctuation.section.embedded.flatbars"
@@ -281,103 +186,7 @@
         ]
       },
       "editor.semanticTokenColorCustomizations": {
-        "[rawbars]": {
-          "enabled": true,
-          "rules": {
-            "comment": {
-              "fontStyle": "bold"
-            },
-            "embeddedDelimiter": {
-              "fontStyle": "bold"
-            },
-            "function": {
-              "fontStyle": "bold"
-            },
-            "keyword": {
-              "fontStyle": "bold"
-            },
-            "macro": {
-              "fontStyle": "bold"
-            },
-            "number": {
-              "fontStyle": "bold"
-            },
-            "operator": {
-              "fontStyle": "bold"
-            },
-            "string": {
-              "fontStyle": "bold"
-            },
-            "variable": {
-              "fontStyle": "bold"
-            }
-          }
-        },
-        "[minbars]": {
-          "enabled": true,
-          "rules": {
-            "comment": {
-              "fontStyle": "bold"
-            },
-            "embeddedDelimiter": {
-              "fontStyle": "bold"
-            },
-            "function": {
-              "fontStyle": "bold"
-            },
-            "keyword": {
-              "fontStyle": "bold"
-            },
-            "macro": {
-              "fontStyle": "bold"
-            },
-            "number": {
-              "fontStyle": "bold"
-            },
-            "operator": {
-              "fontStyle": "bold"
-            },
-            "string": {
-              "fontStyle": "bold"
-            },
-            "variable": {
-              "fontStyle": "bold"
-            }
-          }
-        },
-        "[classicbars]": {
-          "enabled": true,
-          "rules": {
-            "comment": {
-              "fontStyle": "bold"
-            },
-            "embeddedDelimiter": {
-              "fontStyle": "bold"
-            },
-            "function": {
-              "fontStyle": "bold"
-            },
-            "keyword": {
-              "fontStyle": "bold"
-            },
-            "macro": {
-              "fontStyle": "bold"
-            },
-            "number": {
-              "fontStyle": "bold"
-            },
-            "operator": {
-              "fontStyle": "bold"
-            },
-            "string": {
-              "fontStyle": "bold"
-            },
-            "variable": {
-              "fontStyle": "bold"
-            }
-          }
-        },
-        "[maxbars]": {
+        "[trussbars]": {
           "enabled": true,
           "rules": {
             "comment": {
@@ -428,16 +237,13 @@
   },
   "homepage": "https://github.com/wstein/flatbars#readme",
   "keywords": [
-    "handlebars",
-    "mustache",
+    "trussbars",
+    "truss",
     "templates",
-    "hbs",
+    "rust",
     "lsp",
     "flatbars",
-    "rawbars",
-    "minbars",
-    "classicbars",
-    "maxbars"
+    "template-engine"
   ],
   "qna": "https://github.com/wstein/flatbars/discussions",
   "galleryBanner": {

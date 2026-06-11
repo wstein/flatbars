@@ -1,16 +1,17 @@
 <idea-plugin>
   <id>com.flatbars.flatbars</id>
-  <name>FlatBars</name>
-  <vendor email="claude@wstein.de" url="https://github.com/wstein/flatbars">FlatBars</vendor>
+  <name>Trussbars</name>
+  <vendor email="claude@wstein.de" url="https://github.com/wstein/flatbars">Trussbars</vendor>
   <description><![CDATA[
-    Syntax support for FlatBars templates (and the Handlebars / Mustache surfaces it
-    covers), implementing the two-layer model of ADR-017:
+    Syntax support for Trussbars templates (<code>.truss</code>) — the production Rust
+    template engine built on the FlatBars MaxBars surface — implementing the two-layer
+    model of ADR-017:
     <ul>
       <li><b>A TextMate grammar (the floor)</b> colours the default-delimiter forms
       everywhere — including Community IDEs and before the server attaches.</li>
       <li><b>flatbars-lsp semantic tokens (the ceiling)</b>, on IntelliJ Ultimate
       (2024.2+), run the actual engine lexer and override the grammar, correcting the
-      stateful regions (set delimiters, dialects, MaxBars operators) a grammar cannot
+      stateful regions (infix operators, pipes, nested blocks) a grammar cannot
       track. The engine always wins where it runs. (Built with -PwithLsp.)</li>
     </ul>
     <p>
@@ -26,9 +27,9 @@
       <li>First public release.</li>
       <li>TextMate fallback (every JetBrains IDE) and Ultimate-only LSP ceiling
       (IntelliJ IDEA Ultimate 2024.2+).</li>
-      <li>Native extensions per dialect — long (.rawbars / .minbars /
-      .classicbars / .maxbars) and short (.rbars / .mbars / .fbars / .xbars); MaxBars
-      also claims .truss (Trussbars AOT-compiled templates).</li>
+      <li>Trussbars-only: the `.truss` extension (the production Trussbars engine,
+      built on the FlatBars MaxBars surface). The other FlatBars dialects stay in the
+      engine and the Lab, but are not shipped as editor languages.</li>
       <li>Helper-name highlighting from the prelude catalogue; canonicalisation
       quick-fix on deprecated aliases.</li>
       <li>Hybrid-template injection grammar — *.host.flatbars-ext files paint
@@ -67,9 +68,9 @@
     <!-- Notifications group used by node-missing errors and Tools-menu actions. -->
     <notificationGroup id="FlatBars" displayType="BALLOON" isLogByDefault="true"/>
 
-    <!-- The runnable file templates "New ▸ FlatBars Template" surface, gated by
-         the textmate bundle providing the dialect language registration. -->
-    <internalFileTemplate name="FlatBars Template.classicbars"/>
+    <!-- The runnable file template "New ▸ Trussbars Template" surface, gated by
+         the textmate bundle providing the language registration. -->
+    <internalFileTemplate name="Trussbars Template.truss"/>
 
     <!-- Live Templates (every common block form). The XML lives at
          resources/liveTemplates/FlatBars.xml. -->

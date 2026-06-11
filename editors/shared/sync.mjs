@@ -46,25 +46,16 @@ export async function bundleServer(esbuild, { repoRoot, outfile, sourcemap = fal
   });
 }
 
-// The editor language set — one language per surface dialect. Single source for
-// the VS Code manifest (asserted by its smoke test) and the JetBrains TextMate
-// bundle manifest. All four share the one `source.flatbars` grammar.
-//
-// Each dialect ships TWO native extensions: the long form (`.rawbars`) and a
-// short alias (`.rbars`). ClassicBars and MinBars additionally claim the
-// Handlebars / Mustache extensions they're semantically compatible with —
-// `.hbs` / `.handlebars` for ClassicBars (Handlebars surface), `.mustache` for
-// MinBars (Mustache spec). MaxBars additionally claims `.truss` — the on-disk
-// extension for Trussbars templates (the MaxBars→Rust AOT compiler, `trussbars/`);
-// a Trussbars template is MaxBars source, so it highlights through the same
-// grammar. Users who already have a Handlebars or Mustache extension installed
-// should choose one via `files.associations` to disambiguate; the FlatBars plugin
-// is happy to defer.
+// The editor language set. The VS Code / JetBrains plugins are **Trussbars-only**: one
+// language for `.truss` templates (the production Trussbars engine — the MaxBars→Rust AOT
+// compiler, `trussbars/`). The other surfaces (RawBars / MinBars / ClassicBars / MaxBars)
+// remain first-class in the engine and the FlatBars Lab, but are NOT shipped as editor
+// languages — the extensions present explicitly as Trussbars. Single source for the VS
+// Code manifest (asserted by its smoke test) and the JetBrains TextMate bundle manifest;
+// it uses the one `source.flatbars` grammar. Internally the LSP tokenizes / diagnoses a
+// `trussbars` document with the engine's `maxbars` dialect (Trussbars' surface).
 export const LANGUAGES = [
-  { id: "rawbars", aliases: ["RawBars"], extensions: [".rawbars", ".rbars"] },
-  { id: "minbars", aliases: ["MinBars"], extensions: [".minbars", ".mbars", ".mustache"] },
-  { id: "classicbars", aliases: ["ClassicBars"], extensions: [".classicbars", ".fbars", ".hbs", ".handlebars"] },
-  { id: "maxbars", aliases: ["MaxBars"], extensions: [".maxbars", ".xbars", ".truss"] },
+  { id: "trussbars", aliases: ["Trussbars"], extensions: [".truss"] },
 ];
 
 export const LANGUAGE_IDS = LANGUAGES.map((l) => l.id);

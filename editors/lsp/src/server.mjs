@@ -37,7 +37,7 @@ import {
 export function startServer(connection) {
   const documents = new TextDocuments(TextDocument);
   const legend = buildLegend();
-  let defaultDialect = "classicbars";
+  let defaultDialect = "maxbars"; // Trussbars' engine surface (the shipped language)
 
   connection.onInitialize((params) => {
     const opt = params.initializationOptions;

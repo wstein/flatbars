@@ -65,30 +65,23 @@ t("plain content produces no tokens", () => {
 });
 
 // ── Dialect resolution: languageId first, then native extension, then default ──
-t("dialectForLanguageId maps the four dialect languages; umbrella/others -> null", () => {
+t("dialectForLanguageId maps the shipped `trussbars` language onto the maxbars surface", () => {
+  // The plugins are Trussbars-only: the `trussbars` language id → the `maxbars` engine.
+  assert.equal(dialectForLanguageId("trussbars"), "maxbars");
+  // The shared engine still resolves its own dialect names (the Lab / paint-parity gate).
   assert.equal(dialectForLanguageId("maxbars"), "maxbars");
-  assert.equal(dialectForLanguageId("rawbars"), "rawbars");
+  // Non-shipped ids resolve to null.
   assert.equal(dialectForLanguageId("flatbars"), null); // umbrella
   assert.equal(dialectForLanguageId("handlebars"), null); // not ours
 });
-t("dialectForUri maps every dialect extension (long, short, and host-compat)", () => {
-  // Long-form per-dialect natives
-  assert.equal(dialectForUri("file:///x/page.rawbars"), "rawbars");
-  assert.equal(dialectForUri("file:///x/page.minbars"), "minbars");
-  assert.equal(dialectForUri("file:///x/page.classicbars"), "classicbars");
-  assert.equal(dialectForUri("file:///x/page.maxbars"), "maxbars");
-  // Short-form aliases
-  assert.equal(dialectForUri("file:///x/page.rbars"), "rawbars");
-  assert.equal(dialectForUri("file:///x/page.mbars"), "minbars");
-  assert.equal(dialectForUri("file:///x/page.fbars"), "classicbars");
-  assert.equal(dialectForUri("file:///x/page.xbars"), "maxbars");
-  // Trussbars AOT-compiled templates are MaxBars source.
+t("dialectForUri maps the Trussbars `.truss` extension; everything else -> null", () => {
+  // The Trussbars-only plugins associate a single extension, `.truss`, onto `maxbars`.
   assert.equal(dialectForUri("file:///x/page.truss"), "maxbars");
-  // Host-compat: Handlebars / Mustache extensions claimed by their semantic peers
-  assert.equal(dialectForUri("file:///x/page.hbs"), "classicbars");
-  assert.equal(dialectForUri("file:///x/page.handlebars"), "classicbars");
-  assert.equal(dialectForUri("file:///x/page.mustache"), "minbars");
-  // The retired umbrella and unrelated extensions resolve to null.
+  // The other dialects' extensions are no longer shipped → null.
+  assert.equal(dialectForUri("file:///x/page.rawbars"), null);
+  assert.equal(dialectForUri("file:///x/page.hbs"), null);
+  assert.equal(dialectForUri("file:///x/page.mustache"), null);
+  assert.equal(dialectForUri("file:///x/page.maxbars"), null);
   assert.equal(dialectForUri("file:///x/page.flatbars"), null);
   assert.equal(dialectForUri("file:///x/page.txt"), null);
 });
@@ -104,10 +97,10 @@ t("parseDiagnostics flags {{#if a == 1}} off MaxBars, clean on MaxBars", () => {
   assert.deepEqual(parseDiagnostics("{{name}}", "classicbars"), [], "a clean template has none");
 });
 
-t("resolveDialect: languageId wins, then uri, then the configured default", () => {
-  assert.equal(resolveDialect("maxbars", "file:///x/a.flatbars", "classicbars"), "maxbars"); // id wins
-  assert.equal(resolveDialect("flatbars", "file:///x/a.rawbars", "classicbars"), "rawbars"); // umbrella -> uri
-  assert.equal(resolveDialect("flatbars", "file:///x/a.flatbars", "minbars"), "minbars"); // -> default
+t("resolveDialect: languageId wins, then uri, then the configured default (Trussbars-only)", () => {
+  assert.equal(resolveDialect("trussbars", "file:///x/a.txt", "trussbars"), "maxbars"); // id (trussbars→maxbars) wins
+  assert.equal(resolveDialect("plaintext", "file:///x/a.truss", "trussbars"), "maxbars"); // non-ours id → uri (.truss)
+  assert.equal(resolveDialect("plaintext", "file:///x/a.txt", "trussbars"), "maxbars"); // → default (trussbars→maxbars)
 });
 
 // ── LSP wire encoding round-trips to the same positioned tokens ─────────────
