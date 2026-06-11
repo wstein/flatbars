@@ -1716,6 +1716,7 @@
       import { renderPerformance } from "./app/dock/performance.mjs?v=1";
       import { renderWhitespace } from "./app/dock/whitespace.mjs?v=1";
       import { renderCoverage } from "./app/dock/coverage.mjs?v=1";
+      import { renderDataAccess } from "./app/dock/data-access.mjs?v=1";
       import { EditorState, Annotation, StateField, StateEffect, Compartment } from "https://esm.sh/@codemirror/state@6.5.2/es2022/state.mjs";
       import {
         Decoration,
@@ -5089,7 +5090,17 @@
             if (misses) return "warn";
             return lastDataAccess.length ? "success" : "";
           },
-          render: renderDataAccess },
+          render: (body) => renderDataAccess(body,
+            { rows: lastDataAccess, requiredAssigns: lastRequiredAssigns, missingAssigns: lastMissingAssigns },
+            {
+              rowPosition: (r) => {
+                const src = fileSource(r.file);
+                return typeof r.start === "number"
+                  ? charToLineColumn(src, spanRange(src, r.start, r.end)[0])
+                  : { line: 1, column: 1 };
+              },
+              openProblem, saveAsVector,
+            }) },
         { id: "trim", label: "Whitespace", requires: ["standalone"],
           count: () => lastWhitespace.length,
           badge: () => "",
@@ -5281,80 +5292,10 @@
       // ── Panel #1: Data Access ─────────────────────────────────────────
       // Every data lookup the template makes (paths and bare identifiers),
       // classified hit/miss/oob/type-mismatch/scoped. Jump-linked to source.
-      function renderDataAccess(body) {
-        const rows = lastDataAccess;
-        const counts = { hit: 0, miss: 0, "type-mismatch": 0, oob: 0, scoped: 0 };
-        for (const r of rows) counts[r.status] = (counts[r.status] || 0) + 1;
-        const section = makeEl("div", { class: "dx-section" });
-        const head = makeEl("div", { class: "dx-head" }, [
-          makeEl("strong", {}, "Data access"),
-          " — ", String(rows.length), " lookups · ",
-          makeEl("span", { class: "dx-pill ok" }, `${counts.hit} hit`), " ",
-          makeEl("span", { class: "dx-pill warn" }, `${counts.miss} miss`), " ",
-          makeEl("span", { class: "dx-pill danger" }, `${counts["type-mismatch"] + counts.oob} type/oob`), " ",
-          makeEl("span", { class: "dx-pill muted" }, `${counts.scoped} scoped`),
-        ]);
-        section.append(head);
-        // Engine-reported assign contract — programs report which top-level
-        // keys they read; missing ones are real bugs (renamed key, dropped
-        // field), not heuristics. Show them prominently above the per-lookup list.
-        if (lastRequiredAssigns.length) {
-          const contract = makeEl("div", { class: "dx-contract" });
-          contract.append(makeEl("strong", {}, "Required assigns"), ": ");
-          for (const n of lastRequiredAssigns) {
-            const cls = lastMissingAssigns.includes(n) ? "dx-assign missing" : "dx-assign";
-            contract.append(makeEl("span", { class: cls, title: lastMissingAssigns.includes(n) ? "missing from data" : "present in data" }, n));
-          }
-          if (lastMissingAssigns.length) {
-            contract.append(makeEl("span", { class: "dx-contract-warn" },
-              ` — ${lastMissingAssigns.length} missing from data`));
-          }
-          section.append(contract);
-        }
-        if (rows.length === 0) {
-          section.append(makeEl("div", { class: "dx-empty" },
-            "No data lookups — template renders only literals."));
-          body.append(section);
-          return;
-        }
-        section.append(makeEl("div", { class: "dx-hint" }, [
-          "Static analysis against the current data dictionary. ",
-          "“scoped” means the lookup sits inside a loop or partial-scope, where the head identifier may be a block param. ",
-          makeEl("strong", {}, "Save vector"),
-          " (next to a miss/oob row) copies a JSON conformance vector capturing the current template + data + actual output — a one-click way to turn a bug into a regression test.",
-        ]));
-        const list = makeEl("div", { class: "dx-rows" });
-        for (const r of rows) {
-          const cls = r.status === "hit" ? "ok"
-            : r.status === "scoped" ? "muted"
-            : r.status === "miss" ? "warn"
-            : "danger";
-          const row = makeEl("div", { class: `dx-row ${cls}` });
-          row.append(makeEl("span", { class: "dx-status" }, r.status));
-          row.append(makeEl("span", { class: "dx-path" }, r.path));
-          row.append(makeEl("span", { class: "dx-val" },
-            r.status === "hit" ? dxSnippet(r.value) : ""));
-          const src = fileSource(r.file);
-          const pos = typeof r.start === "number"
-            ? charToLineColumn(src, spanRange(src, r.start, r.end)[0])
-            : { line: 1, column: 1 };
-          row.append(makeEl("span", { class: "dx-where" }, `${r.file}:${pos.line}:${pos.column}`));
-          // Save-as-vector button on every non-hit row. Hits already render the
-          // value the template intended; only the failure modes are worth
-          // promoting to a regression vector. The vector is named after the
-          // path that failed, so its purpose is self-evident in vectors.json.
-          if (r.status !== "hit") {
-            const save = makeEl("button", { class: "dx-save", title: "Copy a conformance vector for this case" }, "Save vector");
-            save.addEventListener("click", (e) => { e.stopPropagation(); saveAsVector(r); });
-            row.append(save);
-          }
-          row.title = "jump to source";
-          row.addEventListener("click", () => openProblem({ file: r.file, line: pos.line, col: pos.column }));
-          list.append(row);
-        }
-        section.append(list);
-        body.append(section);
-      }
+      // Panel #1: Data Access now lives in ./app/dock/data-access.mjs — it takes
+      // its three caches (lastDataAccess / lastRequiredAssigns / lastMissingAssigns)
+      // plus injected rowPosition, openProblem, and saveAsVector (the descriptor
+      // above passes them). dxSnippet moved into that module.
 
       // Build a `conformance/vectors.json`-shaped object from the current
       // workspace + the actual rendered output, and copy it to the clipboard.
@@ -5381,14 +5322,7 @@
           () => toast("Couldn't copy (permission?)"),
         );
       }
-      function dxSnippet(v) {
-        if (v === null || v === undefined) return "nil";
-        if (typeof v === "string") return JSON.stringify(v).slice(0, 60);
-        if (typeof v === "object") {
-          try { return JSON.stringify(v).slice(0, 60); } catch { return "[object]"; }
-        }
-        return String(v);
-      }
+      // dxSnippet moved into ./app/dock/data-access.mjs (its only consumer).
 
       // Panel #2: Whitespace trim trace now lives in ./app/dock/whitespace.mjs —
       // it takes its cache (lastWhitespace) plus the openProblem callback and the

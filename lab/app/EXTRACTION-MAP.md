@@ -56,7 +56,9 @@ instead of re-closing over it.
 | Dock Panel #6 Performance | `app/dock/performance.mjs` | reads 1 cache (`lastTimings`) | ✅ (ctx form; DOM-fake tested) |
 | Dock Panel #2 Whitespace | `app/dock/whitespace.mjs` | 1 cache + openProblem + standalone flag | ✅ (ctx form; DOM-fake tested) |
 | Dock Panel #7 Coverage | `app/dock/coverage.mjs` | 1 cache + rowPosition + openProblem | ✅ (ctx form; DOM-fake tested) |
-| Diagnostics dock + panels 1/3/5 + Truthiness (5183–6386) | `app/dock/*.mjs` (one per panel) | read analyses caches | ⛔ (migrate one at a time, ctx form + DOM-fake test each) |
+| Dock Panel #1 Data Access | `app/dock/data-access.mjs` | 3 caches + rowPosition + openProblem + saveAsVector | ✅ (ctx form; DOM-fake + smoke covered) |
+| Dock Panel #3 Partial graph | `panels/partials.mjs` (pre-existing) | — | ✅ (already a module; only descriptor glue in index.html) |
+| Dock panels #5 Capabilities + Truthiness (the two hard ones) | `app/dock/*.mjs` | many caches + engine branch | ⛔ (last; ctx form + DOM-fake test each) |
 | Render Config popover (6387) | `app/config-view.mjs` | reads/writes state | ⛔ |
 | Boot (6611) | `app/boot.mjs` | entry point | ⛔ (last) |
 
