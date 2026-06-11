@@ -11,8 +11,8 @@
 //! opt-in, and zero-cost (every policy is a monomorphized zero-sized marker).
 
 use trussbars_core::{TruthyIn, truthy_in};
-use trussbars_macros::truss;
 use trussbars_interp::{Template, TruthMode, Value};
+use trussbars_macros::truss;
 
 /// A tiny context: a list (to show the empty-collection divergence) and a number (to show
 /// numeric truthiness — which only *exists* under a policy that defines it). No
