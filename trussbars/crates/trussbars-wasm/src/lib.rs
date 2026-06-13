@@ -44,8 +44,9 @@ pub fn version() -> String {
 fn render_impl(template: &str, data_json: &str, truthiness: &str) -> Result<String, String> {
     let json: Json = serde_json::from_str(data_json).map_err(|e| format!("bad data JSON: {e}"))?;
     let data = from_json(&json);
-    let mode = TruthMode::from_ident(truthiness)
-        .ok_or_else(|| format!("unknown truthiness mode `{truthiness}` (expected NonEmpty, Liquid, or Handlebars)"))?;
+    let mode = TruthMode::from_ident(truthiness).ok_or_else(|| {
+        format!("unknown truthiness mode `{truthiness}` (expected NonEmpty, Liquid, or Handlebars)")
+    })?;
     let template = Template::parse(template)?;
     template.with_truthiness(mode).render(&data)
 }
@@ -60,7 +61,9 @@ fn from_json(j: &Json) -> Value {
         Json::String(s) => Value::Str(Rc::from(s.as_str())),
         Json::Array(a) => Value::Array(a.iter().map(from_json).collect::<Vec<_>>().into()),
         Json::Object(o) => Value::Object(Rc::new(
-            o.iter().map(|(k, v)| (k.clone(), from_json(v))).collect::<BTreeMap<_, _>>(),
+            o.iter()
+                .map(|(k, v)| (k.clone(), from_json(v)))
+                .collect::<BTreeMap<_, _>>(),
         )),
     }
 }
@@ -74,7 +77,10 @@ mod tests {
 
     #[test]
     fn renders_a_native_template_against_json_data() {
-        assert_eq!(render_impl("Hi {{ name }}", r#"{"name":"Ada"}"#, "NonEmpty").unwrap(), "Hi Ada");
+        assert_eq!(
+            render_impl("Hi {{ name }}", r#"{"name":"Ada"}"#, "NonEmpty").unwrap(),
+            "Hi Ada"
+        );
     }
 
     #[test]

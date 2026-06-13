@@ -890,7 +890,9 @@ fn emit_expr(env: &Env, e: &Expr) -> Result<String, String> {
 /// and an inscrutable rustc error instead of a located template diagnostic).
 fn field_ident(key: &str) -> Result<&str, String> {
     let mut cs = key.chars();
-    let ok = cs.next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+    let ok = cs
+        .next()
+        .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
         && cs.all(|c| c.is_ascii_alphanumeric() || c == '_');
     if ok {
         Ok(key)

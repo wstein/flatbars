@@ -1330,9 +1330,13 @@ fn eval_helper(env: &Env, name: &str, args: &[Expr]) -> Result<Value, String> {
         // `~` (ADR-042): strict string concat — both operands must be strings, a
         // non-string is an error (matching the oracle's TypeError + the AOT's
         // string-typed `concat`), *not* the lenient stringify `append` uses.
-        ("concat", [Value::Str(x) | Value::Safe(x), Value::Str(y) | Value::Safe(y)]) => {
-            Ok(str_val(alloc::format!("{x}{y}")))
-        }
+        (
+            "concat",
+            [
+                Value::Str(x) | Value::Safe(x),
+                Value::Str(y) | Value::Safe(y),
+            ],
+        ) => Ok(str_val(alloc::format!("{x}{y}"))),
         ("concat", [_, _]) => Err("concat expects two strings".into()),
         ("replace", [a, b, c]) => Ok(str_val(s(a).replace(&s(b), &s(c)))),
         ("includes", [a, b]) => Ok(Value::Bool(s(a).contains(&s(b)))),

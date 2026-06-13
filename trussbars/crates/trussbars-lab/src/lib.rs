@@ -49,11 +49,21 @@ pub struct Resp {
 impl Resp {
     /// A `text/plain` response with the given status + body.
     pub fn text(code: u16, reason: &'static str, body: impl Into<Vec<u8>>) -> Resp {
-        Resp { code, reason, ctype: "text/plain; charset=utf-8", body: body.into() }
+        Resp {
+            code,
+            reason,
+            ctype: "text/plain; charset=utf-8",
+            body: body.into(),
+        }
     }
     /// A `200 OK` `application/json` response.
     pub fn json(body: impl Into<Vec<u8>>) -> Resp {
-        Resp { code: 200, reason: "OK", ctype: "application/json; charset=utf-8", body: body.into() }
+        Resp {
+            code: 200,
+            reason: "OK",
+            ctype: "application/json; charset=utf-8",
+            body: body.into(),
+        }
     }
     fn forbidden(why: &str) -> Resp {
         Resp::text(403, "Forbidden", format!("forbidden: {why}"))
@@ -88,7 +98,13 @@ pub fn jail(root: &Path, rel: &str) -> Option<PathBuf> {
 
 /// The `/__fs/*` bridge handler over `root`. Enforces the token, the CSRF `Origin`
 /// guard, and the jail; serves `read` / `list`, and `write` only when `allow_write`.
-pub fn handle_fs(root: &Path, req: &Req, token: &str, allow_write: bool, origin: Option<&str>) -> Resp {
+pub fn handle_fs(
+    root: &Path,
+    req: &Req,
+    token: &str,
+    allow_write: bool,
+    origin: Option<&str>,
+) -> Resp {
     // (2) Session token.
     if req.headers.get("x-fb-token").map(String::as_str) != Some(token) {
         return Resp::forbidden("bad or missing token");
@@ -108,7 +124,12 @@ pub fn handle_fs(root: &Path, req: &Req, token: &str, allow_write: bool, origin:
         ("read", "GET") => match jail(root, rel) {
             None => Resp::forbidden("path escapes the launch directory"),
             Some(abs) => match fs::read(&abs) {
-                Ok(bytes) => Resp { code: 200, reason: "OK", ctype: "text/plain; charset=utf-8", body: bytes },
+                Ok(bytes) => Resp {
+                    code: 200,
+                    reason: "OK",
+                    ctype: "text/plain; charset=utf-8",
+                    body: bytes,
+                },
                 Err(e) => not_found_or_500(&e, "read"),
             },
         },
@@ -131,7 +152,11 @@ pub fn handle_fs(root: &Path, req: &Req, token: &str, allow_write: bool, origin:
                 },
             }
         }
-        _ => Resp::text(404, "Not Found", format!("no such bridge op: {} {op}", req.method)),
+        _ => Resp::text(
+            404,
+            "Not Found",
+            format!("no such bridge op: {} {op}", req.method),
+        ),
     }
 }
 
@@ -159,7 +184,13 @@ fn list_dir(dir: &Path) -> std::io::Result<String> {
     });
     let items: Vec<String> = entries
         .iter()
-        .map(|(name, is_dir)| format!("{{\"name\":{},\"kind\":\"{}\"}}", json_str(name), if *is_dir { "dir" } else { "file" }))
+        .map(|(name, is_dir)| {
+            format!(
+                "{{\"name\":{},\"kind\":\"{}\"}}",
+                json_str(name),
+                if *is_dir { "dir" } else { "file" }
+            )
+        })
         .collect();
     Ok(format!("[{}]", items.join(",")))
 }
@@ -181,7 +212,11 @@ pub fn inject_token(html: &str, token: &str) -> String {
 /// Is this `/__fs/*` request authorized? `None` = ok; `Some(reason)` = a 403 reason.
 /// Shared by the bridge ops and the watch stream (the watch can't return a buffered
 /// [`Resp`], so it needs the decision separately).
-pub fn fs_auth_error(headers: &BTreeMap<String, String>, token: &str, origin: Option<&str>) -> Option<&'static str> {
+pub fn fs_auth_error(
+    headers: &BTreeMap<String, String>,
+    token: &str,
+    origin: Option<&str>,
+) -> Option<&'static str> {
     if headers.get("x-fb-token").map(String::as_str) != Some(token) {
         return Some("bad or missing token");
     }
@@ -202,7 +237,9 @@ pub fn scan_mtimes(root: &Path) -> BTreeMap<String, std::time::SystemTime> {
 }
 
 fn scan_into(root: &Path, dir: &Path, out: &mut BTreeMap<String, std::time::SystemTime>) {
-    let Ok(entries) = fs::read_dir(dir) else { return };
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
     for e in entries.flatten() {
         let path = e.path();
         let Ok(ft) = e.file_type() else { continue };
@@ -240,7 +277,10 @@ pub fn diff_scans(
 
 /// One SSE `data:` frame for a change event (`data: {"path":…,"type":…}\n\n`).
 pub fn sse_change(path: &str, kind: &str) -> String {
-    format!("data: {{\"path\":{},\"type\":\"{kind}\"}}\n\n", json_str(path))
+    format!(
+        "data: {{\"path\":{},\"type\":\"{kind}\"}}\n\n",
+        json_str(path)
+    )
 }
 
 /// Parse the request head (everything before the blank line): the request line + the
@@ -361,8 +401,14 @@ mod tests {
         Req {
             method: method.into(),
             path: path.into(),
-            query: query.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
-            headers: headers.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+            query: query
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+            headers: headers
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
             body: Vec::new(),
         }
     }
@@ -370,8 +416,14 @@ mod tests {
     #[test]
     fn jail_resolves_and_rejects_escapes() {
         let root = Path::new("/srv/proj");
-        assert_eq!(jail(root, "hello.hbs"), Some(PathBuf::from("/srv/proj/hello.hbs")));
-        assert_eq!(jail(root, "./sub/a.txt"), Some(PathBuf::from("/srv/proj/sub/a.txt")));
+        assert_eq!(
+            jail(root, "hello.hbs"),
+            Some(PathBuf::from("/srv/proj/hello.hbs"))
+        );
+        assert_eq!(
+            jail(root, "./sub/a.txt"),
+            Some(PathBuf::from("/srv/proj/sub/a.txt"))
+        );
         assert_eq!(jail(root, "../../etc/passwd"), None);
         assert_eq!(jail(root, "/../etc/passwd"), None);
         assert_eq!(jail(root, "sub/../../escape"), None);
@@ -380,17 +432,64 @@ mod tests {
     #[test]
     fn a_missing_or_wrong_token_is_forbidden() {
         let root = Path::new(".");
-        assert_eq!(handle_fs(root, &req("GET", "/__fs/read", &[("path", "x")], &[]), "tok", false, None).code, 403);
-        assert_eq!(handle_fs(root, &req("GET", "/__fs/read", &[("path", "x")], &[("x-fb-token", "no")]), "tok", false, None).code, 403);
+        assert_eq!(
+            handle_fs(
+                root,
+                &req("GET", "/__fs/read", &[("path", "x")], &[]),
+                "tok",
+                false,
+                None
+            )
+            .code,
+            403
+        );
+        assert_eq!(
+            handle_fs(
+                root,
+                &req(
+                    "GET",
+                    "/__fs/read",
+                    &[("path", "x")],
+                    &[("x-fb-token", "no")]
+                ),
+                "tok",
+                false,
+                None
+            )
+            .code,
+            403
+        );
     }
 
     #[test]
     fn cross_origin_is_rejected_same_origin_allowed() {
         let dir = std::env::temp_dir();
         let server = "http://127.0.0.1:9000".to_string();
-        let bad = handle_fs(&dir, &req("GET", "/__fs/list", &[("path", ".")], &[("x-fb-token", "tok"), ("origin", "http://evil.test")]), "tok", false, Some(&server));
+        let bad = handle_fs(
+            &dir,
+            &req(
+                "GET",
+                "/__fs/list",
+                &[("path", ".")],
+                &[("x-fb-token", "tok"), ("origin", "http://evil.test")],
+            ),
+            "tok",
+            false,
+            Some(&server),
+        );
         assert_eq!(bad.code, 403);
-        let good = handle_fs(&dir, &req("GET", "/__fs/list", &[("path", ".")], &[("x-fb-token", "tok"), ("origin", &server)]), "tok", false, Some(&server));
+        let good = handle_fs(
+            &dir,
+            &req(
+                "GET",
+                "/__fs/list",
+                &[("path", ".")],
+                &[("x-fb-token", "tok"), ("origin", &server)],
+            ),
+            "tok",
+            false,
+            Some(&server),
+        );
         assert_eq!(good.code, 200);
     }
 
@@ -400,20 +499,56 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join("hello.hbs"), "Hi {{name}}").unwrap();
 
-        let read = handle_fs(&dir, &req("GET", "/__fs/read", &[("path", "hello.hbs")], &[("x-fb-token", "t")]), "t", false, None);
+        let read = handle_fs(
+            &dir,
+            &req(
+                "GET",
+                "/__fs/read",
+                &[("path", "hello.hbs")],
+                &[("x-fb-token", "t")],
+            ),
+            "t",
+            false,
+            None,
+        );
         assert_eq!(read.code, 200);
         assert_eq!(String::from_utf8(read.body).unwrap(), "Hi {{name}}");
 
-        let list = handle_fs(&dir, &req("GET", "/__fs/list", &[("path", ".")], &[("x-fb-token", "t")]), "t", false, None);
-        assert!(String::from_utf8(list.body).unwrap().contains("\"hello.hbs\""));
+        let list = handle_fs(
+            &dir,
+            &req(
+                "GET",
+                "/__fs/list",
+                &[("path", ".")],
+                &[("x-fb-token", "t")],
+            ),
+            "t",
+            false,
+            None,
+        );
+        assert!(
+            String::from_utf8(list.body)
+                .unwrap()
+                .contains("\"hello.hbs\"")
+        );
 
         // write forbidden read-only, allowed under --write, still jailed.
-        let mut w = req("POST", "/__fs/write", &[("path", "new.txt")], &[("x-fb-token", "t")]);
+        let mut w = req(
+            "POST",
+            "/__fs/write",
+            &[("path", "new.txt")],
+            &[("x-fb-token", "t")],
+        );
         w.body = b"written".to_vec();
         assert_eq!(handle_fs(&dir, &w, "t", false, None).code, 403);
         assert_eq!(handle_fs(&dir, &w, "t", true, None).code, 200);
         assert_eq!(fs::read_to_string(dir.join("new.txt")).unwrap(), "written");
-        let mut esc = req("POST", "/__fs/write", &[("path", "../escape.txt")], &[("x-fb-token", "t")]);
+        let mut esc = req(
+            "POST",
+            "/__fs/write",
+            &[("path", "../escape.txt")],
+            &[("x-fb-token", "t")],
+        );
         esc.body = b"x".to_vec();
         assert_eq!(handle_fs(&dir, &esc, "t", true, None).code, 403);
 
@@ -452,9 +587,15 @@ mod tests {
         h.insert("x-fb-token".into(), "tok".into());
         assert_eq!(fs_auth_error(&h, "tok", None), None);
         h.insert("origin".into(), "http://evil.test".into());
-        assert_eq!(fs_auth_error(&h, "tok", Some("http://127.0.0.1:9000")), Some("cross-origin"));
+        assert_eq!(
+            fs_auth_error(&h, "tok", Some("http://127.0.0.1:9000")),
+            Some("cross-origin")
+        );
         h.insert("origin".into(), "http://127.0.0.1:9000".into());
-        assert_eq!(fs_auth_error(&h, "tok", Some("http://127.0.0.1:9000")), None);
+        assert_eq!(
+            fs_auth_error(&h, "tok", Some("http://127.0.0.1:9000")),
+            None
+        );
     }
 
     #[test]
@@ -474,13 +615,19 @@ mod tests {
         // Remove a file → a "rename".
         fs::remove_file(dir.join("a.hbs")).unwrap();
         let snap3 = scan_mtimes(&dir);
-        assert_eq!(diff_scans(&snap2, &snap3), vec![("a.hbs".to_string(), "rename")]);
+        assert_eq!(
+            diff_scans(&snap2, &snap3),
+            vec![("a.hbs".to_string(), "rename")]
+        );
 
         fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
     fn sse_change_is_a_valid_frame() {
-        assert_eq!(sse_change("sub/x.hbs", "change"), "data: {\"path\":\"sub/x.hbs\",\"type\":\"change\"}\n\n");
+        assert_eq!(
+            sse_change("sub/x.hbs", "change"),
+            "data: {\"path\":\"sub/x.hbs\",\"type\":\"change\"}\n\n"
+        );
     }
 }

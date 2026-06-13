@@ -16,8 +16,8 @@ use std::thread;
 use std::time::Duration;
 
 use trussbars_lab::{
-    diff_scans, fs_auth_error, handle_fs, inject_token, jail, make_token, mime_for, parse_head,
-    scan_mtimes, split_target, sse_change, Req, Resp,
+    Req, Resp, diff_scans, fs_auth_error, handle_fs, inject_token, jail, make_token, mime_for,
+    parse_head, scan_mtimes, split_target, sse_change,
 };
 
 fn main() {
@@ -60,9 +60,16 @@ fn main() {
     eprintln!(
         "  FS bridge   /__fs/*  jailed to {}  ({})",
         project.display(),
-        if allow_write { "read+write" } else { "read-only" }
+        if allow_write {
+            "read+write"
+        } else {
+            "read-only"
+        }
     );
-    eprintln!("  session token: {}…  (injected as window.__FB_TOKEN)", &token[..8.min(token.len())]);
+    eprintln!(
+        "  session token: {}…  (injected as window.__FB_TOKEN)",
+        &token[..8.min(token.len())]
+    );
     eprintln!("  bound to 127.0.0.1 only · Ctrl-C to stop");
 
     for stream in listener.incoming() {
@@ -76,7 +83,14 @@ fn main() {
     }
 }
 
-fn serve(mut stream: TcpStream, project: &Path, lab_root: &Path, token: &str, allow_write: bool, port: u16) -> std::io::Result<()> {
+fn serve(
+    mut stream: TcpStream,
+    project: &Path,
+    lab_root: &Path,
+    token: &str,
+    allow_write: bool,
+    port: u16,
+) -> std::io::Result<()> {
     // Read until the header terminator, then any declared body.
     let mut buf = Vec::new();
     let mut chunk = [0u8; 8192];
@@ -90,7 +104,10 @@ fn serve(mut stream: TcpStream, project: &Path, lab_root: &Path, token: &str, al
             break i;
         }
         if buf.len() > 64 * 1024 {
-            return write_resp(&mut stream, &Resp::text(431, "Request Header Fields Too Large", "header too large"));
+            return write_resp(
+                &mut stream,
+                &Resp::text(431, "Request Header Fields Too Large", "header too large"),
+            );
         }
     };
     let head = String::from_utf8_lossy(&buf[..head_end]).into_owned();
@@ -104,14 +121,20 @@ fn serve(mut stream: TcpStream, project: &Path, lab_root: &Path, token: &str, al
     if path == "/__fs/watch" {
         let origin = format!("http://127.0.0.1:{port}");
         if let Some(reason) = fs_auth_error(&headers, token, Some(&origin)) {
-            return write_resp(&mut stream, &Resp::text(403, "Forbidden", format!("forbidden: {reason}")));
+            return write_resp(
+                &mut stream,
+                &Resp::text(403, "Forbidden", format!("forbidden: {reason}")),
+            );
         }
         return watch_stream(stream, project);
     }
 
     // Read the body (Content-Length) for writes.
     let mut body = buf[head_end + 4..].to_vec();
-    if let Some(len) = headers.get("content-length").and_then(|v| v.parse::<usize>().ok()) {
+    if let Some(len) = headers
+        .get("content-length")
+        .and_then(|v| v.parse::<usize>().ok())
+    {
         while body.len() < len {
             let n = stream.read(&mut chunk)?;
             if n == 0 {
@@ -122,7 +145,18 @@ fn serve(mut stream: TcpStream, project: &Path, lab_root: &Path, token: &str, al
         body.truncate(len);
     }
 
-    let resp = route(&method, &path, query, headers, body, project, lab_root, token, allow_write, port);
+    let resp = route(
+        &method,
+        &path,
+        query,
+        headers,
+        body,
+        project,
+        lab_root,
+        token,
+        allow_write,
+        port,
+    );
     write_resp(&mut stream, &resp)
 }
 
@@ -140,7 +174,13 @@ fn route(
     port: u16,
 ) -> Resp {
     if path.starts_with("/__fs/") {
-        let req = Req { method: method.into(), path: path.into(), query, headers, body };
+        let req = Req {
+            method: method.into(),
+            path: path.into(),
+            query,
+            headers,
+            body,
+        };
         let origin = format!("http://127.0.0.1:{port}");
         return handle_fs(project, &req, token, allow_write, Some(&origin));
     }
@@ -149,19 +189,36 @@ fn route(
     }
     // `/` → the Lab.
     if path == "/" {
-        return Resp { code: 301, reason: "Moved Permanently", ctype: "text/plain; charset=utf-8", body: b"/lab/".to_vec() };
+        return Resp {
+            code: 301,
+            reason: "Moved Permanently",
+            ctype: "text/plain; charset=utf-8",
+            body: b"/lab/".to_vec(),
+        };
     }
     // The Lab index — token-injected so the in-page provider can authenticate.
     if (path == "/lab/" || path == "/lab/index.html")
         && let Ok(html) = std::fs::read_to_string(lab_root.join("index.html"))
     {
-        return Resp { code: 200, reason: "OK", ctype: "text/html; charset=utf-8", body: inject_token(&html, token).into_bytes() };
+        return Resp {
+            code: 200,
+            reason: "OK",
+            ctype: "text/html; charset=utf-8",
+            body: inject_token(&html, token).into_bytes(),
+        };
     }
     // Static assets under the lab root (strip the `/lab/` mount prefix).
-    let rel = path.strip_prefix("/lab/").unwrap_or(path.trim_start_matches('/'));
+    let rel = path
+        .strip_prefix("/lab/")
+        .unwrap_or(path.trim_start_matches('/'));
     match jail(lab_root, rel) {
         Some(abs) => match std::fs::read(&abs) {
-            Ok(bytes) => Resp { code: 200, reason: "OK", ctype: mime_for(path), body: bytes },
+            Ok(bytes) => Resp {
+                code: 200,
+                reason: "OK",
+                ctype: mime_for(path),
+                body: bytes,
+            },
             Err(_) => Resp::text(404, "Not Found", format!("404 not found: {path}")),
         },
         None => Resp::text(403, "Forbidden", "forbidden"),
